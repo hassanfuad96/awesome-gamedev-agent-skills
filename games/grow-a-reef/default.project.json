@@ -1,0 +1,57 @@
+{
+  "name": "GrowAReef",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Shared": {
+        "$path": "src/shared"
+      },
+      "Remotes": {
+        "$className": "Folder",
+        "SelectSeed": {
+          "$className": "RemoteEvent"
+        },
+        "BuySeed": {
+          "$className": "RemoteEvent"
+        },
+        "ExpandReef": {
+          "$className": "RemoteEvent"
+        },
+        "RequestSync": {
+          "$className": "RemoteEvent"
+        },
+        "DataSync": {
+          "$className": "RemoteEvent"
+        },
+        "ShopSync": {
+          "$className": "RemoteEvent"
+        },
+        "Notify": {
+          "$className": "RemoteEvent"
+        }
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "$properties": {
+        "Gravity": 70
+      }
+    }
+  }
+}
