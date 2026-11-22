@@ -62,7 +62,7 @@ stored as a timestamp, so coral keeps growing while you're offline.
    `rojo serve` and press **Connect** in the Rojo plugin instead.
 3. **Max players: 6.** There are six reefs. In Studio, File → Game Settings → Places, set
    *Max Players* to 6 (more players than reefs get kicked with a "server is full" message).
-4. **Saving.** Publish the place (File → Publish to Roblox), then turn on File → Game Settings →
+3. **Saving.** Publish the place (File → Publish to Roblox), then turn on File → Game Settings →
    Security → *Enable Studio Access to API Services*. Use a test place for this, because Studio
    reads and writes the same live data your players use. Without it the game still runs in Studio,
    but progress isn't saved (Output shows a warning).
@@ -117,22 +117,32 @@ To change the economy with the pacing calculator, see
 
 ## Test checklist
 
-None of this has been run in Studio yet. The code was written and reviewed outside Studio, and
-Rojo, Luau type checking and play tests weren't available there. Please run these and report
-anything in Output:
+**Checked outside Studio** (Rojo 7.7.1, Lune 0.11.1, on 2026-11-22):
 
-1. **Build:** `rojo build default.project.json -o GrowAReef.rbxlx` succeeds.
-2. **Solo Play:** you spawn at your reef. Buy kelp, plant it, watch it grow, harvest it, sell it,
+```bash
+rojo build default.project.json -o GrowAReef.rbxlx   # builds
+lune run tests/compile_check.luau src                # all 17 scripts compile
+lune run tests/check_place.luau GrowAReef.rbxlx      # 35 checks pass
+```
+
+`check_place` confirms that the remotes exist, that each script has the right class and every
+`require` points at a real module, and it runs the config and economy maths (sell values,
+expand prices, mutation odds over 200,000 rolls).
+
+**Not checked yet:** Roblox engine behaviour (parts, UI, DataStores, ClickDetectors) only runs
+inside Studio. Please run these and report anything in Output:
+
+1. **Solo Play:** you spawn at your reef. Buy kelp, plant it, watch it grow, harvest it, sell it,
    then check that the Shells number changes. Click a growing coral (you should see a countdown
    message) and a locked tile (you should see the "Expand" message).
-3. **Fish:** leave grown coral on the reef for about a minute; fish should appear and be
+2. **Fish:** leave grown coral on the reef for about a minute; fish should appear and be
    catchable.
-4. **Saving (published test place with API access):** earn shells, stop, play again. The shells,
+3. **Saving (published test place with API access):** earn shells, stop, play again. The shells,
    seeds, bag and planted coral should all be back, and coral should have kept growing.
-5. **Server & Clients with 2 players** (Test tab): each gets their own reef; clicking the other
+4. **Server & Clients with 2 players** (Test tab): each gets their own reef; clicking the other
    reef says it's theirs. To test currents quickly, set `Current.interval = 20` and raise the
    Glowing weight, then check that a mutation crosses to the other reef.
-6. **Phone:** Device Simulator, check the hotbar and shop fit and can be tapped.
+5. **Phone:** Device Simulator, check the hotbar and shop fit and can be tapped.
 
 ## Known limits and next steps
 
