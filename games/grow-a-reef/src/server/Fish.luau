@@ -11,6 +11,8 @@ local EconomyMath = require(ReplicatedStorage.Shared.EconomyMath)
 local PlayerData = require(script.Parent.PlayerData)
 local Plots = require(script.Parent.Plots)
 local EventState = require(script.Parent.EventState)
+local Pets = require(script.Parent.Pets)
+local ReefIndex = require(script.Parent.ReefIndex)
 local RateLimit = require(script.Parent.RateLimit)
 
 local Fish = {}
@@ -99,8 +101,8 @@ local function spawnFish(player: Player, coral: Plots.ReadyCoral)
 	local fishKind = kind :: ReefConfig.FishDef
 
 	local seed = ReefConfig.Seeds[coral.seed]
-	local mutation = ReefConfig.MutationById[coral.mutation]
-	local value = math.max(1, math.floor(seed.sellValue * ReefConfig.Fish.valueFraction * fishKind.multiplier * mutation.multiplier))
+	local mutations = ReefConfig.mutationMultiplier(coral.mutation)
+	local value = math.max(1, math.floor(seed.sellValue * ReefConfig.Fish.valueFraction * fishKind.multiplier * mutations))
 
 	local home = coral.position
 	local function randomPoint(): Vector3
@@ -131,9 +133,12 @@ local function spawnFish(player: Player, coral: Plots.ReadyCoral)
 			return
 		end
 		caught = true
-		PlayerData.addShells(clicker, value)
+		-- A pufferfish makes the catch worth more.
+		local earned = math.floor(value * Pets.fishMultiplier(clicker))
+		PlayerData.addShells(clicker, earned)
 		profile.data.fishCaught += 1
-		Plots.notify(clicker, `Caught a {fishKind.id}! +{EconomyMath.formatNumber(value)} shells`, if fishKind.multiplier >= 4 then "rare" else "good")
+		Plots.notify(clicker, `Caught a {fishKind.id}! +{EconomyMath.formatNumber(earned)} shells`, if fishKind.multiplier >= 4 then "rare" else "good")
+		ReefIndex.discoverFish(clicker, profile, fishKind.id)
 		PlayerData.sync(clicker)
 		despawn(clicker, model)
 	end)

@@ -17,7 +17,13 @@ local RateLimit = require(script.Parent.RateLimit)
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 -- A planted coral. x and z are studs from the plot centre.
+-- mutation is a mutation key: "None", "Golden" or "Glowing+Golden" (ReefConfig.mutationParts).
 export type Plant = { seed: string, plantedAt: number, mutation: string, x: number, z: number }
+
+export type Pet = { species: string, golden: boolean }
+
+-- What the player has found, by Reef Index entry, and the sets already paid out.
+export type IndexBook = { coral: { [string]: true }, fish: { [string]: true }, sets: { [string]: true } }
 
 export type Data = {
 	version: number,
@@ -30,6 +36,10 @@ export type Data = {
 	totalEarned: number,
 	harvested: number,
 	fishCaught: number,
+	index: IndexBook,
+	pets: { [string]: Pet }, -- keyed by pet id
+	petSeq: number, -- the last pet id handed out
+	equipped: { string }, -- pet ids, at most ReefConfig.Pets.maxEquipped
 }
 
 export type Profile = {
@@ -72,7 +82,24 @@ local function defaultData(): Data
 		totalEarned = 0,
 		harvested = 0,
 		fishCaught = 0,
+		index = { coral = {}, fish = {}, sets = {} },
+		pets = {},
+		petSeq = 0,
+		equipped = {},
 	}
+end
+
+-- Copies the keys of a saved set that pass `valid`, as a fresh { [key]: true }.
+local function cleanKeySet(raw: any, valid: (string) -> boolean): { [string]: true }
+	local clean = {}
+	if type(raw) == "table" then
+		for key, value in raw do
+			if type(key) == "string" and value == true and valid(key) then
+				clean[key] = true
+			end
+		end
+	end
+	return clean
 end
 
 -- Repairs anything malformed instead of erroring, so old or edited saves still load.
@@ -108,7 +135,7 @@ local function sanitize(raw: any): Data
 		for key, count in raw.inventory do
 			if type(key) == "string" then
 				local seedId, mutationId = ReefConfig.splitInventoryKey(key)
-				if seedId and mutationId and ReefConfig.Seeds[seedId] and ReefConfig.MutationById[mutationId] then
+				if seedId and mutationId and ReefConfig.Seeds[seedId] and ReefConfig.isMutationKey(mutationId) then
 					local clean = EconomyMath.sanitizeAmount(count)
 					if clean > 0 then
 						data.inventory[key] = clean
@@ -128,7 +155,7 @@ local function sanitize(raw: any): Data
 			or type(saved.seed) ~= "string"
 			or not ReefConfig.Seeds[saved.seed]
 			or type(saved.mutation) ~= "string"
-			or not ReefConfig.MutationById[saved.mutation]
+			or not ReefConfig.isMutationKey(saved.mutation)
 			or type(x) ~= "number"
 			or type(z) ~= "number"
 			or not (x * x + z * z <= bedRadius * bedRadius) -- also false for NaN
@@ -166,6 +193,60 @@ local function sanitize(raw: any): Data
 				local column = (index - 1) % 4 + 1
 				local row = (index - 1) // 4 + 1
 				addPlant(index, tile, (column - 2.5) * 8 * 0.7, (row - 2) * 8 * 0.7)
+			end
+		end
+	end
+
+	local index = if type(raw.index) == "table" then raw.index else {}
+	data.index.coral = cleanKeySet(index.coral, function(key)
+		local seedId, mutationKey = ReefConfig.splitInventoryKey(key)
+		return seedId ~= nil and ReefConfig.Seeds[seedId] ~= nil and ReefConfig.isMutationKey(mutationKey)
+	end)
+	local fishKinds = {}
+	for _, kind in ReefConfig.Fish.kinds do
+		fishKinds[kind.id] = true
+	end
+	data.index.fish = cleanKeySet(index.fish, function(id)
+		return fishKinds[id] == true
+	end)
+	local setIds = {}
+	for _, set in ReefConfig.IndexSets do
+		setIds[set.id] = true
+	end
+	data.index.sets = cleanKeySet(index.sets, function(id)
+		return setIds[id] == true
+	end)
+
+	data.petSeq = math.min(EconomyMath.sanitizeAmount(raw.petSeq), 1e6)
+	local petCount = 0
+	if type(raw.pets) == "table" then
+		for key, pet in raw.pets do
+			local id = tonumber(key)
+			if
+				petCount < ReefConfig.Pets.maxOwned
+				and id
+				and id == math.floor(id)
+				and id >= 1
+				and id <= 1e6
+				and type(pet) == "table"
+				and type(pet.species) == "string"
+				and ReefConfig.Pets.species[pet.species]
+			then
+				data.pets[tostring(id)] = { species = pet.species, golden = pet.golden == true }
+				data.petSeq = math.max(data.petSeq, id)
+				petCount += 1
+			end
+		end
+	end
+	if type(raw.equipped) == "table" then
+		for _, petId in raw.equipped do
+			if
+				#data.equipped < ReefConfig.Pets.maxEquipped
+				and type(petId) == "string"
+				and data.pets[petId]
+				and not table.find(data.equipped, petId)
+			then
+				table.insert(data.equipped, petId)
 			end
 		end
 	end
@@ -383,6 +464,9 @@ function PlayerData.sync(player: Player)
 		expandCost = if data.unlocked < ReefConfig.MAX_SLOTS then ReefConfig.expandCost(data.unlocked) else nil,
 		selected = profile.selected,
 		fishCaught = data.fishCaught,
+		index = data.index,
+		pets = data.pets,
+		equipped = data.equipped,
 	})
 end
 

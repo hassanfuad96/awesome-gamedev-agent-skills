@@ -6,7 +6,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
-local CoralVisuals = require(script.Parent.CoralVisuals)
+local CoralVisuals = require(ReplicatedStorage.Shared.CoralVisuals)
 
 local SeabedDecor = {}
 

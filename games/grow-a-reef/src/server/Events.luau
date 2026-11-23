@@ -127,6 +127,13 @@ end
 function Events.start(worldParts: World.WorldParts)
 	TreasureStorm.start()
 	local stream = worldParts.currentStream
+	local streamColor = stream.Color
+	-- Night darkens the sea and, while it lasts, grown coral can turn Shadow.
+	local night = nightLighting(worldParts)
+	night.every = SETTINGS.mutationTick
+	night.tick = function()
+		Plots.mutateAll("Shadow", SETTINGS.shadowChance)
+	end
 	local handlers: { [string]: Handler } = {
 		Current = {
 			start = function()
@@ -138,7 +145,21 @@ function Events.start(worldParts: World.WorldParts)
 			every = ReefConfig.Current.tick,
 			tick = Currents.spreadOnce,
 		},
-		Night = nightLighting(worldParts),
+		Cold = {
+			start = function()
+				stream.Color = ColorSequence.new(Color3.fromRGB(235, 250, 255))
+				stream.Enabled = true
+			end,
+			stop = function()
+				stream.Enabled = false
+				stream.Color = streamColor
+			end,
+			every = SETTINGS.mutationTick,
+			tick = function()
+				Plots.mutateAll("Frosted", SETTINGS.frostChance)
+			end,
+		},
+		Night = night,
 		Frenzy = {}, -- Fish reads EventState.fishSpawnMultiplier()
 		Treasure = { every = SETTINGS.treasure.every, tick = TreasureStorm.dropChest },
 		Whale = {

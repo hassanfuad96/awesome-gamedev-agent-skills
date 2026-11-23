@@ -21,6 +21,15 @@
         "PlantAt": {
           "$className": "RemoteEvent"
         },
+        "BuyEgg": {
+          "$className": "RemoteEvent"
+        },
+        "EquipPet": {
+          "$className": "RemoteEvent"
+        },
+        "ReleasePet": {
+          "$className": "RemoteEvent"
+        },
         "RequestSync": {
           "$className": "RemoteEvent"
         },

@@ -2,7 +2,8 @@
 
 A Roblox farming game set underwater. Plant coral seeds on your reef, wait for them to grow,
 harvest them and sell them for shells. Grown coral attracts fish you can catch for extra shells.
-Ocean currents carry rare mutations from one player's reef to the next.
+Coral can carry two mutations at once, sea events and currents add new ones, a Reef Index
+tracks every coral and fish you find, and pets hatched from eggs follow you and help out.
 
 Written in Luau as a [Rojo](https://rojo.space) project, following the Roblox skills in this
 repository (`skills/other-engines/roblox-*`).
@@ -17,6 +18,8 @@ repository (`skills/other-engines/roblox-*`).
 | Sell | Walk to **Sell Coral** (orange stand) and press the prompt. Everything in your bag sells. |
 | Catch fish | Fish swim around grown coral on your reef. Click them before they swim off. |
 | Grow your reef | You start with 6 coral slots. In the Seed Shop, "Grow your reef" adds a slot (up to 12) and widens your bed. |
+| Reef Index | Press **Index** on the left. Every coral in every mutation combo, and every fish. |
+| Pets | Hatch eggs at the **Pet Hatchery** (purple stand), then take pets out from **Pets** on the left. |
 
 The whole map is underwater: deep-blue haze instead of sky, a glowing surface with light shafts
 far overhead, kelp forests, coral clusters, starfish and urchins on the seabed, and drifting
@@ -30,15 +33,19 @@ names and lines are in `ReefConfig.Shopkeepers`.
 
 ### Mutations and sea events
 
-When a seed is planted it can sprout with a mutation that multiplies its sell value:
+A coral can hold **two mutations**, and their multipliers multiply: Glowing + Golden sells at
+x10, Prismatic + Shadow at x60. When a seed is planted it can sprout with one:
 
-| Mutation | Chance | Value |
+| Mutation | Where it comes from | Value |
 |---|---|---|
-| Glowing | 7.5% | x2 |
-| Golden | 2.2% | x5 |
-| Prismatic | 0.3% | x15 |
+| Glowing | 7.5% when planted (3x during Bioluminescent Night) | x2 |
+| Golden | 2.2% when planted | x5 |
+| Prismatic | 0.3% when planted | x15 |
+| Frosted | grown coral during a Cold Current | x3 |
+| Shadow | grown coral during a Bioluminescent Night | x4 |
 
-Fish caught near mutated coral are worth more as well.
+The second mutation comes from sea events, or from a neighbour's coral through an Ocean
+Current. Fish caught near mutated coral are worth more as well.
 
 Every 3 minutes a **sea event** starts for everyone on the server. It is picked at random and
 never the same twice in a row. The timer under your shells counts down to the next one, then
@@ -46,11 +53,44 @@ shows the event running.
 
 | Event | Length | What happens |
 |---|---|---|
-| Ocean Current | 40 s | A grown mutated coral can copy its mutation onto an un-mutated coral on the next player's reef downstream (the last reef wraps around to the first). |
-| Bioluminescent Night | 75 s | The sea goes dark so glowing things stand out, and Glowing mutations are 3x as likely on coral planted now. |
+| Ocean Current | 40 s | One mutation from a grown coral can drift onto a coral on the next player's reef downstream that has room for it, stacking with what it has (the last reef wraps around to the first). |
+| Cold Current | 45 s | Grown coral can turn Frosted (x3). |
+| Bioluminescent Night | 75 s | The sea goes dark so glowing things stand out. Glowing is 3x as likely on coral planted now, and grown coral can turn Shadow (x4). |
 | Feeding Frenzy | 60 s | Fish come to grown coral twice as fast. |
 | Treasure Storm | 40 s | Chests sink onto the plaza and reefs. Anyone can hold E (or tap) to open one for 30-200 shells, or sometimes rare seeds. Unopened chests wash away after 45 s. |
 | Whale Pass | 50 s | A giant whale crosses overhead, and all coral grows twice as fast while it's there. |
+
+### Reef Index
+
+The **Index** button opens a collection book of every seed in all 16 mutation combinations
+and every fish, 100 entries in all. Entries you haven't found are black silhouettes. Harvesting
+a coral or catching a fish records it. Completing a seed's set pays 10x that seed's sell value
+(180 shells for Bubble Kelp, up to 320,000 for Starlight Coral) and the fish set pays 1,000.
+To also award a badge, create it on the Creator Dashboard and put its id in
+`ReefConfig.Index.badges` under the set id.
+
+### Pets
+
+Eggs are sold at the **Pet Hatchery** for shells, and every outcome's odds are shown before
+you buy:
+
+| Egg | Price | Seahorse | Pufferfish | Octopus |
+|---|---|---|---|---|
+| Reef Egg | 750 | 50% | 35% | 15% |
+| Abyss Egg | 6,000 | 30% | 30% | 40% |
+
+Any pet has a 4% chance to hatch **Golden**, which doubles its perk.
+
+| Pet | Perk (Golden) |
+|---|---|
+| Seahorse | Coral grows 25% faster (50%) |
+| Octopus | Harvests a grown coral every minute (30 s) |
+| Pufferfish | Fish you catch are worth 50% more (double) |
+
+Take out up to 2 pets at once; they swim beside you, and everyone sees them. Two of the same
+kind don't add up. You can keep 24 and release one for 100 shells (1,000 if Golden). Eggs cost
+shells only. If they are ever sold for Robux, Roblox's paid random items rules apply: read that
+section of `skills/other-engines/roblox-simulator-economy/SKILL.md` first.
 
 ### Seeds
 
@@ -92,7 +132,8 @@ stored as a timestamp, so coral keeps growing while you're offline.
 ```
 default.project.json        Rojo mapping; also creates the RemoteEvents and sets Gravity = 70
 src/shared/                 -> ReplicatedStorage.Shared
-  ReefConfig.luau           every tunable number: seeds, mutations, fish, sea events, prices
+  ReefConfig.luau           every tunable number: seeds, mutations, fish, sea events, index, pets
+  CoralVisuals.luau         coral models made from Parts, plus mutation effects (server and Index)
   EconomyMath.luau          copied unchanged from skills/other-engines/roblox-simulator-economy
 src/server/                 -> ServerScriptService.Server
   Main.server.luau          starts everything in order
@@ -101,7 +142,8 @@ src/server/                 -> ServerScriptService.Server
   SeabedDecor.luau          kelp forests, coral clusters, starfish and urchins
   PlayerData.luau           DataStore load/save with a session lock, data repair, leaderstats
   Plots.luau                plot assignment, free planting (PlantAt), growth, harvesting
-  CoralVisuals.luau         coral models made from Parts, plus mutation effects
+  ReefIndex.luau            Reef Index finds and set rewards
+  Pets.luau                 eggs, taking pets out, releasing, and the pet perks
   ShopkeeperVisuals.luau    the shopkeeper models made from Parts, tagged "Shopkeeper"
   Shop.luau                 shared stock, buying, expanding, seed selection, selling
   Fish.luau                 fish spawning, swimming and catching
@@ -115,7 +157,11 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   Main.client.luau          connects remotes and UI
   OceanEffects.luau         marine snow around the camera, bubbles from divers
   CoralLabels.luau          name and growth countdown over each coral
-  Hud.luau                  shells, bag, sea-event timer, toasts, seed hotbar
+  Hud.luau                  shells, bag, sea-event timer, toasts, seed hotbar, Index/Pets buttons
+  IndexPanel.luau           the Reef Index window (3D entries, silhouettes, set progress)
+  PetPanel.luau             the Pets window (eggs with odds, your pets)
+  PetVisuals.luau           pet models made from Parts
+  PetFollowers.luau         everyone's pets swimming beside them (client only)
   Planter.luau              placement preview ring and click/tap to plant
   SeaLife.luau              fish schools, turtles, jellyfish, manta ray, crabs (client only)
   ShopPanel.luau            seed shop window
@@ -131,7 +177,8 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   reach, spaced from other coral and inside a free slot, using the same `plantProblem` rules the
   client preview uses. Harvesting and fish catching use `ClickDetector.MouseClick`, which fires
   on the server with the real player.
-- Buying and expanding check that the player is standing at the Seed Shop.
+- Buying and expanding check that the player is standing at the Seed Shop; eggs, at the Pet
+  Hatchery. The server rolls every egg from the same odds list the window shows.
 - Every request goes through a per-player rate limit.
 - Saves use `UpdateAsync` with a session lease, so two servers can't overwrite each other's
   progress during a fast rejoin. Loaded data is repaired (bad numbers, unknown seeds, coral
@@ -155,8 +202,8 @@ To change the economy with the pacing calculator, see
 
 ```bash
 rojo build default.project.json -o GrowAReef.rbxlx   # builds
-lune run tests/compile_check.luau src                # all 23 scripts compile
-lune run tests/check_place.luau GrowAReef.rbxlx      # 103 checks pass
+lune run tests/compile_check.luau src                # all 32 scripts compile
+lune run tests/check_place.luau GrowAReef.rbxlx      # 182 checks pass
 ```
 
 `check_place` confirms that the remotes exist, that each script has the right class and every
@@ -168,11 +215,15 @@ below with the free-planting reef (mouse planting with the green and red preview
 too-close and edge refusals, harvesting, fish), and the shopkeepers turning, bobbing and
 greeting. All five sea events were started with item 6 and checked: their timer and banner, the
 night lighting fading out and back, chests landing and paying out, the whale crossing with
-coral growing at 2x, and the current's stream. Growing the reef widened the bed. Output showed
-no game errors, only the expected DataStore warning. Item 5 was checked before the reef
-redesign. Not yet checked: tap-to-plant on a phone, the Glowing odds at night and the fish
-rate in a frenzy (both random, so they need many tries), and items 3 and 4, which need a
-published place and two clients.
+coral growing at 2x, and the current's stream. Growing the reef widened the bed. Also checked:
+a Cold Current turning grown kelp Frosted and a Night stacking Shadow on top (Frosted + Shadow,
+x12, also on the fish it attracts); the Reef Index recording harvests and catches; hatching
+eggs at the Pet Hatchery (shells charged, odds shown), taking pets out (the third refused),
+the Seahorse (1.25x growth), Octopus (harvest within a minute) and Pufferfish (x1.5 catch)
+perks, and releasing. Output showed no game errors, only the expected DataStore warning.
+Item 5 was checked before the reef redesign. Not yet checked: tap-to-plant on a phone, the
+random odds over many tries, a mutation drifting between two players' reefs, completing an
+Index set, and items 3 and 4, which need a published place and two clients.
 
 Roblox engine behaviour (parts, UI, DataStores, ClickDetectors) only runs inside Studio.
 After changes, run these and check Output:

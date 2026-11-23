@@ -58,16 +58,15 @@ local function refresh(coral: Model, label: Label, now: number)
 	end
 	local plot = coral.Parent
 	local mine = plot ~= nil and plot:GetAttribute("OwnerUserId") == Players.LocalPlayer.UserId
-	local mutation = ReefConfig.MutationById[coral:GetAttribute("Mutation")]
+	local mutationKey = coral:GetAttribute("Mutation")
+	if not ReefConfig.isMutationKey(mutationKey) then
+		mutationKey = "None"
+	end
+	local first = ReefConfig.MutationById[ReefConfig.mutationParts(mutationKey)[1]]
 	local readyAt = coral:GetAttribute("ReadyAt")
 	label.gui.Enabled = true
-	if mutation and mutation.id ~= "None" then
-		label.title.Text = `{mutation.id} {seed.name}`
-		label.title.TextColor3 = mutation.color or Ui.Colors.rare
-	else
-		label.title.Text = seed.name
-		label.title.TextColor3 = Ui.Colors.text
-	end
+	label.title.Text = ReefConfig.displayName(coral:GetAttribute("Seed"), mutationKey)
+	label.title.TextColor3 = if first then first.color or Ui.Colors.rare else Ui.Colors.text
 	if type(readyAt) == "number" and readyAt > now then
 		label.status.Text = Ui.formatTime(readyAt - now)
 		label.status.TextColor3 = Ui.Colors.muted

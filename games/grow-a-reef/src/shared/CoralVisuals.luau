@@ -1,6 +1,7 @@
 --!nonstrict
 -- Builds a coral Model out of plain Parts at full size. The model's pivot is the
--- centre of its base, so Model:ScaleTo() grows it up out of the tile.
+-- centre of its base, so Model:ScaleTo() grows it up out of the reef bed. Shared so the
+-- server plants it and the client can draw it in the Reef Index.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -77,35 +78,45 @@ local builders: { [string]: (Model, CFrame, Color3) -> () } = {
 	end,
 }
 
-local function applyMutation(model: Model, mutationId: string)
-	local mutation = ReefConfig.MutationById[mutationId]
-	if not mutation or mutationId == "None" then
+-- Surface materials some mutations give; with two, the later one in the key wins.
+local MATERIALS = {
+	Golden = Enum.Material.Foil,
+	Frosted = Enum.Material.Ice,
+}
+
+-- Tints the coral for each mutation in its key: the first sets the colour, a second shades it.
+local function applyMutations(model: Model, mutationKey: string)
+	local parts = ReefConfig.mutationParts(mutationKey)
+	if #parts == 0 then
 		return
 	end
 	local root = model.PrimaryPart
-	for _, child in model:GetChildren() do
-		if child:IsA("BasePart") and child ~= root and mutation.color then
-			child.Color = (child.Color :: Color3):Lerp(mutation.color, 0.75)
-			if mutationId == "Golden" then
-				child.Material = Enum.Material.Foil
+	for index, mutationId in parts do
+		local mutation = ReefConfig.MutationById[mutationId]
+		for _, child in model:GetChildren() do
+			if child:IsA("BasePart") and child ~= root and mutation and mutation.color then
+				child.Color = (child.Color :: Color3):Lerp(mutation.color, if index == 1 then 0.75 else 0.45)
+				child.Material = MATERIALS[mutationId] or child.Material
 			end
 		end
 	end
 	if root then
+		local first = ReefConfig.MutationById[parts[1]]
+		local prismatic = table.find(parts, "Prismatic") ~= nil
 		local light = Instance.new("PointLight")
-		light.Color = mutation.color or Color3.new(1, 1, 1)
-		light.Range = if mutationId == "Prismatic" then 14 else 9
+		light.Color = first.color or Color3.new(1, 1, 1)
+		light.Range = if prismatic or #parts > 1 then 14 else 9
 		light.Brightness = 2
 		light.Parent = root
-		if mutationId == "Prismatic" then
+		if prismatic then
 			local sparkles = Instance.new("Sparkles")
-			sparkles.SparkleColor = mutation.color or Color3.new(1, 1, 1)
+			sparkles.SparkleColor = ReefConfig.MutationById.Prismatic.color or Color3.new(1, 1, 1)
 			sparkles.Parent = root
 		end
 	end
 end
 
-function CoralVisuals.build(seedId: string, mutationId: string, base: CFrame): Model
+function CoralVisuals.build(seedId: string, mutationKey: string, base: CFrame): Model
 	local seed = ReefConfig.Seeds[seedId]
 	local model = Instance.new("Model")
 	model.Name = "Coral"
@@ -126,9 +137,9 @@ function CoralVisuals.build(seedId: string, mutationId: string, base: CFrame): M
 	if seed and build then
 		build(model, base, seed.color)
 	end
-	applyMutation(model, mutationId)
+	applyMutations(model, mutationKey)
 	model:SetAttribute("Seed", seedId)
-	model:SetAttribute("Mutation", mutationId)
+	model:SetAttribute("Mutation", mutationKey)
 	return model
 end
 

@@ -12,9 +12,10 @@ local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
 local EconomyMath = require(ReplicatedStorage.Shared.EconomyMath)
 local World = require(script.Parent.World)
 local PlayerData = require(script.Parent.PlayerData)
-local CoralVisuals = require(script.Parent.CoralVisuals)
+local CoralVisuals = require(ReplicatedStorage.Shared.CoralVisuals)
 local RateLimit = require(script.Parent.RateLimit)
 local EventState = require(script.Parent.EventState)
+local ReefIndex = require(script.Parent.ReefIndex)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 
@@ -41,12 +42,7 @@ local function notify(player: Player, text: string, tone: string?)
 end
 Plots.notify = notify
 
-local function displayName(seedId: string, mutationId: string): string
-	local seed = ReefConfig.Seeds[seedId]
-	local name = if seed then seed.name else seedId
-	return if mutationId == "None" then name else mutationId .. " " .. name
-end
-Plots.displayName = displayName
+local displayName = ReefConfig.displayName
 
 local function growthOf(plant: Plant): number
 	local seed = ReefConfig.Seeds[plant.seed]
@@ -152,14 +148,17 @@ local function plant(player: Player, profile: Profile, plot: PlotParts, x: numbe
 	PlayerData.sync(player)
 end
 
-local function harvest(player: Player, profile: Profile, plot: PlotParts, plantId: string, grown: Plant)
+-- `by` names a pet that harvested for the player ("Your Octopus").
+local function harvest(player: Player, profile: Profile, plot: PlotParts, plantId: string, grown: Plant, by: string?)
 	profile.data.plants[plantId] = nil
 	local key = ReefConfig.inventoryKey(grown.seed, grown.mutation)
 	profile.data.inventory[key] = (profile.data.inventory[key] or 0) + 1
 	profile.data.harvested += 1
 	setCoral(player, plot, plantId, nil)
 	local value = ReefConfig.harvestValue(grown.seed, grown.mutation)
-	notify(player, `+1 {displayName(grown.seed, grown.mutation)} (sells for {EconomyMath.formatNumber(value)} shells)`, "good")
+	local what = if by then `{by} harvested a` else "+1"
+	notify(player, `{what} {displayName(grown.seed, grown.mutation)} (sells for {EconomyMath.formatNumber(value)} shells)`, "good")
+	ReefIndex.discoverCoral(player, profile, grown.seed, grown.mutation)
 	PlayerData.sync(player)
 end
 
@@ -316,27 +315,28 @@ function Plots.readyCorals(player: Player): { ReadyCoral }
 	return result
 end
 
--- Planted coral without a mutation, grown or not (currents can mutate these).
-function Plots.unmutatedPlants(player: Player): { string }
+-- Planted coral, grown or not, that could still take this mutation (currents use it).
+function Plots.plantsAccepting(player: Player, mutationId: string): { string }
 	local result: { string } = {}
 	local profile = PlayerData.get(player)
 	if not profile then
 		return result
 	end
 	for plantId, growing in profile.data.plants do
-		if growing.mutation == "None" then
+		if ReefConfig.withMutation(growing.mutation, mutationId) then
 			table.insert(result, plantId)
 		end
 	end
 	return result
 end
 
--- Whale Pass: every growing coral counts as planted `seconds` earlier, so it grows faster.
--- Shifting the saved planting time keeps growth a plain timestamp, offline included.
-function Plots.boostGrowth(seconds: number)
+-- Every growing coral counts as planted `seconds` earlier, so it grows faster: for
+-- everyone (Whale Pass) or for one player (a seahorse). Shifting the saved planting time
+-- keeps growth a plain timestamp, offline included.
+function Plots.boostGrowth(seconds: number, only: Player?)
 	for player, models in coralModels do
 		local profile = PlayerData.get(player)
-		if profile then
+		if profile and (not only or player == only) then
 			for plantId, growing in profile.data.plants do
 				local seed = ReefConfig.Seeds[growing.seed]
 				if seed and growthOf(growing) < 1 then
@@ -351,19 +351,57 @@ function Plots.boostGrowth(seconds: number)
 	end
 end
 
-function Plots.setMutation(player: Player, plantId: string, mutationId: string): boolean
+-- Adds one mutation to a planted coral. Returns the coral's new mutation key, or nil when
+-- it can't take that mutation (it has it already, or it's full).
+function Plots.addMutation(player: Player, plantId: string, mutationId: string): string?
 	local profile = PlayerData.get(player)
 	local plot = plotByPlayer[player]
-	if not profile or not plot or not ReefConfig.MutationById[mutationId] then
-		return false
+	local target = profile and profile.data.plants[plantId]
+	if not plot or not target then
+		return nil
 	end
-	local target = profile.data.plants[plantId]
-	if not target then
-		return false
+	local key = ReefConfig.withMutation(target.mutation, mutationId)
+	if not key then
+		return nil
 	end
-	target.mutation = mutationId
+	target.mutation = key
 	setCoral(player, plot, plantId, target)
-	return true
+	return key
+end
+
+-- Sea events (Cold Current, Night): each fully grown coral on every reef takes the
+-- mutation with this chance, if it has room for it.
+function Plots.mutateAll(mutationId: string, chance: number)
+	for player in coralModels do
+		local profile = PlayerData.get(player)
+		if profile then
+			for plantId, growing in profile.data.plants do
+				if growthOf(growing) >= 1 and rng:NextNumber() < chance then
+					local key = Plots.addMutation(player, plantId, mutationId)
+					if key then
+						local multiplier = ReefConfig.mutationMultiplier(key)
+						notify(player, `Your coral turned {mutationId}: {displayName(growing.seed, key)} (x{multiplier})!`, "rare")
+					end
+				end
+			end
+		end
+	end
+end
+
+-- Harvests one fully grown coral for a pet. Returns false when none is ready.
+function Plots.harvestOne(player: Player, by: string): boolean
+	local profile = PlayerData.get(player)
+	local plot = plotByPlayer[player]
+	if not profile or not plot then
+		return false
+	end
+	for plantId, growing in profile.data.plants do
+		if growthOf(growing) >= 1 then
+			harvest(player, profile, plot, plantId, growing, by)
+			return true
+		end
+	end
+	return false
 end
 
 function Plots.start(worldParts: World.WorldParts)

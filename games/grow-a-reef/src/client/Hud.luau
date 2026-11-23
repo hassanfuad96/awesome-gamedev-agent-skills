@@ -35,7 +35,8 @@ local TONE_COLORS = {
 	bad = Ui.Colors.bad,
 }
 
-function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> ()): Hud
+-- onOpen is called with "index" or "pets" when a side button is pressed.
+function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (string) -> ()): Hud
 	local gui = Ui.new("ScreenGui", {
 		Name = "ReefHud",
 		ResetOnSpawn = false,
@@ -115,6 +116,30 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> ()): Hud
 			Padding = UDim.new(0, 4),
 		}),
 	})
+
+	-- Left edge: the Reef Index and pets, above where the touch thumbstick sits.
+	local side = Ui.new("Frame", {
+		Name = "SideButtons",
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 10, 0.5, -30),
+		Size = UDim2.fromOffset(72, 152),
+		BackgroundTransparency = 1,
+		Parent = gui,
+	}, { Ui.new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) }) })
+	for order, panel in { { id = "index", text = "Index" }, { id = "pets", text = "Pets" } } do
+		local button = Ui.button({
+			Name = panel.text,
+			LayoutOrder = order,
+			Text = panel.text,
+			Size = UDim2.fromOffset(72, 72),
+			BackgroundColor3 = Ui.Colors.panel,
+			Parent = side,
+		})
+		Ui.stroke(Ui.Colors.accent, 2).Parent = button
+		button.Activated:Connect(function()
+			onOpen(panel.id)
+		end)
+	end
 
 	-- Bottom: seed hotbar. Kept narrow so it sits between the touch thumbstick and jump button.
 	local hotbarHolder = Ui.new("Frame", {

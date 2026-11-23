@@ -12,18 +12,19 @@ local function check(cond, msg) if cond then print("ok   " .. msg) else failures
 -- 1. Place structure
 local game = roblox.deserializePlace(fs.readFile(process.args[1]))
 local rs = game:GetService("ReplicatedStorage")
-for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "RequestSync", "DataSync", "ShopSync", "Notify" } do
+for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify" } do
 	local r = rs.Remotes:FindFirstChild(name)
 	check(r and r.ClassName == "RemoteEvent", "remote " .. name)
 end
 local server = game:GetService("ServerScriptService").Server
 check(server.Main.ClassName == "Script", "server Main is a Script")
-for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "CoralVisuals", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm" } do
+for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets" } do
 	check(server:FindFirstChild(m) and server[m].ClassName == "ModuleScript", "server module " .. m)
 end
 local client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 check(client.Main.ClassName == "LocalScript", "client Main is a LocalScript")
 check(rs.Shared.ReefConfig.ClassName == "ModuleScript", "shared ReefConfig")
+check(rs.Shared:FindFirstChild("CoralVisuals") and rs.Shared.CoralVisuals.ClassName == "ModuleScript", "shared CoralVisuals")
 check(math.abs(game:GetService("Workspace").Gravity - 70) < 0.01, "Workspace.Gravity = 70")
 
 -- 2. Every require(script.Parent.X) / Shared.X points at a real sibling
@@ -75,7 +76,38 @@ for _, event in Config.Events.list do
 	check(Config.EventById[event.id] == event and event.duration > 0 and event.weight > 0, "sea event " .. event.id .. " is listed with a duration and weight")
 	table.insert(eventIds, event.id)
 end
-check(table.concat(eventIds, ",") == "Current,Night,Frenzy,Treasure,Whale", "five sea events")
+check(table.concat(eventIds, ",") == "Current,Cold,Night,Frenzy,Treasure,Whale", "six sea events")
+
+-- Stacked mutations
+check(Config.harvestValue("kelp", "Glowing+Golden") == 180, "Glowing + Golden Bubble Kelp sells at x10 (180)")
+check(Config.withMutation("Golden", "Glowing") == "Glowing+Golden", "adding Glowing to Golden gives Glowing+Golden")
+check(Config.withMutation("Glowing+Golden", "Shadow") == nil, "a coral holds at most two mutations")
+check(Config.withMutation("Golden", "Golden") == nil, "the same mutation can't stack twice")
+check(Config.withMutation("None", "Frosted") == "Frosted", "an event mutation lands on plain coral")
+check(Config.isMutationKey("Golden+Glowing") == false and Config.isMutationKey("Glowing+Golden"), "mutation keys are in alphabetical order")
+check(Config.isMutationKey("Glowing+Glowing") == false and Config.isMutationKey("Nope") == false, "bad mutation keys are rejected")
+local cs, cm = Config.splitInventoryKey(Config.inventoryKey("star", "Prismatic+Shadow"))
+check(cs == "star" and cm == "Prismatic+Shadow", "combo inventory key round trip")
+check(Config.displayName("kelp", "Glowing+Golden") == "Glowing + Golden Bubble Kelp", "combo display name")
+check(#Config.MUTATION_KEYS == 16, "16 mutation keys (none, 5 singles, 10 pairs)")
+
+-- Reef Index
+local indexEntries = 0
+for _, set in Config.IndexSets do
+	indexEntries += #set.entries
+end
+check(#Config.IndexSets == 7 and indexEntries == 100, "Reef Index: 7 sets, 100 entries")
+
+-- Pet eggs: every outcome is a real pet and the shown odds sum to 100
+for _, egg in Config.Pets.eggs do
+	local eggOdds = Econ.oddsPercent(egg.odds)
+	local sum = 0
+	for id, percent in eggOdds do
+		check(Config.Pets.species[id] ~= nil, "egg " .. egg.id .. " outcome " .. id .. " is a pet")
+		sum += percent
+	end
+	check(math.abs(sum - 100) < 1e-9 and egg.price > 0, "egg " .. egg.id .. " odds sum to 100")
+end
 for _, entry in Config.Events.treasure.seeds do
 	check(Config.Seeds[entry.id] ~= nil and entry.count >= 1, "treasure seed " .. entry.id .. " exists")
 end

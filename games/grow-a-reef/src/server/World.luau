@@ -28,6 +28,7 @@ export type WorldParts = {
 	plots: { PlotParts },
 	shopStand: BasePart,
 	sellStand: BasePart,
+	hatcheryStand: BasePart,
 	boardList: Frame,
 	currentStream: ParticleEmitter,
 	surface: BasePart,
@@ -343,14 +344,15 @@ local function buildBoard(parent: Instance): Frame
 	local board = part({
 		Name = "TopReefsBoard",
 		Size = Vector3.new(20, 14, 1),
-		Position = Vector3.new(0, 9, -42),
+		-- Behind the Pet Hatchery and raised, so its roof doesn't hide the board.
+		Position = Vector3.new(0, 12, -52),
 		Color = Color3.fromRGB(30, 60, 90),
 		Parent = parent,
 	})
 	part({
 		Name = "BoardPost",
-		Size = Vector3.new(1.5, 4, 1.5),
-		Position = Vector3.new(0, 1, -42),
+		Size = Vector3.new(1.5, 5, 1.5),
+		Position = Vector3.new(0, 2.5, -52),
 		Color = ROCK,
 		Parent = parent,
 	})
@@ -445,6 +447,7 @@ function World.build(): WorldParts
 	ShopkeeperVisuals.build("SeedShop", shopStand.CFrame * behindCounter * facePlayers).Parent = shopStand.Parent
 	local onCounter = CFrame.new(4.5, sellStand.Size.Y / 2, 0)
 	ShopkeeperVisuals.build("Sell", sellStand.CFrame * onCounter * facePlayers).Parent = sellStand.Parent
+	local hatcheryStand = stand(root, "PetHatchery", Vector3.new(0, 0, -26), Color3.fromRGB(150, 95, 220), "Pet Hatchery", "Hatchery", "Hatch eggs")
 	local boardList = buildBoard(root)
 
 	local plotsFolder = Instance.new("Folder")
@@ -489,6 +492,7 @@ function World.build(): WorldParts
 		plots = plots,
 		shopStand = shopStand,
 		sellStand = sellStand,
+		hatcheryStand = hatcheryStand,
 		boardList = boardList,
 		currentStream = stream,
 		surface = surface,

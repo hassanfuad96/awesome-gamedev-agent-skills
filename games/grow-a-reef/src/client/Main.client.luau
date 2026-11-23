@@ -9,7 +9,10 @@ local RunService = game:GetService("RunService")
 
 local CoralLabels = require(script.Parent.CoralLabels)
 local Hud = require(script.Parent.Hud)
+local IndexPanel = require(script.Parent.IndexPanel)
 local OceanEffects = require(script.Parent.OceanEffects)
+local PetFollowers = require(script.Parent.PetFollowers)
+local PetPanel = require(script.Parent.PetPanel)
 local Planter = require(script.Parent.Planter)
 local SeaLife = require(script.Parent.SeaLife)
 local ShopPanel = require(script.Parent.ShopPanel)
@@ -19,8 +22,15 @@ local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui") :: PlayerGui
 
+local index = IndexPanel.new(playerGui)
+local pets = PetPanel.new(playerGui)
 local hud = Hud.new(playerGui, function(seedId: string?)
 	Remotes.SelectSeed:FireServer(seedId)
+end, function(panel: string)
+	-- The side buttons toggle their window; only one big window is open at a time.
+	local opening = if panel == "index" then not index.gui.Enabled else not pets.gui.Enabled
+	index:setOpen(panel == "index" and opening)
+	pets:setOpen(panel == "pets" and opening)
 end)
 local shop = ShopPanel.new(playerGui)
 
@@ -31,6 +41,8 @@ Remotes.DataSync.OnClientEvent:Connect(function(data)
 	hud:setData(data)
 	shop:setData(data)
 	Planter.setData(data)
+	index:setData(data)
+	pets:setData(data)
 end)
 
 Remotes.ShopSync.OnClientEvent:Connect(function(payload)
@@ -49,8 +61,12 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, triggeredBy)
 	if triggeredBy ~= player then
 		return
 	end
-	if prompt:GetAttribute("Kind") == "SeedShop" then
+	local kind = prompt:GetAttribute("Kind")
+	if kind == "SeedShop" then
 		shop:setOpen(true, prompt.Parent :: BasePart)
+	elseif kind == "Hatchery" then
+		index:setOpen(false)
+		pets:setOpen(true, prompt.Parent :: BasePart)
 	end
 end)
 
@@ -63,6 +79,7 @@ RunService.Heartbeat:Connect(function(dt)
 	elapsed = 0
 	hud:updateTimers()
 	shop:update()
+	pets:update()
 end)
 
 CoralLabels.start(playerGui)
@@ -70,6 +87,7 @@ Planter.start()
 Shopkeepers.start(playerGui)
 SeaLife.start()
 OceanEffects.start()
+PetFollowers.start()
 
 -- Ask for a snapshot in case DataSync fired before these handlers connected.
 Remotes.RequestSync:FireServer()

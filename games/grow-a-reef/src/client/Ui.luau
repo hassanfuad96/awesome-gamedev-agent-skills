@@ -89,6 +89,29 @@ function Ui.button(props: { [string]: any }): TextButton
 	return button
 end
 
+-- A ViewportFrame showing `model` (it takes the model), with the camera framing it.
+function Ui.viewport(props: { [string]: any }, model: Model): ViewportFrame
+	local defaults = {
+		BackgroundTransparency = 1,
+		Ambient = Color3.fromRGB(170, 180, 200),
+		LightColor = Color3.fromRGB(255, 250, 240),
+		LightDirection = Vector3.new(-1, -1, -0.6),
+	}
+	for key, value in props do
+		defaults[key] = value
+	end
+	local frame = Ui.new("ViewportFrame", defaults)
+	local camera = Instance.new("Camera")
+	camera.FieldOfView = 30
+	camera.Parent = frame
+	frame.CurrentCamera = camera
+	model.Parent = frame
+	local center, size = model:GetBoundingBox()
+	local distance = (size.Magnitude / 2) / math.tan(math.rad(camera.FieldOfView / 2)) * 1.05
+	camera.CFrame = CFrame.new(center.Position) * CFrame.Angles(0, math.rad(25), 0) * CFrame.Angles(math.rad(-15), 0, 0) * CFrame.new(0, 0, distance)
+	return frame
+end
+
 function Ui.formatTime(seconds: number): string
 	local s = math.max(0, math.ceil(seconds))
 	if s >= 60 then

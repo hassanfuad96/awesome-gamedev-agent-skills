@@ -31,20 +31,27 @@ function Currents.spreadOnce()
 	end
 	for i, source in owners do
 		if rng:NextNumber() < ReefConfig.Current.spreadChance then
-			local mutated = {}
+			-- One mutation at a time drifts across, onto a coral that can still take it, so
+			-- a neighbour's Golden can stack onto your Glowing.
+			local target = owners[i % #owners + 1]
+			local offers = {}
 			for _, coral in Plots.readyCorals(source) do
-				if coral.mutation ~= "None" then
-					table.insert(mutated, coral)
+				for _, mutationId in ReefConfig.mutationParts(coral.mutation) do
+					local takers = Plots.plantsAccepting(target, mutationId)
+					if #takers > 0 then
+						table.insert(offers, { mutationId = mutationId, takers = takers })
+					end
 				end
 			end
-			local target = owners[i % #owners + 1]
-			local candidates = Plots.unmutatedPlants(target)
-			if #mutated > 0 and #candidates > 0 then
-				local from = mutated[rng:NextInteger(1, #mutated)]
-				local plantId = candidates[rng:NextInteger(1, #candidates)]
-				if Plots.setMutation(target, plantId, from.mutation) then
-					Plots.notify(target, `The current carried a {from.mutation} mutation from {source.DisplayName}'s reef onto your coral!`, "rare")
-					Plots.notify(source, `Your {from.mutation} coral drifted onto {target.DisplayName}'s reef.`)
+			if #offers > 0 then
+				local offer = offers[rng:NextInteger(1, #offers)]
+				local plantId = offer.takers[rng:NextInteger(1, #offer.takers)]
+				local key = Plots.addMutation(target, plantId, offer.mutationId)
+				if key then
+					local label = table.concat(ReefConfig.mutationParts(key), " + ")
+					local multiplier = ReefConfig.mutationMultiplier(key)
+					Plots.notify(target, `The current carried {offer.mutationId} from {source.DisplayName}'s reef onto your coral! It's now {label} (x{multiplier}).`, "rare")
+					Plots.notify(source, `Your {offer.mutationId} drifted onto {target.DisplayName}'s reef.`)
 				end
 			end
 		end

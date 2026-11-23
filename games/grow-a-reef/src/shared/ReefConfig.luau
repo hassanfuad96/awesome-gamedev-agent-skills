@@ -36,7 +36,7 @@ export type ShopkeeperDef = {
 
 local ReefConfig = {}
 
-ReefConfig.DATA_VERSION = 2 -- 2: coral planted anywhere in a round bed (1 used a tile grid)
+ReefConfig.DATA_VERSION = 3 -- 3: stacked mutations, Reef Index, pets; 2: free planting; 1: tile grid
 ReefConfig.STARTING_SHELLS = 40
 ReefConfig.STARTING_SEEDS = { kelp = 3 } :: { [string]: number }
 ReefConfig.MAX_SEEDS_PER_TYPE = 999
@@ -84,8 +84,10 @@ ReefConfig.Seeds = {
 	},
 } :: { [string]: SeedDef }
 
--- Rolled once when a seed is planted. Currents can later copy a mutation onto
--- a neighbour's un-mutated coral.
+-- A coral can hold up to MAX_MUTATIONS mutations at once, and their multipliers multiply
+-- ("Glowing + Golden" sells at x10). One is rolled from this table when a seed is planted;
+-- sea events and currents add more later.
+ReefConfig.MAX_MUTATIONS = 2
 ReefConfig.Mutations = {
 	{ id = "None", weight = 900, multiplier = 1 },
 	{ id = "Glowing", weight = 75, multiplier = 2, color = Color3.fromRGB(120, 255, 200) },
@@ -93,9 +95,21 @@ ReefConfig.Mutations = {
 	{ id = "Prismatic", weight = 3, multiplier = 15, color = Color3.fromRGB(255, 120, 255) },
 } :: { MutationDef }
 
+-- Never rolled at planting; only sea events give these (Cold Current, Bioluminescent Night).
+ReefConfig.EventMutations = {
+	{ id = "Frosted", weight = 0, multiplier = 3, color = Color3.fromRGB(175, 230, 255) },
+	{ id = "Shadow", weight = 0, multiplier = 4, color = Color3.fromRGB(110, 60, 180) },
+} :: { MutationDef }
+
 ReefConfig.MutationById = {} :: { [string]: MutationDef }
-for _, mutation in ReefConfig.Mutations do
-	ReefConfig.MutationById[mutation.id] = mutation
+ReefConfig.MUTATION_ORDER = {} :: { string } -- every real mutation, in display order
+for _, list in { ReefConfig.Mutations, ReefConfig.EventMutations } do
+	for _, mutation in list do
+		ReefConfig.MutationById[mutation.id] = mutation
+		if mutation.id ~= "None" then
+			table.insert(ReefConfig.MUTATION_ORDER, mutation.id)
+		end
+	end
 end
 
 ReefConfig.RESTOCK_SECONDS = 300
@@ -121,14 +135,19 @@ ReefConfig.Events = {
 	interval = 180, -- seconds from the end of one event to the start of the next
 	list = {
 		{
-			id = "Current", name = "Ocean Current", weight = 30, duration = 40,
+			id = "Current", name = "Ocean Current", weight = 25, duration = 40,
 			color = Color3.fromRGB(110, 200, 255),
 			message = "An ocean current is flowing! Mutations can drift between reefs.",
 		},
 		{
+			id = "Cold", name = "Cold Current", weight = 15, duration = 45,
+			color = Color3.fromRGB(175, 230, 255),
+			message = "A cold current is flowing! Grown coral can turn Frosted (x3).",
+		},
+		{
 			id = "Night", name = "Bioluminescent Night", weight = 20, duration = 75,
 			color = Color3.fromRGB(120, 255, 220),
-			message = "Bioluminescent Night! The sea goes dark, and Glowing mutations are 3x as likely. Plant now!",
+			message = "Bioluminescent Night! Glowing is 3x as likely when you plant, and grown coral can turn Shadow (x4).",
 		},
 		{
 			id = "Frenzy", name = "Feeding Frenzy", weight = 20, duration = 60,
@@ -136,12 +155,12 @@ ReefConfig.Events = {
 			message = "Feeding Frenzy! Fish come to your coral twice as fast.",
 		},
 		{
-			id = "Treasure", name = "Treasure Storm", weight = 15, duration = 40,
+			id = "Treasure", name = "Treasure Storm", weight = 10, duration = 40,
 			color = Color3.fromRGB(255, 205, 80),
 			message = "Treasure Storm! Chests are sinking from the surface. Open them for shells and seeds!",
 		},
 		{
-			id = "Whale", name = "Whale Pass", weight = 15, duration = 50,
+			id = "Whale", name = "Whale Pass", weight = 10, duration = 50,
 			color = Color3.fromRGB(150, 190, 255),
 			message = "A giant whale is passing overhead! Coral grows twice as fast while it's here.",
 		},
@@ -149,6 +168,9 @@ ReefConfig.Events = {
 	glowingMultiplier = 3, -- Bioluminescent Night: Glowing mutation weight x this
 	fishSpawnMultiplier = 2, -- Feeding Frenzy: fish spawn clock runs this much faster
 	growthMultiplier = 2, -- Whale Pass: coral grows this much faster
+	mutationTick = 6, -- seconds between event mutation rolls (Cold Current, Night)
+	frostChance = 0.1, -- Cold Current: chance per roll that a grown coral turns Frosted
+	shadowChance = 0.05, -- Bioluminescent Night: chance per roll that a grown coral turns Shadow
 	treasure = {
 		every = 3, -- seconds between chests during a storm
 		lifetime = 45, -- seconds before an unopened chest washes away
@@ -262,22 +284,168 @@ function ReefConfig.plantProblem(x: number, z: number, unlocked: number, plants:
 	return nil
 end
 
-function ReefConfig.harvestValue(seedId: string, mutationId: string): number
-	local seed = ReefConfig.Seeds[seedId]
-	local mutation = ReefConfig.MutationById[mutationId]
-	if not seed or not mutation then
-		return 0
-	end
-	return math.floor(seed.sellValue * mutation.multiplier)
+-- A coral's mutations are one key: "None", one id ("Golden"), or ids joined with "+" in
+-- alphabetical order ("Glowing+Golden"). The bag and the Reef Index use the same key.
+function ReefConfig.mutationParts(key: string): { string }
+	return if key == "None" then {} else string.split(key, "+")
 end
 
-function ReefConfig.inventoryKey(seedId: string, mutationId: string): string
-	return seedId .. ":" .. mutationId
+function ReefConfig.mutationKey(parts: { string }): string
+	if #parts == 0 then
+		return "None"
+	end
+	local sorted = table.clone(parts)
+	table.sort(sorted)
+	return table.concat(sorted, "+")
+end
+
+-- "None", or 1 to MAX_MUTATIONS different real mutations in alphabetical order.
+function ReefConfig.isMutationKey(key: unknown): boolean
+	if type(key) ~= "string" then
+		return false
+	end
+	if key == "None" then
+		return true
+	end
+	local parts = string.split(key, "+")
+	if #parts > ReefConfig.MAX_MUTATIONS then
+		return false
+	end
+	for i, id in parts do
+		if id == "None" or not ReefConfig.MutationById[id] or (i > 1 and parts[i - 1] >= id) then
+			return false
+		end
+	end
+	return true
+end
+
+-- The key with one more mutation, or nil when it already has it or has no room.
+function ReefConfig.withMutation(key: string, mutationId: string): string?
+	local parts = ReefConfig.mutationParts(key)
+	if not ReefConfig.MutationById[mutationId] or mutationId == "None" or #parts >= ReefConfig.MAX_MUTATIONS then
+		return nil
+	end
+	if table.find(parts, mutationId) then
+		return nil
+	end
+	table.insert(parts, mutationId)
+	return ReefConfig.mutationKey(parts)
+end
+
+-- Sell multiplier of a key (the mutations' multipliers multiplied), 0 if the key is invalid.
+function ReefConfig.mutationMultiplier(key: string): number
+	if not ReefConfig.isMutationKey(key) then
+		return 0
+	end
+	local total = 1
+	for _, id in ReefConfig.mutationParts(key) do
+		total *= ReefConfig.MutationById[id].multiplier
+	end
+	return total
+end
+
+-- "Glowing + Golden Bubble Kelp"; just the seed name with no mutations.
+function ReefConfig.displayName(seedId: string, key: string): string
+	local seed = ReefConfig.Seeds[seedId]
+	local name = if seed then seed.name else seedId
+	local parts = ReefConfig.mutationParts(key)
+	return if #parts == 0 then name else table.concat(parts, " + ") .. " " .. name
+end
+
+function ReefConfig.harvestValue(seedId: string, mutationKey: string): number
+	local seed = ReefConfig.Seeds[seedId]
+	if not seed then
+		return 0
+	end
+	return math.floor(seed.sellValue * ReefConfig.mutationMultiplier(mutationKey))
+end
+
+function ReefConfig.inventoryKey(seedId: string, mutationKey: string): string
+	return seedId .. ":" .. mutationKey
 end
 
 function ReefConfig.splitInventoryKey(key: string): (string?, string?)
-	local seedId, mutationId = string.match(key, "^(%w+):(%w+)$")
-	return seedId, mutationId
+	local seedId, mutationKey = string.match(key, "^(%w+):([%w%+]+)$")
+	return seedId, mutationKey
+end
+
+-- Every mutation key, in Reef Index order: none, each single mutation, then each pair.
+ReefConfig.MUTATION_KEYS = { "None" } :: { string }
+for _, id in ReefConfig.MUTATION_ORDER do
+	table.insert(ReefConfig.MUTATION_KEYS, id)
+end
+for i, first in ReefConfig.MUTATION_ORDER do
+	for j = i + 1, #ReefConfig.MUTATION_ORDER do
+		table.insert(ReefConfig.MUTATION_KEYS, ReefConfig.mutationKey({ first, ReefConfig.MUTATION_ORDER[j] }))
+	end
+end
+
+export type IndexSet = { id: string, name: string, kind: string, entries: { string }, reward: number }
+
+-- The Reef Index: one set per seed (every mutation key of it) and one set of every fish.
+-- Completing a set pays its reward once; badges are optional (create the badge on the
+-- Creator Dashboard, then put its id here under the set id, e.g. kelp = 123456).
+ReefConfig.Index = {
+	setRewardPerSellValue = 10, -- a seed's set pays that seed's sell value x this
+	fishSetReward = 1000,
+	badges = {} :: { [string]: number },
+}
+ReefConfig.IndexSets = {} :: { IndexSet }
+for _, seedId in ReefConfig.SEED_ORDER do
+	local entries = {}
+	for _, key in ReefConfig.MUTATION_KEYS do
+		table.insert(entries, ReefConfig.inventoryKey(seedId, key))
+	end
+	local seed = ReefConfig.Seeds[seedId]
+	table.insert(ReefConfig.IndexSets, {
+		id = seedId,
+		name = seed.name,
+		kind = "coral",
+		entries = entries,
+		reward = seed.sellValue * ReefConfig.Index.setRewardPerSellValue,
+	})
+end
+do
+	local fishIds = {}
+	for _, kind in ReefConfig.Fish.kinds do
+		table.insert(fishIds, kind.id)
+	end
+	table.insert(ReefConfig.IndexSets, { id = "fish", name = "Fish", kind = "fish", entries = fishIds, reward = ReefConfig.Index.fishSetReward })
+end
+
+export type PetDef = { id: string, name: string, perk: string, goldenPerk: string, color: Color3 }
+export type EggDef = { id: string, name: string, price: number, color: Color3, odds: { { id: string, weight: number } } }
+
+-- Pets hatch from eggs bought with shells at the Pet Hatchery. Golden pets have double
+-- perks. Eggs cost shells only; if they are ever sold for Robux, read the paid random
+-- items section of skills/other-engines/roblox-simulator-economy first.
+ReefConfig.Pets = {
+	maxOwned = 24,
+	maxEquipped = 2, -- the same kind twice gives no extra perk
+	goldenChance = 0.04,
+	releaseShells = { normal = 100, golden = 1000 },
+	growthBonus = 0.25, -- seahorse: coral grows this much faster (golden: twice this)
+	harvestEvery = 60, -- octopus: seconds between harvests (golden: half this)
+	fishBonus = 0.5, -- pufferfish: fish worth this much more (golden: twice this)
+	species = {
+		seahorse = { id = "seahorse", name = "Seahorse", color = Color3.fromRGB(255, 160, 70), perk = "Coral grows 25% faster", goldenPerk = "Coral grows 50% faster" },
+		octopus = { id = "octopus", name = "Octopus", color = Color3.fromRGB(200, 90, 160), perk = "Harvests a grown coral every minute", goldenPerk = "Harvests a grown coral every 30 s" },
+		pufferfish = { id = "pufferfish", name = "Pufferfish", color = Color3.fromRGB(240, 210, 90), perk = "Fish you catch are worth 50% more", goldenPerk = "Fish you catch are worth double" },
+	} :: { [string]: PetDef },
+	eggs = {
+		{
+			id = "reef", name = "Reef Egg", price = 750, color = Color3.fromRGB(120, 200, 230),
+			odds = { { id = "seahorse", weight = 50 }, { id = "pufferfish", weight = 35 }, { id = "octopus", weight = 15 } },
+		},
+		{
+			id = "abyss", name = "Abyss Egg", price = 6000, color = Color3.fromRGB(90, 60, 160),
+			odds = { { id = "seahorse", weight = 30 }, { id = "pufferfish", weight = 30 }, { id = "octopus", weight = 40 } },
+		},
+	} :: { EggDef },
+}
+ReefConfig.EggById = {} :: { [string]: EggDef }
+for _, egg in ReefConfig.Pets.eggs do
+	ReefConfig.EggById[egg.id] = egg
 end
 
 return ReefConfig
