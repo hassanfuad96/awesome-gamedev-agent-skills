@@ -18,6 +18,10 @@ repository (`skills/other-engines/roblox-*`).
 | Catch fish | Fish swim around grown coral on your reef. Click them before they swim off. |
 | Grow your reef | In the Seed Shop, "Unlock a reef tile" adds one of 6 locked tiles. |
 
+Each stand has a shopkeeper: Captain Coralie, a diver behind the Seed Shop counter, and Pinch,
+a crab on the Sell Coral counter. They turn to face you and greet you when you walk up. Their
+names and lines are in `ReefConfig.Shopkeepers`.
+
 ### Mutations and currents
 
 When a seed is planted it can sprout with a mutation that multiplies its sell value:
@@ -77,10 +81,11 @@ src/shared/                 -> ReplicatedStorage.Shared
   EconomyMath.luau          copied unchanged from skills/other-engines/roblox-simulator-economy
 src/server/                 -> ServerScriptService.Server
   Main.server.luau          starts everything in order
-  World.luau                builds the seabed, lighting, stands, leaderboard board and 6 plots
+  World.luau                builds the seabed, lighting, stands, shopkeepers, leaderboard board and 6 plots
   PlayerData.luau           DataStore load/save with a session lock, data repair, leaderstats
   Plots.luau                plot assignment, planting, growth, harvesting (ClickDetectors)
   CoralVisuals.luau         coral models made from Parts, plus mutation effects
+  ShopkeeperVisuals.luau    the shopkeeper models made from Parts, tagged "Shopkeeper"
   Shop.luau                 shared stock, buying, expanding, seed selection, selling
   Fish.luau                 fish spawning, swimming and catching
   Currents.luau             ocean current event and mutation spreading
@@ -90,6 +95,7 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   Main.client.luau          connects remotes and UI
   Hud.luau                  shells, bag, current timer, toasts, seed hotbar
   ShopPanel.luau            seed shop window
+  Shopkeepers.luau          shopkeeper idle animation, turning and greetings (client only)
   TileLabels.luau           growth countdowns over each tile
   Ui.luau                   shared colours and UI helpers
 ```
@@ -117,20 +123,24 @@ To change the economy with the pacing calculator, see
 
 ## Test checklist
 
-**Checked outside Studio** (Rojo 7.7.1, Lune 0.11.1, on 2026-11-22):
+**Checked outside Studio** (Rojo 7.7.1, Lune 0.11.1, on 2026-11-23):
 
 ```bash
 rojo build default.project.json -o GrowAReef.rbxlx   # builds
-lune run tests/compile_check.luau src                # all 17 scripts compile
-lune run tests/check_place.luau GrowAReef.rbxlx      # 35 checks pass
+lune run tests/compile_check.luau src                # all 19 scripts compile
+lune run tests/check_place.luau GrowAReef.rbxlx      # 87 checks pass
 ```
 
 `check_place` confirms that the remotes exist, that each script has the right class and every
 `require` points at a real module, and it runs the config and economy maths (sell values,
 expand prices, mutation odds over 200,000 rolls).
 
-**Not checked yet:** Roblox engine behaviour (parts, UI, DataStores, ClickDetectors) only runs
-inside Studio. Please run these and report anything in Output:
+**Checked in Studio** (solo Play through the Studio MCP server, on 2026-11-23): items 1, 2 and
+5 below, plus the shopkeepers turning, bobbing and greeting. Output showed no game errors, only
+the expected DataStore warning. Items 3 and 4 still need a published place and two clients.
+
+Roblox engine behaviour (parts, UI, DataStores, ClickDetectors) only runs inside Studio.
+After changes, run these and check Output:
 
 1. **Solo Play:** you spawn at your reef. Buy kelp, plant it, watch it grow, harvest it, sell it,
    then check that the Shells number changes. Click a growing coral (you should see a countdown

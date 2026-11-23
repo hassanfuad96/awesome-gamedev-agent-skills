@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 
 local Hud = require(script.Parent.Hud)
 local ShopPanel = require(script.Parent.ShopPanel)
+local Shopkeepers = require(script.Parent.Shopkeepers)
 local TileLabels = require(script.Parent.TileLabels)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -61,6 +62,7 @@ RunService.Heartbeat:Connect(function(dt)
 end)
 
 task.spawn(TileLabels.start, playerGui)
+Shopkeepers.start(playerGui)
 
 -- Ask for a snapshot in case DataSync fired before these handlers connected.
 Remotes.RequestSync:FireServer()

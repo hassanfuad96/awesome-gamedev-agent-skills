@@ -28,6 +28,12 @@ export type FishDef = {
 	color: Color3,
 }
 
+export type ShopkeeperDef = {
+	name: string,
+	bob: number, -- idle bob height in studs
+	greetings: { string },
+}
+
 local ReefConfig = {}
 
 ReefConfig.DATA_VERSION = 1
@@ -117,6 +123,34 @@ ReefConfig.Fish = {
 ReefConfig.SAVE_INTERVAL = 90
 ReefConfig.LEADERBOARD_REFRESH = 60
 ReefConfig.INTERACT_DISTANCE = 20 -- studs from a shop or sell stand
+
+-- Cosmetic shopkeepers, keyed by the stand's prompt Kind. The server builds them
+-- (ShopkeeperVisuals); each client animates them and shows a greeting on approach.
+ReefConfig.SHOPKEEPER_TAG = "Shopkeeper"
+ReefConfig.SHOPKEEPER_GREET_DISTANCE = 22 -- studs
+ReefConfig.SHOPKEEPER_GREET_COOLDOWN = 20 -- seconds before the same shopkeeper greets again
+ReefConfig.Shopkeepers = {
+	SeedShop = {
+		name = "Captain Coralie",
+		bob = 0.25,
+		greetings = {
+			"Welcome, diver! Fresh seeds, straight from the deep.",
+			"New here? Bubble Kelp grows in 20 seconds.",
+			"Rare seeds sell out fast. Come back after a restock!",
+			"Short on space? I can unlock more reef tiles for you.",
+		},
+	},
+	Sell = {
+		name = "Pinch",
+		bob = 0.12,
+		greetings = {
+			"Got coral? I'll take the whole bag!",
+			"Glowing, Golden, Prismatic... mutated coral pays more!",
+			"Fresh from the reef? Hand it over, I pay in shells.",
+			"Snip snip! Best prices on the seabed.",
+		},
+	},
+} :: { [string]: ShopkeeperDef }
 
 function ReefConfig.expandCost(unlocked: number): number
 	local extra = unlocked - ReefConfig.STARTING_TILES

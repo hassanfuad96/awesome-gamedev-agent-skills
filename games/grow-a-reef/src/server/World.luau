@@ -1,5 +1,6 @@
 --!nonstrict
--- Builds the seabed, stands, leaderboard board and the empty plots at server start.
+-- Builds the seabed, stands and their shopkeepers, leaderboard board and the empty plots
+-- at server start.
 -- Everything lives under Workspace.Reef so it is easy to find in Explorer during play;
 -- once you like the layout you can copy it out of a running session and save it into
 -- the place, then delete this module's calls.
@@ -9,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
+local ShopkeeperVisuals = require(script.Parent.ShopkeeperVisuals)
 
 export type PlotParts = {
 	index: number,
@@ -333,6 +335,13 @@ function World.build(): WorldParts
 
 	local shopStand = stand(root, "SeedShop", Vector3.new(-26, 0, -22), Color3.fromRGB(70, 170, 110), "Seed Shop", "SeedShop", "Browse seeds")
 	local sellStand = stand(root, "SellStand", Vector3.new(26, 0, -22), Color3.fromRGB(220, 140, 60), "Sell Coral", "Sell", "Sell all coral")
+	-- Shopkeepers face the play area (+Z), like the stand signs: the diver stands behind
+	-- the Seed Shop counter and the crab sits on the Sell Coral counter, off to one side.
+	local facePlayers = CFrame.Angles(0, math.pi, 0)
+	local behindCounter = CFrame.new(0, -shopStand.Size.Y / 2, -shopStand.Size.Z / 2 - 1.1)
+	ShopkeeperVisuals.build("SeedShop", shopStand.CFrame * behindCounter * facePlayers).Parent = shopStand.Parent
+	local onCounter = CFrame.new(4.5, sellStand.Size.Y / 2, 0)
+	ShopkeeperVisuals.build("Sell", sellStand.CFrame * onCounter * facePlayers).Parent = sellStand.Parent
 	local boardList = buildBoard(root)
 
 	local plotsFolder = Instance.new("Folder")
