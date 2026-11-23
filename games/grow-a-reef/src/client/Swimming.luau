@@ -11,6 +11,7 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
+local Audio = require(script.Parent.Audio)
 
 local Swimming = {}
 
@@ -88,6 +89,7 @@ local function start()
 	end
 	swimming = true
 	startedAt = os.clock()
+	Audio.play("swim")
 	-- PlatformStand hands the body over to the constraints below. A jump would end it, so
 	-- jumping is off until the swim ends; jump presses still swim up.
 	humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)

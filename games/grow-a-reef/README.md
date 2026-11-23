@@ -178,6 +178,20 @@ cost 500K, then 1.5M, 4.5M and so on (x3 each). Optional rebirth badges go in
 Every Reef Index set now also gives a title, a fence, decorations or a Golden pet
 (`ReefConfig.IndexRewards`); players who finished a set earlier get it when they next join.
 
+### Music and sound
+
+Every sound comes from the Roblox Creator Store's licensed libraries (APM Music and Pro Sound
+Effects), so they are free to use in any experience. The ids are all in `src/shared/ReefSounds.luau`;
+swap one there to change it.
+
+- **Music:** two calm underwater tracks play in turn. The Volcano Vent, Giant Octopus and Shipwreck
+  have their own tense music, and when the orcas arrive it switches to chase music. A **Music**
+  button at the top right turns the music off and on (sound effects stay).
+- **Ambience:** a soft underwater loop under everything.
+- **Effects:** planting, harvesting, selling, buying, hatching, placing decorations, upgrades,
+  rewards, rebirths, teleports, starting a swim, every sea event starting, octopus hits, treasure
+  clues, and lava rocks and the treasure chest heard where they land.
+
 ### Admins
 
 Owners and admins get a red **Admin** button on the left. Its window can:
@@ -227,6 +241,7 @@ src/shared/                 -> ReplicatedStorage.Shared
   CoralVisuals.luau         coral models made from Parts, plus mutation effects (server and Index)
   FenceVisuals.luau         reef fences made from Parts: planks, hedge, wall, ribs or crystal
   DecorVisuals.luau         the reef decorations made from Parts
+  ReefSounds.luau           every sound id: music, ambience and effects
   EconomyMath.luau          copied unchanged from skills/other-engines/roblox-simulator-economy
 src/server/                 -> ServerScriptService.Server
   Main.server.luau          starts everything in order
@@ -258,7 +273,7 @@ src/server/                 -> ServerScriptService.Server
   GiantOctopus.luau         the Giant Octopus event: hits, health and prizes
   Merchant.luau             the Mermaid Merchant event: Marina's stall and offers (BuyMerchant)
   TreasureHunt.luau         the Sunken Treasure Hunt event: burying, clues, heat, digging
-  EventVisuals.luau         the volcano, lava rock, octopus, mermaid stall and dig spot models
+  EventVisuals.luau         the volcano, lava rock, octopus, mermaid stall and dig spot models (and their sounds)
   Leaderboard.luau          global "Top Reefs" (shells earned) and "Best Reefs" (likes) boards
   RateLimit.luau            per-player token bucket for every request
 src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
@@ -268,6 +283,7 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   Hud.luau                  shells, bag, sea-event timer, toasts, seed hotbar, side and Shop/Home buttons
   SuppliesPanel.luau        the Upgrade Station window (Reef, Gear, Fences, Decor)
   MerchantPanel.luau        Marina the Mermaid Merchant's trade window
+  Audio.luau                music, ambience and sound effects (and the Music button)
   TutorialPanel.luau        the Starter Lagoon tutorial card, beam and marker
   QuestsPanel.luau          the Quests window: daily quests, rebirth, titles
   NameTags.luau             titles and rebirths over players' heads

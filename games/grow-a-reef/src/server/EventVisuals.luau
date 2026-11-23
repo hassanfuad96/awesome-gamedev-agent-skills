@@ -3,7 +3,10 @@
 -- events, made from plain Parts like the rest of the reef. Each builder returns a Model
 -- whose PrimaryPart sits at the `base` CFrame given (on the seabed, facing -Z).
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+
+local ReefSounds = require(ReplicatedStorage.Shared.ReefSounds)
 
 local EventVisuals = {}
 
@@ -146,6 +149,34 @@ function EventVisuals.burst(at: Vector3, color: Color3, count: number)
 	spot.Parent = Workspace
 	e:Emit(count)
 	task.delay(2, spot.Destroy, spot)
+end
+
+-- A one-off sound heard around a point (ReefSounds.effects[name]), cleaned up after.
+function EventVisuals.sound(at: Vector3, name: string)
+	local def = ReefSounds.effects[name]
+	if not def then
+		return
+	end
+	local spot = Instance.new("Part")
+	spot.Name = "SoundSpot"
+	spot.Anchored = true
+	spot.CanCollide = false
+	spot.CanQuery = false
+	spot.CanTouch = false
+	spot.Transparency = 1
+	spot.Size = Vector3.new(1, 1, 1)
+	spot.Position = at
+	local s = Instance.new("Sound")
+	s.SoundId = ReefSounds.assetId(def)
+	s.Volume = def.volume or 0.6
+	s.PlaybackSpeed = def.playbackSpeed or 1
+	s.RollOffMode = Enum.RollOffMode.InverseTapered
+	s.RollOffMinDistance = 15
+	s.RollOffMaxDistance = 160
+	s.Parent = spot
+	spot.Parent = Workspace
+	s:Play()
+	task.delay(6, spot.Destroy, spot)
 end
 
 -- The Giant Octopus: a huge head with big eyes and eight curling arms. Returns the model and

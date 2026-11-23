@@ -170,6 +170,7 @@ function TreasureHunt.start(onFound: (() -> ())?)
 		prompt.Enabled = false
 		EventVisuals.openChest(at).Parent = model
 		EventVisuals.burst(at + Vector3.new(0, 2, 0), GOLD, 80)
+		EventVisuals.sound(at, "dig")
 		reward(player)
 		notifyAll(`{player.DisplayName} dug up the sunken treasure!`, "rare")
 		if onFound then

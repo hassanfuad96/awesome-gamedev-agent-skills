@@ -23,11 +23,11 @@ for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leade
 end
 local client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 check(client.Main.ClassName == "LocalScript", "client Main is a LocalScript")
-for _, m in { "Swimming", "AdminPanel", "SuppliesPanel", "QuestsPanel", "NameTags", "TutorialPanel", "MerchantPanel" } do
+for _, m in { "Swimming", "AdminPanel", "SuppliesPanel", "QuestsPanel", "NameTags", "TutorialPanel", "MerchantPanel", "Audio" } do
 	check(client:FindFirstChild(m) and client[m].ClassName == "ModuleScript", "client module " .. m)
 end
 check(rs.Shared.ReefConfig.ClassName == "ModuleScript", "shared ReefConfig")
-for _, m in { "CoralVisuals", "FenceVisuals", "DecorVisuals" } do
+for _, m in { "CoralVisuals", "FenceVisuals", "DecorVisuals", "ReefSounds" } do
 	check(rs.Shared:FindFirstChild(m) and rs.Shared[m].ClassName == "ModuleScript", "shared " .. m)
 end
 check(math.abs(game:GetService("Workspace").Gravity - 70) < 0.01, "Workspace.Gravity = 70")
@@ -268,6 +268,24 @@ for _, set in Config.IndexSets do
 	check(Config.IndexRewards[set.id] ~= nil, "Index set " .. set.id .. " has a reward")
 end
 check(Config.FenceById.crystal.shop == false and Config.IndexRewards.anemone.fence == "crystal", "the Glow Crystal fence comes only from the Index")
+
+-- Sounds: every id is a real asset number, and event music belongs to real events
+local Sounds = load("src/shared/ReefSounds.luau")
+local soundDefs = { Sounds.ambience, Sounds.orcaMusic }
+for _, def in Sounds.playlist do table.insert(soundDefs, def) end
+for _, def in Sounds.eventMusic do table.insert(soundDefs, def) end
+for _, def in Sounds.effects do table.insert(soundDefs, def) end
+local soundsOk = #Sounds.playlist > 0
+for _, def in soundDefs do
+	soundsOk = soundsOk and type(def.id) == "number" and def.id > 0 and def.id % 1 == 0 and (def.volume == nil or (def.volume > 0 and def.volume <= 1))
+end
+check(soundsOk, string.format("%d sounds have asset ids and sane volumes", #soundDefs))
+for eventId in Sounds.eventMusic do
+	check(Config.EventById[eventId] ~= nil, "event music for " .. eventId .. " belongs to a real sea event")
+end
+for _, name in { "plant", "harvest", "sell", "buy", "hatch", "teleport", "swim", "place", "lava", "octopusHit", "dig", "reward", "bigReward", "eventStart", "clue" } do
+	check(Sounds.effects[name] ~= nil, "sound effect " .. name)
+end
 
 print(failures == 0 and "ALL PASSED" or (failures .. " FAILED"))
 process.exit(if failures > 0 then 1 else 0)

@@ -63,6 +63,7 @@ local function throw(target: Vector3, onLand: (() -> ())?)
 		end
 		rock:Destroy()
 		EventVisuals.burst(target + Vector3.new(0, 1, 0), MOLTEN, 30)
+		EventVisuals.sound(target, "lava")
 		if onLand then
 			onLand()
 		end
