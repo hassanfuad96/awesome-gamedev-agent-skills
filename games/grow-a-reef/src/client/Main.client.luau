@@ -6,7 +6,9 @@ local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TextChatService = game:GetService("TextChatService")
 
+local AdminPanel = require(script.Parent.AdminPanel)
 local CoralLabels = require(script.Parent.CoralLabels)
 local Hud = require(script.Parent.Hud)
 local IndexPanel = require(script.Parent.IndexPanel)
@@ -25,13 +27,16 @@ local playerGui = player:WaitForChild("PlayerGui") :: PlayerGui
 
 local index = IndexPanel.new(playerGui)
 local pets = PetPanel.new(playerGui)
+local admin = AdminPanel.new(playerGui)
+local sidePanels = { index = index, pets = pets, admin = admin }
 local hud = Hud.new(playerGui, function(seedId: string?)
 	Remotes.SelectSeed:FireServer(seedId)
 end, function(panel: string)
 	-- The side buttons toggle their window; only one big window is open at a time.
-	local opening = if panel == "index" then not index.gui.Enabled else not pets.gui.Enabled
-	index:setOpen(panel == "index" and opening)
-	pets:setOpen(panel == "pets" and opening)
+	local opening = sidePanels[panel] and not sidePanels[panel].gui.Enabled
+	for id, window in sidePanels do
+		window:setOpen(id == panel and opening)
+	end
 end, function(destination: string)
 	Remotes.Teleport:FireServer(destination)
 end)
@@ -60,6 +65,23 @@ Remotes.Notify.OnClientEvent:Connect(function(text, tone)
 	end
 end)
 
+-- Admin announcements (already filtered by the server): the banner, and a line in chat.
+Remotes.Announcement.OnClientEvent:Connect(function(from, text, global)
+	if type(from) ~= "string" or type(text) ~= "string" then
+		return
+	end
+	hud:announce(from, text, global == true)
+	local channels = TextChatService:FindFirstChild("TextChannels")
+	local general = channels and channels:FindFirstChild("RBXGeneral")
+	if general then
+		-- Chat reads rich text, so escape the message's own markup characters.
+		local safe = string.gsub(`[{from}] {text}`, "[&<>]", { ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;" })
+		pcall(function()
+			(general :: TextChannel):DisplaySystemMessage(`<font color="#FFCD50">{safe}</font>`)
+		end)
+	end
+end)
+
 Remotes.Teleported.OnClientEvent:Connect(function()
 	Swimming.stop()
 	hud:flash()
@@ -74,6 +96,7 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, triggeredBy)
 		shop:setOpen(true, prompt.Parent :: BasePart)
 	elseif kind == "Hatchery" then
 		index:setOpen(false)
+		admin:setOpen(false)
 		pets:setOpen(true, prompt.Parent :: BasePart)
 	end
 end)

@@ -171,6 +171,11 @@ local function sellAll(player: Player)
 	PlayerData.sync(player)
 end
 
+-- Restock right now (admins), which also restarts the restock timer.
+function Shop.restockNow()
+	restock()
+end
+
 function Shop.start(worldParts: World.WorldParts)
 	shopStand = worldParts.shopStand
 	sellStand = worldParts.sellStand

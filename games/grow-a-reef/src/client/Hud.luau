@@ -26,6 +26,8 @@ export type Hud = typeof(setmetatable(
 		hotbar: ScrollingFrame,
 		hint: TextLabel,
 		flashFrame: Frame,
+		banner: Frame,
+		bannerShownAt: number,
 		onSelect: (string?) -> (),
 	},
 	Hud
@@ -126,11 +128,16 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 		Name = "SideButtons",
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 10, 0.5, -30),
-		Size = UDim2.fromOffset(72, 152),
+		Size = UDim2.fromOffset(72, 232),
 		BackgroundTransparency = 1,
 		Parent = gui,
 	}, { Ui.new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) }) })
-	for order, panel in { { id = "index", text = "Index" }, { id = "pets", text = "Pets" } } do
+	local sidePanels = {
+		{ id = "index", text = "Index", color = Ui.Colors.accent },
+		{ id = "pets", text = "Pets", color = Ui.Colors.accent },
+		{ id = "admin", text = "Admin", color = Ui.Colors.bad }, -- only shown to admins
+	}
+	for order, panel in sidePanels do
 		local button = Ui.button({
 			Name = panel.text,
 			LayoutOrder = order,
@@ -139,11 +146,61 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 			BackgroundColor3 = Ui.Colors.panel,
 			Parent = side,
 		})
-		Ui.stroke(Ui.Colors.accent, 2).Parent = button
+		Ui.stroke(panel.color, 2).Parent = button
 		button.Activated:Connect(function()
 			onOpen(panel.id)
 		end)
+		if panel.id == "admin" then
+			-- The server sets IsAdmin; the server also checks every admin request itself.
+			local player = Players.LocalPlayer
+			local function refresh()
+				button.Visible = player:GetAttribute("IsAdmin") == true
+			end
+			player:GetAttributeChangedSignal("IsAdmin"):Connect(refresh)
+			refresh()
+		end
 	end
+
+	-- Admin announcements: a banner under the status bar.
+	local banner = Ui.new("Frame", {
+		Name = "Announcement",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0.3, 0),
+		Size = UDim2.new(0.7, 0, 0, 78),
+		BackgroundColor3 = Ui.Colors.panel,
+		BackgroundTransparency = 0.05,
+		Visible = false,
+		ZIndex = 5,
+		Parent = gui,
+	}, {
+		Ui.corner(12),
+		Ui.stroke(Ui.Colors.rare, 2),
+		Ui.new("UISizeConstraint", { MaxSize = Vector2.new(560, 78) }),
+	})
+	Ui.label({
+		Name = "From",
+		Text = "",
+		Font = Ui.TitleFont,
+		MaxTextSize = 18,
+		Position = UDim2.fromOffset(12, 6),
+		Size = UDim2.new(1, -24, 0, 22),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Ui.Colors.rare,
+		ZIndex = 5,
+		Parent = banner,
+	})
+	Ui.label({
+		Name = "Message",
+		Text = "",
+		MaxTextSize = 18,
+		TextWrapped = true,
+		Position = UDim2.fromOffset(12, 28),
+		Size = UDim2.new(1, -24, 1, -34),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		ZIndex = 5,
+		Parent = banner,
+	})
 
 	-- Right edge: teleports, above where the touch jump button sits.
 	local teleports = Ui.new("Frame", {
@@ -238,7 +295,7 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeStatus)
 
 	-- Smaller on phones. The hotbar keeps its share of the screen width so more seeds fit.
-	Ui.autoScale({ top, toasts, side, teleports, hotbarHolder }, function(scale)
+	Ui.autoScale({ top, toasts, side, teleports, banner, hotbarHolder }, function(scale)
 		currentScale = scale
 		hotbarHolder.Size = UDim2.new(0.55 / scale, 0, 0, 96)
 		placeStatus()
@@ -253,6 +310,8 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 		hotbar = hotbar,
 		hint = hint,
 		flashFrame = flash,
+		banner = banner,
+		bannerShownAt = 0,
 		onSelect = onSelect,
 	}, Hud)
 	return self
@@ -399,6 +458,21 @@ function Hud.toast(self: Hud, text: string, tone: string?)
 		TweenService:Create(label, info, { TextTransparency = 1 }):Play()
 		task.wait(0.45)
 		toast:Destroy()
+	end)
+end
+
+-- Shows an admin announcement for a few seconds; a newer one replaces it.
+function Hud.announce(self: Hud, from: string, text: string, global: boolean)
+	local banner = self.banner
+	banner.From.Text = if global then `{from} (all servers)` else from
+	banner.Message.Text = text
+	banner.Visible = true
+	local shownAt = os.clock()
+	self.bannerShownAt = shownAt
+	task.delay(ReefConfig.Admin.announceSeconds, function()
+		if self.bannerShownAt == shownAt then
+			banner.Visible = false
+		end
 	end)
 end
 

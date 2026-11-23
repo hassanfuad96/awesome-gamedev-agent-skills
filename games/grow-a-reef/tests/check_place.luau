@@ -12,18 +12,20 @@ local function check(cond, msg) if cond then print("ok   " .. msg) else failures
 -- 1. Place structure
 local game = roblox.deserializePlace(fs.readFile(process.args[1]))
 local rs = game:GetService("ReplicatedStorage")
-for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify", "Teleport", "Teleported" } do
+for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify", "Teleport", "Teleported", "AdminAction", "Announcement" } do
 	local r = rs.Remotes:FindFirstChild(name)
 	check(r and r.ClassName == "RemoteEvent", "remote " .. name)
 end
 local server = game:GetService("ServerScriptService").Server
 check(server.Main.ClassName == "Script", "server Main is a Script")
-for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport", "Shipwreck", "ShipwreckVisuals" } do
+for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport", "Shipwreck", "ShipwreckVisuals", "Admin" } do
 	check(server:FindFirstChild(m) and server[m].ClassName == "ModuleScript", "server module " .. m)
 end
 local client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 check(client.Main.ClassName == "LocalScript", "client Main is a LocalScript")
-check(client:FindFirstChild("Swimming") and client.Swimming.ClassName == "ModuleScript", "client module Swimming")
+for _, m in { "Swimming", "AdminPanel" } do
+	check(client:FindFirstChild(m) and client[m].ClassName == "ModuleScript", "client module " .. m)
+end
 check(rs.Shared.ReefConfig.ClassName == "ModuleScript", "shared ReefConfig")
 for _, m in { "CoralVisuals", "FenceVisuals" } do
 	check(rs.Shared:FindFirstChild(m) and rs.Shared[m].ClassName == "ModuleScript", "shared " .. m)
@@ -61,6 +63,10 @@ check(Config.plantProblem(0, 0, 10, {}) == nil, "coral fits in the middle of an 
 check(Config.plantProblem(35.6, 0, 10, {}) ~= nil and Config.plantProblem(35.4, 0, 10, {}) == nil, "coral must stay 1.5 studs inside the bed edge")
 check(Config.Swim.speed > 16 and Config.Swim.rise > 0 and Config.Swim.sink > 0, "swimming is faster than walking (16)")
 check(Config.Teleport.cooldown > 0 and Config.Teleport.shopsPad.Z > -15, "teleport has a cooldown and the shops pad clears the stands")
+check(Config.adminRole(5067168140) == "Owner" and Config.adminRole(1) == nil, "far_rel2017 (5067168140) is the owner; others are not admins")
+local giftsOk = #Config.Admin.giftShells > 0
+for _, amount in Config.Admin.giftShells do giftsOk = giftsOk and amount > 0 and amount % 1 == 0 end
+check(giftsOk and Config.Admin.announceMaxLength <= 200, "admin gift amounts and announcement length are sane")
 local fence = Config.FenceById[Config.DEFAULT_FENCE]
 check(fence ~= nil and fence.name == "Shipwreck Wood" and #fence.plankColors > 0, "the default fence is Shipwreck Wood")
 for _, style in Config.Fences do

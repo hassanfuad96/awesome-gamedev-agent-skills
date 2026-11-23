@@ -73,6 +73,29 @@ export type FenceDef = {
 	barnacles: boolean,
 }
 
+-- Admins get an Admin button: start or stop sea events, announce to this server or every
+-- server, and hand out gifts. Listed by user id, because usernames can change; the id is the
+-- number in the player's profile link (roblox.com/users/<id>/profile). The server checks
+-- every admin request against these lists.
+ReefConfig.Admin = {
+	owners = { [5067168140] = "far_rel2017" } :: { [number]: string },
+	admins = {} :: { [number]: string }, -- e.g. [123456789] = "a_friend"
+	announceMaxLength = 200,
+	announceSeconds = 8, -- how long an announcement stays on screen
+	giftShells = { 1000, 10000, 100000 },
+	giftSeedCount = 1, -- seeds per player for each press of a seed gift button
+	globalTopic = "GrowAReefAnnouncements", -- MessagingService topic for every-server messages
+}
+
+function ReefConfig.adminRole(userId: number): string?
+	if ReefConfig.Admin.owners[userId] then
+		return "Owner"
+	elseif ReefConfig.Admin.admins[userId] then
+		return "Admin"
+	end
+	return nil
+end
+
 -- Teleporting between the shops and your reef, from the HUD's Shop and Home buttons or the
 -- whirlpool pads (one by the stands, one in front of every reef's gate).
 ReefConfig.Teleport = {

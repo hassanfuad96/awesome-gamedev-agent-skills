@@ -34,7 +34,9 @@ local SETTINGS = ReefConfig.Events
 local FADE = TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
 
 local rng = Random.new()
-local forced: string? = nil
+local forced: string? = nil -- start this event next, without waiting (Studio debug, admins)
+local running: string? = nil
+local stopRequested = false
 
 local function notifyAll(text: string, tone: string)
 	for _, player in Players:GetPlayers() do
@@ -105,15 +107,20 @@ local function run(event: ReefConfig.EventDef, handler: Handler)
 		handler.start()
 	end
 
-	local elapsed = 0
-	while elapsed < event.duration do
-		local step = math.min(handler.every or event.duration, event.duration - elapsed)
-		task.wait(step)
+	-- Short waits so an admin's stop takes effect quickly; ticks still come every `every`.
+	running = event.id
+	stopRequested = false
+	local elapsed, sinceTick = 0, 0
+	while elapsed < event.duration and not stopRequested do
+		local step = task.wait(math.min(0.25, event.duration - elapsed))
 		elapsed += step
-		if handler.tick then
+		sinceTick += step
+		if handler.tick and handler.every and sinceTick >= handler.every then
+			sinceTick -= handler.every
 			handler.tick()
 		end
 	end
+	running = nil
 
 	if handler.stop then
 		handler.stop()
@@ -123,6 +130,27 @@ local function run(event: ReefConfig.EventDef, handler: Handler)
 	Workspace:SetAttribute("EventStartedAt", nil)
 	Workspace:SetAttribute("EventEndsAt", nil)
 	notifyAll(`{event.name} is over.`, "info")
+end
+
+-- Admin controls. Starting an event ends the running one first; the new one starts as soon
+-- as the old one has cleaned up. Stopping ends the running event now, and the usual wait
+-- for the next one begins.
+function Events.startNow(id: string): boolean
+	if not ReefConfig.EventById[id] then
+		return false
+	end
+	forced = id
+	if running then
+		stopRequested = true
+	end
+	return true
+end
+
+function Events.stopNow(): string?
+	if running then
+		stopRequested = true
+	end
+	return running
 end
 
 function Events.start(worldParts: World.WorldParts)

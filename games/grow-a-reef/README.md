@@ -111,6 +111,25 @@ section of `skills/other-engines/roblox-simulator-economy/SKILL.md` first.
 The shop stock is shared by everyone on the server and restocks every 5 minutes. Growth is
 stored as a timestamp, so coral keeps growing while you're offline.
 
+### Admins
+
+Owners and admins get a red **Admin** button on the left. Its window can:
+
+- **Sea events:** start any event now (a running one ends first), or stop the running one.
+- **Announcement:** type a message and send it to this server or to every server. It shows
+  as a gold banner and in chat, after Roblox's text filter has checked it.
+- **Gifts for everyone in this server:** 1 seed of any kind (Seagrass included), 1K, 10K or
+  100K shells, or an instant Seed Shop restock.
+
+Admins are listed by **user id** in `ReefConfig.Admin` (usernames can change; ids can't).
+The id is the number in a player's profile link, `roblox.com/users/<id>/profile`.
+far_rel2017 (5067168140) is the owner. To add an admin, put `[<id>] = "name"` in
+`ReefConfig.Admin.admins` and publish. The server checks every admin request against these
+lists, so the window alone gives nobody any power.
+
+Every-server announcements use MessagingService, so they work in a published game (and in
+Studio); if a publish fails, the message still shows on the server that sent it.
+
 ## Set it up in Roblox Studio
 
 1. Install Rojo 7.7 (the Rojo Studio plugin plus the `rojo` command, from
@@ -151,6 +170,7 @@ src/server/                 -> ServerScriptService.Server
   ReefIndex.luau            Reef Index finds and set rewards
   Pets.luau                 eggs, taking pets out, releasing, and the pet perks
   Teleport.luau             Shop/Home teleports, the whirlpool pads and their bubble effect
+  Admin.luau                admin checks, event control, announcements, gifts
   ShopkeeperVisuals.luau    the shopkeeper models made from Parts, tagged "Shopkeeper"
   Shop.luau                 shared stock, buying, expanding, seed selection, selling
   Fish.luau                 fish spawning, swimming and catching
@@ -168,6 +188,7 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   CoralLabels.luau          name and growth countdown over each coral
   Hud.luau                  shells, bag, sea-event timer, toasts, seed hotbar, Index/Pets and Shop/Home buttons
   Swimming.luau             jump-to-swim movement and animation (client only)
+  AdminPanel.luau           the Admin window (shown only to admins)
   IndexPanel.luau           the Reef Index window (3D entries, silhouettes, set progress)
   PetPanel.luau             the Pets window (eggs with odds, your pets)
   PetVisuals.luau           pet models made from Parts
@@ -213,8 +234,8 @@ To change the economy with the pacing calculator, see
 
 ```bash
 rojo build default.project.json -o GrowAReef.rbxlx   # builds
-lune run tests/compile_check.luau src                # all 37 scripts compile
-lune run tests/check_place.luau GrowAReef.rbxlx      # 218 checks pass
+lune run tests/compile_check.luau src                # all 39 scripts compile
+lune run tests/check_place.luau GrowAReef.rbxlx      # 236 checks pass
 ```
 
 `check_place` confirms that the remotes exist, that each script has the right class and every
