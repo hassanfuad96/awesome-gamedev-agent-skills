@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
+local SeabedDecor = require(script.Parent.SeabedDecor)
 local ShopkeeperVisuals = require(script.Parent.ShopkeeperVisuals)
 
 export type PlotParts = {
@@ -107,23 +108,35 @@ end
 local function setupLighting()
 	Lighting.Ambient = Color3.fromRGB(40, 80, 110)
 	Lighting.OutdoorAmbient = Color3.fromRGB(70, 120, 160)
-	Lighting.FogColor = Color3.fromRGB(18, 72, 112)
-	Lighting.FogStart = 40
-	Lighting.FogEnd = 320
 	Lighting.ClockTime = 13
 	Lighting.Brightness = 1.6
 	Lighting.GlobalShadows = true
 
-	-- Atmosphere would override the fog settings above, so remove a default one.
-	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
-	if atmosphere then
-		atmosphere:Destroy()
+	-- Deep water: a dense blue Atmosphere hides the sky and fades distance into blue, so the
+	-- seabed has no visible edge. (Atmosphere replaces Lighting's fog settings.)
+	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
+	atmosphere.Density = 0.52
+	atmosphere.Offset = 0.2
+	atmosphere.Color = Color3.fromRGB(70, 170, 205)
+	atmosphere.Decay = Color3.fromRGB(20, 80, 130)
+	atmosphere.Glare = 0
+	atmosphere.Haze = 2.5
+	atmosphere.Parent = Lighting
+
+	-- No sun, moon or stars overhead; the water surface (buildSurface) takes their place.
+	local sky = Lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky")
+	sky.CelestialBodiesShown = false
+	sky.StarCount = 0
+	sky.Parent = Lighting
+	local clouds = Workspace.Terrain:FindFirstChildOfClass("Clouds")
+	if clouds then
+		clouds.Enabled = false
 	end
 
 	local tint = Instance.new("ColorCorrectionEffect")
 	tint.Name = "UnderwaterTint"
-	tint.TintColor = Color3.fromRGB(190, 230, 255)
-	tint.Saturation = 0.15
+	tint.TintColor = Color3.fromRGB(170, 225, 255)
+	tint.Saturation = 0.05
 	tint.Parent = Lighting
 
 	local bloom = Instance.new("BloomEffect")
@@ -132,6 +145,39 @@ local function setupLighting()
 	bloom.Size = 30
 	bloom.Threshold = 1.2
 	bloom.Parent = Lighting
+end
+
+-- The water surface far overhead, glowing, with soft shafts of light coming down from it.
+local function buildSurface(parent: Instance, rng: Random)
+	part({
+		Name = "WaterSurface",
+		Size = Vector3.new(1400, 2, 1200),
+		Position = Vector3.new(0, 110, 20),
+		Color = Color3.fromRGB(120, 210, 235),
+		Material = Enum.Material.Neon,
+		Transparency = 0.25,
+		CanCollide = false,
+		CanQuery = false,
+		CastShadow = false, -- it would shade the whole map
+		Parent = parent,
+	})
+	for _ = 1, 14 do
+		local width = rng:NextNumber(5, 12)
+		part({
+			Name = "LightShaft",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(120, width, width),
+			CFrame = CFrame.new(rng:NextNumber(-200, 200), 50, rng:NextNumber(-100, 150))
+				* CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), math.rad(90) + rng:NextNumber(-0.25, 0.25)),
+			Color = Color3.fromRGB(190, 235, 255),
+			Material = Enum.Material.Neon,
+			Transparency = 0.94,
+			CanCollide = false,
+			CanQuery = false,
+			CastShadow = false,
+			Parent = parent,
+		})
+	end
 end
 
 local function bubbleVent(parent: Instance, position: Vector3)
@@ -339,21 +385,25 @@ function World.build(): WorldParts
 	root.Name = "Reef"
 	root.Parent = Workspace
 
-	-- Seabed and a few rocks for shape.
+	-- Seabed and a few rocks for shape. The seabed runs far past the play area so its edge
+	-- is lost in the haze.
 	part({
 		Name = "Seabed",
-		Size = Vector3.new(440, 4, 280),
+		Size = Vector3.new(1200, 4, 1000),
 		Position = Vector3.new(0, -2, 20),
 		Color = SAND,
 		Material = Enum.Material.Sand,
 		Parent = root,
 	})
+	-- Keep the play area (stands and plots) clear of rocks and decoration.
+	local function clearOfPlayArea(x: number, z: number): boolean
+		return math.abs(z - PLOT_ROW_Z) > 30 and not (math.abs(x) < 60 and z > -60 and z < 10)
+	end
 	local rng = Random.new(42)
 	for i = 1, 40 do
 		local x = rng:NextNumber(-210, 210)
 		local z = rng:NextNumber(-110, 150)
-		-- Keep the play area (stands and plots) clear.
-		if math.abs(z - PLOT_ROW_Z) > 30 and not (math.abs(x) < 60 and z > -60 and z < 10) then
+		if clearOfPlayArea(x, z) then
 			local s = rng:NextNumber(3, 10)
 			local rock = part({
 				Name = "Rock",
@@ -369,6 +419,8 @@ function World.build(): WorldParts
 			end
 		end
 	end
+	SeabedDecor.build(root, rng, clearOfPlayArea)
+	buildSurface(root, rng)
 
 	local spawnLocation = Instance.new("SpawnLocation")
 	spawnLocation.Anchored = true

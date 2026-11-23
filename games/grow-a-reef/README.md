@@ -18,6 +18,12 @@ repository (`skills/other-engines/roblox-*`).
 | Catch fish | Fish swim around grown coral on your reef. Click them before they swim off. |
 | Grow your reef | You start with 6 coral slots. In the Seed Shop, "Grow your reef" adds a slot (up to 12) and widens your bed. |
 
+The whole map is underwater: deep-blue haze instead of sky, a glowing surface with light shafts
+far overhead, kelp forests, coral clusters, starfish and urchins on the seabed, and drifting
+specks and diver bubbles near you. Schools of reef fish, sea turtles, jellyfish, a manta ray
+and crabs swim around. They are decoration and can't be caught; the fish to catch are the
+ones that gather around your own grown coral.
+
 Each stand has a shopkeeper: Captain Coralie, a diver behind the Seed Shop counter, and Pinch,
 a crab on the Sell Coral counter. They turn to face you and greet you when you walk up. Their
 names and lines are in `ReefConfig.Shopkeepers`.
@@ -81,7 +87,9 @@ src/shared/                 -> ReplicatedStorage.Shared
   EconomyMath.luau          copied unchanged from skills/other-engines/roblox-simulator-economy
 src/server/                 -> ServerScriptService.Server
   Main.server.luau          starts everything in order
-  World.luau                builds the seabed, lighting, stands, shopkeepers, leaderboard board and 6 plots
+  World.luau                builds the seabed, underwater lighting, surface, stands, shopkeepers,
+                            leaderboard board and 6 plots
+  SeabedDecor.luau          kelp forests, coral clusters, starfish and urchins
   PlayerData.luau           DataStore load/save with a session lock, data repair, leaderstats
   Plots.luau                plot assignment, free planting (PlantAt), growth, harvesting
   CoralVisuals.luau         coral models made from Parts, plus mutation effects
@@ -93,9 +101,11 @@ src/server/                 -> ServerScriptService.Server
   RateLimit.luau            per-player token bucket for every request
 src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   Main.client.luau          connects remotes and UI
+  OceanEffects.luau         marine snow around the camera, bubbles from divers
   CoralLabels.luau          name and growth countdown over each coral
   Hud.luau                  shells, bag, current timer, toasts, seed hotbar
   Planter.luau              placement preview ring and click/tap to plant
+  SeaLife.luau              fish schools, turtles, jellyfish, manta ray, crabs (client only)
   ShopPanel.luau            seed shop window
   Shopkeepers.luau          shopkeeper idle animation, turning and greetings (client only)
   Ui.luau                   shared colours and UI helpers
@@ -121,7 +131,8 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
 Change numbers in `src/shared/ReefConfig.luau`. Things you might want to change first:
 `STARTING_SHELLS`, seed prices and grow times, `Mutations` weights, `Current.interval`,
 `Fish.spawnChance`, `EXPAND` (slot prices are 200, 500, 1,250, 3,125, 7,812, 19,531), and the bed:
-`BED_RADIUS`, `BED_RADIUS_PER_SLOT` and `PLANT_SPACING`.
+`BED_RADIUS`, `BED_RADIUS_PER_SLOT` and `PLANT_SPACING`. `SeaLife` sets how many of each sea
+creature swim around; the underwater look (Atmosphere, tint) is in `World.luau`'s `setupLighting`.
 
 To change the economy with the pacing calculator, see
 `skills/other-engines/roblox-simulator-economy/SKILL.md`.
@@ -132,8 +143,8 @@ To change the economy with the pacing calculator, see
 
 ```bash
 rojo build default.project.json -o GrowAReef.rbxlx   # builds
-lune run tests/compile_check.luau src                # all 20 scripts compile
-lune run tests/check_place.luau GrowAReef.rbxlx      # 96 checks pass
+lune run tests/compile_check.luau src                # all 23 scripts compile
+lune run tests/check_place.luau GrowAReef.rbxlx      # 103 checks pass
 ```
 
 `check_place` confirms that the remotes exist, that each script has the right class and every

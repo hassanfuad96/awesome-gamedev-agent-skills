@@ -9,7 +9,9 @@ local RunService = game:GetService("RunService")
 
 local CoralLabels = require(script.Parent.CoralLabels)
 local Hud = require(script.Parent.Hud)
+local OceanEffects = require(script.Parent.OceanEffects)
 local Planter = require(script.Parent.Planter)
+local SeaLife = require(script.Parent.SeaLife)
 local ShopPanel = require(script.Parent.ShopPanel)
 local Shopkeepers = require(script.Parent.Shopkeepers)
 
@@ -66,6 +68,8 @@ end)
 CoralLabels.start(playerGui)
 Planter.start()
 Shopkeepers.start(playerGui)
+SeaLife.start()
+OceanEffects.start()
 
 -- Ask for a snapshot in case DataSync fired before these handlers connected.
 Remotes.RequestSync:FireServer()

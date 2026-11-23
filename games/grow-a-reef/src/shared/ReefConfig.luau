@@ -157,6 +157,17 @@ ReefConfig.Shopkeepers = {
 
 ReefConfig.CORAL_TAG = "Coral" -- every planted coral model, for the client's labels and preview
 
+-- Ambient sea life (client-side and cosmetic) and where it, and the seabed decoration, roam.
+ReefConfig.SeaLife = {
+	area = { minX = -210, maxX = 210, minZ = -110, maxZ = 150 },
+	fishSchools = 6, -- each school is one species
+	fishPerSchool = 9,
+	turtles = 2,
+	jellyfish = 8,
+	mantas = 1,
+	crabs = 8,
+}
+
 function ReefConfig.expandCost(unlocked: number): number
 	local extra = unlocked - ReefConfig.STARTING_SLOTS
 	return math.floor(ReefConfig.EXPAND.baseCost * ReefConfig.EXPAND.costGrowth ^ extra)
