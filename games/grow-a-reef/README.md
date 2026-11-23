@@ -83,16 +83,22 @@ x10, Prismatic + Shadow at x60. When a seed is planted it can sprout with one:
 | Prismatic | 0.3% when planted | x15 |
 | Frosted | grown coral during a Cold Current | x3 |
 | Shadow | grown coral during a Bioluminescent Night | x4 |
+| Molten | grown coral hit by a lava rock during a Volcano Vent | x6 |
 
 The second mutation comes from sea events, or from a neighbour's coral through an Ocean
 Current. Fish caught near mutated coral are worth more as well.
 
 Every 3 minutes a **sea event** starts for everyone on the server. It is picked at random and
-never the same twice in a row. The timer under your shells counts down to the next one, then
+never the same twice in a row; the weights in `ReefConfig.Events` add up to 100, so each is
+that event's percent chance. The timer under your shells counts down to the next one, then
 shows the event running.
 
 | Event | Length | What happens |
 |---|---|---|
+| Volcano Vent (6%) | 45 s | A volcano rises out past the lagoon's north-east rim and throws glowing lava rocks in arcs. Every 2.5 s one lands on a grown coral on each player's reef; a hit turns it Molten (x6) 60% of the time, if it has room for another mutation. The volcano sinks back afterwards. |
+| Giant Octopus (6%) | 60 s | A giant octopus drops in over the plaza with a health bar (more health with more players). Tap or click it to hit it, up to 4 hits a second each. Beat it in time and everyone who hit it at least 5 times wins shells (x your coral slots / 10), 2 Glow Anemone and a Pearl Clam seed, with a 20% chance of a Starlight Coral seed. Otherwise it gets away. |
+| Mermaid Merchant (6%) | 90 s | Marina the mermaid sets up a shell stall in the plaza with three offers: cheaper Glow Anemone, Pearl Clam and Starlight Coral seeds, and now and then a Seagrass seed for 350K shells. One of each per player. |
+| Sunken Treasure Hunt (6%) | 120 s | A chest is buried on open seabed in the lagoon. Clue 1 names the nearest landmark and the direction from it; Clue 2 (after 45 s) says how many studs away and makes bubbles rise from the sand. The HUD shows how hot you are (Cold, Warm, Hot, Burning hot!). The first player to hold Dig on the spot wins shells (x your slots / 10), a Starlight Coral and two Pearl Clam seeds, with a 10% chance of Seagrass. |
 | Ocean Current | 40 s | One mutation from a grown coral can drift onto a coral on the next player's reef downstream that has room for it, stacking with what it has (the last reef wraps around to the first). |
 | Cold Current | 45 s | Grown coral can turn Frosted (x3). |
 | Bioluminescent Night | 75 s | The sea goes dark so glowing things stand out. Glowing is 3x as likely on coral planted now, and grown coral can turn Shadow (x4). |
@@ -248,6 +254,11 @@ src/server/                 -> ServerScriptService.Server
   TreasureStorm.luau        treasure chests: dropping, opening, rewards
   Shipwreck.luau            the Shipwreck event: sinking, the orca hunt, eating, rewards
   ShipwreckVisuals.luau     the wreck and orca models made from Parts
+  Volcano.luau              the Volcano Vent event: the volcano and its lava rocks
+  GiantOctopus.luau         the Giant Octopus event: hits, health and prizes
+  Merchant.luau             the Mermaid Merchant event: Marina's stall and offers (BuyMerchant)
+  TreasureHunt.luau         the Sunken Treasure Hunt event: burying, clues, heat, digging
+  EventVisuals.luau         the volcano, lava rock, octopus, mermaid stall and dig spot models
   Leaderboard.luau          global "Top Reefs" (shells earned) and "Best Reefs" (likes) boards
   RateLimit.luau            per-player token bucket for every request
 src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
@@ -256,6 +267,7 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   CoralLabels.luau          name and growth countdown over each coral
   Hud.luau                  shells, bag, sea-event timer, toasts, seed hotbar, side and Shop/Home buttons
   SuppliesPanel.luau        the Upgrade Station window (Reef, Gear, Fences, Decor)
+  MerchantPanel.luau        Marina the Mermaid Merchant's trade window
   TutorialPanel.luau        the Starter Lagoon tutorial card, beam and marker
   QuestsPanel.luau          the Quests window: daily quests, rebirth, titles
   NameTags.luau             titles and rebirths over players' heads
@@ -349,7 +361,7 @@ After changes, run these and check Output:
    to 70% (see `Ui.screenScale`); check the hotbar and shop fit and can be tapped.
 6. **Sea events:** in Studio you don't have to wait. In the Command Bar, in the server view, run
    `workspace:SetAttribute("DebugSeaEvent", "Whale")` (or `Current`, `Cold`, `Night`, `Frenzy`,
-   `Treasure`, `Shipwreck`) to start that event now. This only works in Studio.
+   `Treasure`, `Shipwreck`, `Volcano`, `Octopus`, `Merchant`, `Hunt`) to start that event now. This only works in Studio.
 
 ## Known limits and next steps
 

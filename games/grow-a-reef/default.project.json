@@ -80,6 +80,9 @@
         },
         "EquipTitle": {
           "$className": "RemoteEvent"
+        },
+        "BuyMerchant": {
+          "$className": "RemoteEvent"
         }
       }
     },

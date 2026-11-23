@@ -12,18 +12,18 @@ local function check(cond, msg) if cond then print("ok   " .. msg) else failures
 -- 1. Place structure
 local game = roblox.deserializePlace(fs.readFile(process.args[1]))
 local rs = game:GetService("ReplicatedStorage")
-for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify", "Teleport", "Teleported", "AdminAction", "Announcement", "BuyFence", "EquipFence", "BuyDecor", "PlaceDecor", "UpgradeGear", "ClaimQuest", "Rebirth", "EquipTitle", "GuideLine" } do
+for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify", "Teleport", "Teleported", "AdminAction", "Announcement", "BuyFence", "EquipFence", "BuyDecor", "PlaceDecor", "UpgradeGear", "ClaimQuest", "Rebirth", "EquipTitle", "GuideLine", "BuyMerchant" } do
 	local r = rs.Remotes:FindFirstChild(name)
 	check(r and r.ClassName == "RemoteEvent", "remote " .. name)
 end
 local server = game:GetService("ServerScriptService").Server
 check(server.Main.ClassName == "Script", "server Main is a Script")
-for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport", "Shipwreck", "ShipwreckVisuals", "Admin", "Quests", "Supplies", "Likes", "Rebirth", "Tutorial" } do
+for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport", "Shipwreck", "ShipwreckVisuals", "Admin", "Quests", "Supplies", "Likes", "Rebirth", "Tutorial", "Volcano", "GiantOctopus", "Merchant", "TreasureHunt", "EventVisuals" } do
 	check(server:FindFirstChild(m) and server[m].ClassName == "ModuleScript", "server module " .. m)
 end
 local client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 check(client.Main.ClassName == "LocalScript", "client Main is a LocalScript")
-for _, m in { "Swimming", "AdminPanel", "SuppliesPanel", "QuestsPanel", "NameTags", "TutorialPanel" } do
+for _, m in { "Swimming", "AdminPanel", "SuppliesPanel", "QuestsPanel", "NameTags", "TutorialPanel", "MerchantPanel" } do
 	check(client:FindFirstChild(m) and client[m].ClassName == "ModuleScript", "client module " .. m)
 end
 check(rs.Shared.ReefConfig.ClassName == "ModuleScript", "shared ReefConfig")
@@ -127,9 +127,38 @@ for _, event in Config.Events.list do
 	check(Config.EventById[event.id] == event and event.duration > 0 and event.weight > 0, "sea event " .. event.id .. " is listed with a duration and weight")
 	table.insert(eventIds, event.id)
 end
-check(table.concat(eventIds, ",") == "Current,Cold,Night,Frenzy,Treasure,Whale,Shipwreck", "seven sea events")
+check(table.concat(eventIds, ",") == "Current,Cold,Night,Frenzy,Treasure,Whale,Volcano,Octopus,Merchant,Hunt,Shipwreck", "eleven sea events")
 local eventOdds = Econ.oddsPercent(Config.Events.list)
-check(math.abs(eventOdds.Shipwreck - 5) < 1e-9, "Shipwreck is picked 5% of the time")
+local weightTotal = 0
+for _, event in Config.Events.list do weightTotal += event.weight end
+check(weightTotal == 100 and math.abs(eventOdds.Shipwreck - 5) < 1e-9, "event weights add up to 100; Shipwreck is picked 5% of the time")
+
+-- Volcano, Giant Octopus, Mermaid Merchant, Sunken Treasure Hunt
+check(Config.MutationById.Molten ~= nil and Config.MutationById.Molten.multiplier == 6 and Config.MutationById.Molten.weight == 0, "Molten (x6) only comes from the Volcano Vent")
+check(Config.Volcano.moltenChance > 0 and Config.Volcano.moltenChance <= 1 and Config.Volcano.every > 0, "volcano rocks have a Molten chance and a volley timer")
+local volcanoFromCenter = roblox.Vector3.new(Config.Volcano.vent.X, 0, Config.Volcano.vent.Z).Magnitude
+check(volcanoFromCenter > (Lagoon.rimRadius or Config.Hunt.rimFallback) + Config.Volcano.height * 0.75, "the volcano stands out past the lagoon's rim")
+check(Config.Octopus.minHits * 1 / Config.Octopus.hitsPerSecond < Config.EventById.Octopus.duration and Config.Octopus.baseHealth > 0, "a player can land enough hits on the octopus before it leaves")
+local soloSeconds = (Config.Octopus.baseHealth + Config.Octopus.healthPerPlayer) / Config.Octopus.hitsPerSecond
+check(soloSeconds < Config.EventById.Octopus.duration, string.format("one diver tapping flat out can beat the octopus (%.0f s of %d)", soloSeconds, Config.EventById.Octopus.duration))
+for _, gift in Config.Octopus.seeds do check(Config.Seeds[gift.id] ~= nil, "octopus seed " .. gift.id .. " exists") end
+local sureOffers = 0
+for _, offer in Config.Merchant.offers do
+	local seed = Config.Seeds[offer.seed]
+	check(Config.MerchantOfferById[offer.id] == offer and seed ~= nil and offer.count > 0 and offer.price > 0 and offer.chance > 0 and offer.chance <= 1, "merchant offer " .. offer.id .. " is a real seed with a price and chance")
+	if offer.chance >= 1 then sureOffers += 1 end
+	if seed and seed.shop ~= false then
+		check(offer.price < seed.price * offer.count, "merchant offer " .. offer.id .. " is cheaper than the Seed Shop")
+	end
+end
+check(sureOffers >= 1 and Config.Merchant.offersPerVisit >= 1, "Marina always brings at least one offer")
+check(Config.Hunt.secondClueAt < Config.EventById.Hunt.duration and Config.Hunt.heat.burning < Config.Hunt.heat.hot and Config.Hunt.heat.hot < Config.Hunt.heat.warm, "the hunt's second clue comes in time, and heat bands are in order")
+check(Config.huntHeat(5) == "Burning hot!" and Config.huntHeat(30) == "Hot" and Config.huntHeat(60) == "Warm" and Config.huntHeat(500) == "Cold", "hunt heat readings")
+check(Config.compass(0, -10) == "north" and Config.compass(10, 0) == "east" and Config.compass(10, 10) == "south-east" and Config.compass(-10, -10) == "north-west", "compass directions (north is -Z)")
+for _, key in { "research", "upgrade", "coralShop", "oceanGate" } do
+	local at = Lagoon[key]
+	check(typeof(at) ~= "Vector3" or roblox.Vector3.new(at.X, 0, at.Z).Magnitude < (Lagoon.rimRadius or Config.Hunt.rimFallback), "landmark " .. key .. " is inside the lagoon, so hunt clues can point at it")
+end
 local ship = Config.Shipwreck
 check(Config.EventById.Shipwreck.duration == ship.huntStartsAt + ship.huntSeconds + 5 and ship.sinkSeconds < ship.huntStartsAt, "Shipwreck: sink, then hide, hunt and 5 s for the orcas to leave")
 check(ship.orcaSpeed > Config.Swim.speed, "orcas are faster than swimming, so hiding is the way to survive")
@@ -154,14 +183,14 @@ check(Config.isMutationKey("Glowing+Glowing") == false and Config.isMutationKey(
 local cs, cm = Config.splitInventoryKey(Config.inventoryKey("star", "Prismatic+Shadow"))
 check(cs == "star" and cm == "Prismatic+Shadow", "combo inventory key round trip")
 check(Config.displayName("kelp", "Glowing+Golden") == "Glowing + Golden Bubble Kelp", "combo display name")
-check(#Config.MUTATION_KEYS == 16, "16 mutation keys (none, 5 singles, 10 pairs)")
+check(#Config.MUTATION_KEYS == 22, "22 mutation keys (none, 6 singles, 15 pairs)")
 
 -- Reef Index
 local indexEntries = 0
 for _, set in Config.IndexSets do
 	indexEntries += #set.entries
 end
-check(#Config.IndexSets == 8 and indexEntries == 116, "Reef Index: 8 sets, 116 entries")
+check(#Config.IndexSets == 8 and indexEntries == 7 * 22 + 4, "Reef Index: 8 sets, 158 entries")
 
 -- Pet eggs: every outcome is a real pet and the shown odds sum to 100
 for _, egg in Config.Pets.eggs do

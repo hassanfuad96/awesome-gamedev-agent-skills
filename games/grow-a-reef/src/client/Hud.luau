@@ -583,7 +583,16 @@ function Hud.updateTimers(self: Hud)
 		self.event.Text = shipText
 		self.event.TextColor3 = shipColor
 	elseif event and type(endsAt) == "number" and endsAt > now then
-		self.event.Text = `{event.name}! {Ui.formatTime(endsAt - now)}`
+		-- Some events add what matters right now: the octopus's health, how hot the hunt is.
+		local extra = ""
+		local health, maxHealth = Workspace:GetAttribute("OctopusHealth"), Workspace:GetAttribute("OctopusMaxHealth")
+		local heat = Players.LocalPlayer:GetAttribute("HuntHeat")
+		if event.id == "Octopus" and type(health) == "number" and type(maxHealth) == "number" then
+			extra = `. Health {health}/{maxHealth}: tap it!`
+		elseif event.id == "Hunt" and type(heat) == "string" then
+			extra = `. You're {heat}`
+		end
+		self.event.Text = `{event.name}! {Ui.formatTime(endsAt - now)}{extra}`
 		self.event.TextColor3 = event.color
 	elseif type(nextAt) == "number" then
 		self.event.Text = `Next sea event in {Ui.formatTime(nextAt - now)}`

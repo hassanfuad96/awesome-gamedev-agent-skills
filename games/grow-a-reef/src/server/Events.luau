@@ -3,7 +3,9 @@
 -- same twice in a row (ReefConfig.Events). Clients follow along through Workspace
 -- attributes: NextEventAt while waiting; EventId, EventStartedAt and EventEndsAt while one
 -- runs. The HUD shows the timer, SeaLife draws the Whale Pass whale and OceanEffects turns
--- the specks into glowing plankton at night; everything that changes the game runs here.
+-- the specks into glowing plankton at night; everything that changes the game runs here or
+-- in the event's own module (TreasureStorm, Shipwreck, Volcano, GiantOctopus, Merchant,
+-- TreasureHunt).
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -20,6 +22,10 @@ local EventState = require(script.Parent.EventState)
 local Currents = require(script.Parent.Currents)
 local TreasureStorm = require(script.Parent.TreasureStorm)
 local Shipwreck = require(script.Parent.Shipwreck)
+local Volcano = require(script.Parent.Volcano)
+local GiantOctopus = require(script.Parent.GiantOctopus)
+local Merchant = require(script.Parent.Merchant)
+local TreasureHunt = require(script.Parent.TreasureHunt)
 
 type Handler = {
 	start: (() -> ())?,
@@ -204,7 +210,31 @@ function Events.start(worldParts: World.WorldParts)
 			end,
 		},
 		Shipwreck = { start = Shipwreck.start, stop = Shipwreck.stop },
+		Volcano = { start = Volcano.start, stop = Volcano.stop, every = ReefConfig.Volcano.every, tick = Volcano.volley },
+		-- These two end early when the players win (unless another event has started since).
+		Octopus = {
+			start = function()
+				GiantOctopus.start(function()
+					if running == "Octopus" then
+						Events.stopNow()
+					end
+				end)
+			end,
+			stop = GiantOctopus.stop,
+		},
+		Merchant = { start = Merchant.start, stop = Merchant.stop },
+		Hunt = {
+			start = function()
+				TreasureHunt.start(function()
+					if running == "Hunt" then
+						Events.stopNow()
+					end
+				end)
+			end,
+			stop = TreasureHunt.stop,
+		},
 	}
+	Merchant.init()
 
 	-- In Studio, set Workspace's DebugSeaEvent attribute to an event id (from the Command
 	-- Bar, in the server view) to start that event now instead of waiting.

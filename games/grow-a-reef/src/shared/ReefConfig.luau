@@ -540,10 +540,12 @@ ReefConfig.Mutations = {
 	{ id = "Prismatic", weight = 3, multiplier = 15, color = Color3.fromRGB(255, 120, 255) },
 } :: { MutationDef }
 
--- Never rolled at planting; only sea events give these (Cold Current, Bioluminescent Night).
+-- Never rolled at planting; only sea events give these (Cold Current, Bioluminescent Night,
+-- Volcano Vent).
 ReefConfig.EventMutations = {
 	{ id = "Frosted", weight = 0, multiplier = 3, color = Color3.fromRGB(175, 230, 255) },
 	{ id = "Shadow", weight = 0, multiplier = 4, color = Color3.fromRGB(110, 60, 180) },
+	{ id = "Molten", weight = 0, multiplier = 6, color = Color3.fromRGB(255, 110, 40) },
 } :: { MutationDef }
 
 ReefConfig.MutationById = {} :: { [string]: MutationDef }
@@ -575,39 +577,60 @@ export type EventDef = {
 	message: string, -- announced to everyone when it starts
 }
 
--- Sea events: one at a time, picked at random (never the same twice in a row).
+-- Sea events: one at a time, picked at random (never the same twice in a row). The weights
+-- add up to 100, so each one is that event's percent chance.
 ReefConfig.Events = {
 	interval = 180, -- seconds from the end of one event to the start of the next
 	list = {
 		{
-			id = "Current", name = "Ocean Current", weight = 20, duration = 40,
+			id = "Current", name = "Ocean Current", weight = 15, duration = 40,
 			color = Color3.fromRGB(110, 200, 255),
 			message = "An ocean current is flowing! Mutations can drift between reefs.",
 		},
 		{
-			id = "Cold", name = "Cold Current", weight = 15, duration = 45,
+			id = "Cold", name = "Cold Current", weight = 10, duration = 45,
 			color = Color3.fromRGB(175, 230, 255),
 			message = "A cold current is flowing! Grown coral can turn Frosted (x3).",
 		},
 		{
-			id = "Night", name = "Bioluminescent Night", weight = 20, duration = 75,
+			id = "Night", name = "Bioluminescent Night", weight = 15, duration = 75,
 			color = Color3.fromRGB(120, 255, 220),
 			message = "Bioluminescent Night! Glowing is 3x as likely when you plant, and grown coral can turn Shadow (x4).",
 		},
 		{
-			id = "Frenzy", name = "Feeding Frenzy", weight = 20, duration = 60,
+			id = "Frenzy", name = "Feeding Frenzy", weight = 15, duration = 60,
 			color = Color3.fromRGB(255, 170, 90),
 			message = "Feeding Frenzy! Fish come to your coral twice as fast.",
 		},
 		{
-			id = "Treasure", name = "Treasure Storm", weight = 10, duration = 40,
+			id = "Treasure", name = "Treasure Storm", weight = 8, duration = 40,
 			color = Color3.fromRGB(255, 205, 80),
 			message = "Treasure Storm! Chests are sinking from the surface. Open them for shells and seeds!",
 		},
 		{
-			id = "Whale", name = "Whale Pass", weight = 10, duration = 50,
+			id = "Whale", name = "Whale Pass", weight = 8, duration = 50,
 			color = Color3.fromRGB(150, 190, 255),
 			message = "A giant whale is passing overhead! Coral grows twice as fast while it's here.",
+		},
+		{
+			id = "Volcano", name = "Volcano Vent", weight = 6, duration = 45,
+			color = Color3.fromRGB(255, 120, 60),
+			message = "A volcano vent is erupting! Lava rocks that hit your grown coral can turn it Molten (x6).",
+		},
+		{
+			id = "Octopus", name = "Giant Octopus", weight = 6, duration = 60,
+			color = Color3.fromRGB(220, 110, 200),
+			message = "A Giant Octopus is attacking the plaza! Everyone tap it to drive it off. Everyone who helps wins a prize!",
+		},
+		{
+			id = "Merchant", name = "Mermaid Merchant", weight = 6, duration = 90,
+			color = Color3.fromRGB(120, 230, 210),
+			message = "Marina the Mermaid Merchant is in the plaza with rare seeds! She leaves soon.",
+		},
+		{
+			id = "Hunt", name = "Sunken Treasure Hunt", weight = 6, duration = 120,
+			color = Color3.fromRGB(255, 215, 120),
+			message = "A treasure chest is buried somewhere in the lagoon! Follow the clues and dig it up first.",
 		},
 		{
 			-- 20 s to hide, a 30 s hunt, 5 s for the orcas to leave (see Shipwreck below).
@@ -641,6 +664,79 @@ ReefConfig.Events = {
 ReefConfig.EventById = {} :: { [string]: EventDef }
 for _, event in ReefConfig.Events.list do
 	ReefConfig.EventById[event.id] = event
+end
+
+-- Volcano Vent: a volcano rises out past the lagoon and throws lava rocks onto every reef's
+-- grown coral. A rock that hits turns its coral Molten with `moltenChance`.
+ReefConfig.Volcano = {
+	vent = Vector3.new(170, 0, -300), -- north-east, out past the lagoon's rim
+	height = 70,
+	every = 2.5, -- seconds between volleys; each volley throws one rock at each reef
+	rockSpeed = 110, -- studs per second along the arc
+	moltenChance = 0.6,
+	riseSeconds = 6,
+}
+
+-- Giant Octopus: it hovers over the plaza; everyone taps it. Beat it before the event ends
+-- and everyone who hit it `minHits` times wins shells (x their coral slots / 10) and seeds.
+ReefConfig.Octopus = {
+	hover = Vector3.new(0, 24, 0), -- above the plaza centre (ReefConfig.Lagoon.center)
+	baseHealth = 120,
+	healthPerPlayer = 90,
+	hitsPerSecond = 4, -- the most taps a player can land each second
+	clickRange = 70,
+	minHits = 5,
+	shells = 1500,
+	seeds = { { id = "anemone", count = 2 }, { id = "clam", count = 1 } },
+	starChance = 0.2, -- chance each winner also gets a Starlight Coral seed
+}
+
+export type MerchantOffer = { id: string, seed: string, count: number, price: number, chance: number }
+
+-- Mermaid Merchant: Marina sets up a stall in the plaza with `offersPerVisit` offers drawn
+-- from this list (by chance). Each player can buy each offer once per visit.
+ReefConfig.Merchant = {
+	stall = Vector3.new(-20, 0, 18), -- from the plaza centre
+	offersPerVisit = 3,
+	offers = {
+		{ id = "anemone3", seed = "anemone", count = 3, price = 1400, chance = 1 },
+		{ id = "clam2", seed = "clam", count = 2, price = 4200, chance = 1 },
+		{ id = "star1", seed = "star", count = 1, price = 9000, chance = 0.8 },
+		{ id = "star2", seed = "star", count = 2, price = 17000, chance = 0.35 },
+		{ id = "seagrass1", seed = "seagrass", count = 1, price = 350000, chance = 0.15 },
+	} :: { MerchantOffer },
+}
+ReefConfig.MerchantOfferById = {} :: { [string]: MerchantOffer }
+for _, offer in ReefConfig.Merchant.offers do
+	ReefConfig.MerchantOfferById[offer.id] = offer
+end
+
+-- Sunken Treasure Hunt: one chest is buried on open seabed in the lagoon. A first clue at the
+-- start names a landmark and a direction; a closer clue comes at `secondClueAt`. Everyone's
+-- HUD shows how hot they are. The first to dig it up wins.
+ReefConfig.Hunt = {
+	secondClueAt = 45, -- seconds into the hunt
+	digSeconds = 2,
+	digRange = 9,
+	heat = { burning = 15, hot = 40, warm = 90 }, -- studs from the chest
+	shells = 4000, -- x the digger's coral slots / 10
+	seeds = { { id = "star", count = 1 }, { id = "clam", count = 2 } },
+	seagrassChance = 0.1,
+	clearOfBuildings = 30, -- studs from any lagoon building
+	rimFallback = 180, -- lagoon edge if ReefConfig.Lagoon.rimRadius isn't set
+}
+
+-- A compass word for a direction on the seabed ("north-east"). North is -Z.
+function ReefConfig.compass(dx: number, dz: number): string
+	local names = { "north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west" }
+	local angle = math.deg(math.atan2(dx, -dz)) % 360
+	return names[math.floor((angle + 22.5) / 45) % 8 + 1]
+end
+
+-- How close to the buried chest a distance is.
+function ReefConfig.huntHeat(distance: number): string
+	local heat = ReefConfig.Hunt.heat
+	return if distance < heat.burning then "Burning hot!" elseif distance < heat.hot then "Hot" elseif distance < heat.warm then "Warm" else "Cold"
 end
 
 -- The Shipwreck event: a liner sinks onto the seabed past the Ocean Gate, then a pod of
