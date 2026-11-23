@@ -62,11 +62,12 @@ shows the event running.
 | Feeding Frenzy | 60 s | Fish come to grown coral twice as fast. |
 | Treasure Storm | 40 s | Chests sink onto the plaza and reefs. Anyone can hold E (or tap) to open one for 30-200 shells, or sometimes rare seeds. Unopened chests wash away after 45 s. |
 | Whale Pass | 50 s | A giant whale crosses overhead, and all coral grows twice as fast while it's there. |
+| Shipwreck (5%) | 55 s | A liner sinks onto the seabed in front of the stands. 20 s after it starts, six orcas arrive and hunt for 30 s. They are faster than swimming, so swim inside the wreck (through the holes in its sides or the deck hatches) and stay there. Anyone caught is eaten and respawns at home. Everyone who was there when the orcas came and wasn't eaten gets a **Seagrass** seed. The HUD says whether you are hidden. |
 
 ### Reef Index
 
 The **Index** button opens a collection book of every seed in all 16 mutation combinations
-and every fish, 100 entries in all. Entries you haven't found are black silhouettes. Harvesting
+and every fish, 116 entries in all. Entries you haven't found are black silhouettes. Harvesting
 a coral or catching a fish records it. Completing a seed's set pays 10x that seed's sell value
 (180 shells for Bubble Kelp, up to 320,000 for Starlight Coral) and the fish set pays 1,000.
 To also award a badge, create it on the Creator Dashboard and put its id in
@@ -105,6 +106,7 @@ section of `skills/other-engines/roblox-simulator-economy/SKILL.md` first.
 | Glow Anemone | 600 | 5 min | 1,300 | 40% |
 | Pearl Clam | 2,500 | 10 min | 6,000 | 20% |
 | Starlight Coral | 12,000 | 20 min | 32,000 | 7% |
+| Seagrass (Transcendent) | not sold | 30 min | 150,000 | Shipwreck survivors only |
 
 The shop stock is shared by everyone on the server and restocks every 5 minutes. Growth is
 stored as a timestamp, so coral keeps growing while you're offline.
@@ -156,6 +158,8 @@ src/server/                 -> ServerScriptService.Server
   EventState.luau           the running event's modifiers, read by Plots and Fish
   Currents.luau             ocean current mutation spreading
   TreasureStorm.luau        treasure chests: dropping, opening, rewards
+  Shipwreck.luau            the Shipwreck event: sinking, the orca hunt, eating, rewards
+  ShipwreckVisuals.luau     the wreck and orca models made from Parts
   Leaderboard.luau          global "Top Reefs" board (OrderedDataStore of shells earned)
   RateLimit.luau            per-player token bucket for every request
 src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
@@ -209,8 +213,8 @@ To change the economy with the pacing calculator, see
 
 ```bash
 rojo build default.project.json -o GrowAReef.rbxlx   # builds
-lune run tests/compile_check.luau src                # all 35 scripts compile
-lune run tests/check_place.luau GrowAReef.rbxlx      # 202 checks pass
+lune run tests/compile_check.luau src                # all 37 scripts compile
+lune run tests/check_place.luau GrowAReef.rbxlx      # 218 checks pass
 ```
 
 `check_place` confirms that the remotes exist, that each script has the right class and every
@@ -250,8 +254,8 @@ After changes, run these and check Output:
 5. **Phone:** Device Simulator on a phone. The HUD and the Shop, Index and Pets windows shrink
    to 70% (see `Ui.screenScale`); check the hotbar and shop fit and can be tapped.
 6. **Sea events:** in Studio you don't have to wait. In the Command Bar, in the server view, run
-   `workspace:SetAttribute("DebugSeaEvent", "Whale")` (or `Current`, `Night`, `Frenzy`,
-   `Treasure`) to start that event now. This only works in Studio.
+   `workspace:SetAttribute("DebugSeaEvent", "Whale")` (or `Current`, `Cold`, `Night`, `Frenzy`,
+   `Treasure`, `Shipwreck`) to start that event now. This only works in Studio.
 
 ## Known limits and next steps
 

@@ -111,6 +111,9 @@ function SeabedDecor.build(root: Instance, rng: Random, isClear: (number, number
 		if center then
 			for _ = 1, rng:NextInteger(3, 5) do
 				local seedId = ReefConfig.SEED_ORDER[rng:NextInteger(1, #ReefConfig.SEED_ORDER)]
+				if ReefConfig.Seeds[seedId].shop == false then
+					seedId = "kelp" -- keep event seeds rare, even as decoration
+				end
 				local at = center + Vector3.new(rng:NextNumber(-6, 6), 0, rng:NextNumber(-6, 6))
 				local coral = CoralVisuals.build(seedId, "None", CFrame.new(at) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0))
 				coral.Name = "DecorCoral"

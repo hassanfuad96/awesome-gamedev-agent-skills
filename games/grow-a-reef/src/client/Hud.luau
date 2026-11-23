@@ -2,6 +2,7 @@
 -- Always-on HUD: shells, bag value, sea-event timer, toasts and the seed hotbar.
 
 local GuiService = game:GetService("GuiService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
@@ -287,12 +288,26 @@ function Hud.setData(self: Hud, data: any)
 				Text = "",
 				Parent = self.hotbar,
 			})
-			Ui.new("UIStroke", {
+			local stroke = Ui.new("UIStroke", {
 				Color = if selected then Ui.Colors.accent else seed.color,
 				Thickness = if selected then 3 else 1.5,
 				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 				Parent = slot,
 			})
+			if seed.rarity == "Transcendent" and not selected then
+				-- A rainbow border marks the rarest seeds.
+				stroke.Color = Color3.new(1, 1, 1)
+				stroke.Thickness = 2.5
+				Ui.new("UIGradient", {
+					Color = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 255, 230)),
+						ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 170, 255)),
+						ColorSequenceKeypoint.new(1, Color3.fromRGB(235, 150, 255)),
+					}),
+					Rotation = 45,
+					Parent = stroke,
+				})
+			end
 			Ui.new("Frame", {
 				Name = "Swatch",
 				AnchorPoint = Vector2.new(0.5, 0),
@@ -395,12 +410,34 @@ function Hud.flash(self: Hud)
 	TweenService:Create(self.flashFrame, TweenInfo.new(0.6), { BackgroundTransparency = 1 }):Play()
 end
 
+-- During the Shipwreck: when the orcas come, and whether you are hidden inside the wreck.
+local function shipwreckLine(now: number): (string?, Color3?)
+	local orcasAt = Workspace:GetAttribute("OrcasAt")
+	local huntEndsAt = Workspace:GetAttribute("HuntEndsAt")
+	if type(orcasAt) ~= "number" or type(huntEndsAt) ~= "number" or now > huntEndsAt then
+		return nil, nil
+	end
+	local ship = Workspace:GetAttribute("ShipwreckCFrame")
+	local character = Players.LocalPlayer.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local hidden = typeof(ship) == "CFrame" and root ~= nil and ReefConfig.insideShipwreck(ship, root.Position)
+	local status = if hidden then "You're hidden" else "Hide inside the wreck by the shops!"
+	if now < orcasAt then
+		return `Orcas in {Ui.formatTime(orcasAt - now)}! {status}`, if hidden then Ui.Colors.good else Ui.Colors.rare
+	end
+	return `Orca hunt! {Ui.formatTime(huntEndsAt - now)} - {if hidden then status else "You're exposed!"}`, if hidden then Ui.Colors.good else Ui.Colors.bad
+end
+
 function Hud.updateTimers(self: Hud)
 	local now = Workspace:GetServerTimeNow()
 	local event = ReefConfig.EventById[Workspace:GetAttribute("EventId")]
 	local endsAt = Workspace:GetAttribute("EventEndsAt")
 	local nextAt = Workspace:GetAttribute("NextEventAt")
-	if event and type(endsAt) == "number" and endsAt > now then
+	local shipText, shipColor = shipwreckLine(now)
+	if shipText then
+		self.event.Text = shipText
+		self.event.TextColor3 = shipColor
+	elseif event and type(endsAt) == "number" and endsAt > now then
 		self.event.Text = `{event.name}! {Ui.formatTime(endsAt - now)}`
 		self.event.TextColor3 = event.color
 	elseif type(nextAt) == "number" then

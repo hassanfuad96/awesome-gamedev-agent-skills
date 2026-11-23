@@ -18,7 +18,7 @@ for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "Eq
 end
 local server = game:GetService("ServerScriptService").Server
 check(server.Main.ClassName == "Script", "server Main is a Script")
-for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport" } do
+for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport", "Shipwreck", "ShipwreckVisuals" } do
 	check(server:FindFirstChild(m) and server[m].ClassName == "ModuleScript", "server module " .. m)
 end
 local client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
@@ -44,7 +44,7 @@ for _, s in game:GetDescendants() do
 end
 
 -- 3. Config and economy logic, run for real with Lune's Roblox datatypes
-local env = { Color3 = roblox.Color3, Vector3 = roblox.Vector3, math = math, string = string, table = table, pairs = pairs, ipairs = ipairs, type = type, tostring = tostring, tonumber = tonumber, error = error, setmetatable = setmetatable }
+local env = { Color3 = roblox.Color3, Vector3 = roblox.Vector3, CFrame = roblox.CFrame, math = math, string = string, table = table, pairs = pairs, ipairs = ipairs, type = type, tostring = tostring, tonumber = tonumber, error = error, setmetatable = setmetatable }
 local function load(path) return luau.load(fs.readFile(path), { debugName = path, environment = env })() end
 local Config = load("src/shared/ReefConfig.luau")
 local Econ = load("src/shared/EconomyMath.luau")
@@ -90,7 +90,17 @@ for _, event in Config.Events.list do
 	check(Config.EventById[event.id] == event and event.duration > 0 and event.weight > 0, "sea event " .. event.id .. " is listed with a duration and weight")
 	table.insert(eventIds, event.id)
 end
-check(table.concat(eventIds, ",") == "Current,Cold,Night,Frenzy,Treasure,Whale", "six sea events")
+check(table.concat(eventIds, ",") == "Current,Cold,Night,Frenzy,Treasure,Whale,Shipwreck", "seven sea events")
+local eventOdds = Econ.oddsPercent(Config.Events.list)
+check(math.abs(eventOdds.Shipwreck - 5) < 1e-9, "Shipwreck is picked 5% of the time")
+local ship = Config.Shipwreck
+check(Config.EventById.Shipwreck.duration == ship.huntStartsAt + ship.huntSeconds + 5 and ship.sinkSeconds < ship.huntStartsAt, "Shipwreck: sink, then hide, hunt and 5 s for the orcas to leave")
+check(ship.orcaSpeed > Config.Swim.speed, "orcas are faster than swimming, so hiding is the way to survive")
+local reward = Config.Seeds[ship.reward.seed]
+check(reward ~= nil and reward.shop == false and reward.rarity == "Transcendent" and reward.stockChance == 0, "the reward seed is Transcendent and never in the shop")
+local rest = roblox.CFrame.new(ship.landing)
+check(Config.insideShipwreck(rest, ship.landing + roblox.Vector3.new(10, 5, 3)) and not Config.insideShipwreck(rest, ship.landing + roblox.Vector3.new(0, 5, 20)) and not Config.insideShipwreck(rest, ship.landing + roblox.Vector3.new(0, 30, 0)), "inside the hull is hidden; beside or above it is not")
+check(ship.landing.Z + ship.width / 2 < -30 and ship.landing.Z - ship.width / 2 > Config.SeaLife.area.minZ, "the wreck lands on open seabed in front of the stands")
 
 -- Stacked mutations
 check(Config.harvestValue("kelp", "Glowing+Golden") == 180, "Glowing + Golden Bubble Kelp sells at x10 (180)")
@@ -110,7 +120,7 @@ local indexEntries = 0
 for _, set in Config.IndexSets do
 	indexEntries += #set.entries
 end
-check(#Config.IndexSets == 7 and indexEntries == 100, "Reef Index: 7 sets, 100 entries")
+check(#Config.IndexSets == 8 and indexEntries == 116, "Reef Index: 8 sets, 116 entries")
 
 -- Pet eggs: every outcome is a real pet and the shown odds sum to 100
 for _, egg in Config.Pets.eggs do

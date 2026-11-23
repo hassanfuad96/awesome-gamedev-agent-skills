@@ -76,6 +76,39 @@ local builders: { [string]: (Model, CFrame, Color3) -> () } = {
 		end
 		piece(model, Vector3.new(1.2, 1.2, 1.2), base * CFrame.new(0, 3.2, 0), Color3.new(1, 1, 1), Enum.Material.Neon, Enum.PartType.Ball)
 	end,
+	-- Transcendent: tall ribbons shading from teal to violet with glowing tips, round a
+	-- shining heart that gives off drifting motes.
+	seagrass = function(model, base, color)
+		local tips = { Color3.fromRGB(120, 255, 230), Color3.fromRGB(150, 170, 255), Color3.fromRGB(235, 150, 255) }
+		for i = 1, 8 do
+			local angle = (i / 8) * math.pi * 2
+			local height = 5 + (i % 3) * 1.3
+			local tip = tips[i % 3 + 1]
+			local lean = CFrame.Angles(math.sin(angle) * 0.22, angle, -math.cos(angle) * 0.22)
+			local at = base * CFrame.new(math.cos(angle) * 0.9, 0, math.sin(angle) * 0.9) * lean
+			local ribbon = piece(model, Vector3.new(0.55, height, 0.14), at * CFrame.new(0, height / 2, 0), color:Lerp(tip, 0.45), Enum.Material.SmoothPlastic)
+			ribbon.Transparency = 0.1
+			piece(model, Vector3.new(0.6, 0.6, 0.6), at * CFrame.new(0, height, 0), tip, Enum.Material.Neon, Enum.PartType.Ball)
+		end
+		local heart = piece(model, Vector3.new(1.1, 1.1, 1.1), base * CFrame.new(0, 0.8, 0), Color3.new(1, 1, 1), Enum.Material.Neon, Enum.PartType.Ball)
+		heart.Name = "Heart"
+		local light = Instance.new("PointLight")
+		light.Color = color
+		light.Range = 12
+		light.Brightness = 2
+		light.Parent = heart
+		local motes = Instance.new("ParticleEmitter")
+		motes.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		motes.Color = ColorSequence.new(tips[1], tips[3])
+		motes.LightEmission = 1
+		motes.Size = NumberSequence.new(0.25, 0)
+		motes.Lifetime = NumberRange.new(2, 3)
+		motes.Rate = 6
+		motes.Speed = NumberRange.new(1, 2.5)
+		motes.SpreadAngle = Vector2.new(40, 40)
+		motes.EmissionDirection = Enum.NormalId.Top
+		motes.Parent = heart
+	end,
 }
 
 -- Surface materials some mutations give; with two, the later one in the key wins.

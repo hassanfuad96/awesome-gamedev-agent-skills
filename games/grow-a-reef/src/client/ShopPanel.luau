@@ -103,6 +103,9 @@ function ShopPanel.new(playerGui: PlayerGui): ShopPanel
 	local rows: { [string]: Row } = {}
 	for order, seedId in ReefConfig.SEED_ORDER do
 		local seed = ReefConfig.Seeds[seedId]
+		if seed.shop == false then
+			continue -- event-only seeds are never sold
+		end
 		local row = Ui.new("Frame", {
 			Name = seedId,
 			LayoutOrder = order,

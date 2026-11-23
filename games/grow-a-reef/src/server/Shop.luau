@@ -45,7 +45,7 @@ local function restock()
 	stock = {}
 	for _, seedId in ReefConfig.SEED_ORDER do
 		local seed = ReefConfig.Seeds[seedId]
-		if rng:NextNumber() < seed.stockChance then
+		if seed.shop ~= false and rng:NextNumber() < seed.stockChance then
 			stock[seedId] = rng:NextInteger(seed.stockMin, seed.stockMax)
 		end
 	end

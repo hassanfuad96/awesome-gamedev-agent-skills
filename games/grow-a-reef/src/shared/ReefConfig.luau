@@ -12,6 +12,8 @@ export type SeedDef = {
 	stockChance: number, -- chance this seed appears at each restock
 	stockMin: number,
 	stockMax: number,
+	shop: boolean?, -- false: never sold in the Seed Shop (event rewards only)
+	rarity: string?, -- shown for special seeds, e.g. "Transcendent"
 }
 
 export type MutationDef = {
@@ -118,7 +120,7 @@ for _, fence in ReefConfig.Fences do
 	ReefConfig.FenceById[fence.id] = fence
 end
 
-ReefConfig.SEED_ORDER = { "kelp", "brain", "fan", "anemone", "clam", "star" }
+ReefConfig.SEED_ORDER = { "kelp", "brain", "fan", "anemone", "clam", "star", "seagrass" }
 
 ReefConfig.Seeds = {
 	kelp = {
@@ -144,6 +146,12 @@ ReefConfig.Seeds = {
 	star = {
 		id = "star", name = "Starlight Coral", price = 12000, growSeconds = 1200, sellValue = 32000,
 		color = Color3.fromRGB(255, 220, 80), stockChance = 0.07, stockMin = 1, stockMax = 1,
+	},
+	-- Transcendent: only from surviving the Shipwreck event's orca hunt. Never in the shop.
+	seagrass = {
+		id = "seagrass", name = "Seagrass", price = 0, growSeconds = 1800, sellValue = 150000,
+		color = Color3.fromRGB(110, 240, 210), stockChance = 0, stockMin = 0, stockMax = 0,
+		shop = false, rarity = "Transcendent",
 	},
 } :: { [string]: SeedDef }
 
@@ -198,7 +206,7 @@ ReefConfig.Events = {
 	interval = 180, -- seconds from the end of one event to the start of the next
 	list = {
 		{
-			id = "Current", name = "Ocean Current", weight = 25, duration = 40,
+			id = "Current", name = "Ocean Current", weight = 20, duration = 40,
 			color = Color3.fromRGB(110, 200, 255),
 			message = "An ocean current is flowing! Mutations can drift between reefs.",
 		},
@@ -227,6 +235,12 @@ ReefConfig.Events = {
 			color = Color3.fromRGB(150, 190, 255),
 			message = "A giant whale is passing overhead! Coral grows twice as fast while it's here.",
 		},
+		{
+			-- 20 s to hide, a 30 s hunt, 5 s for the orcas to leave (see Shipwreck below).
+			id = "Shipwreck", name = "Shipwreck", weight = 5, duration = 55,
+			color = Color3.fromRGB(255, 110, 100),
+			message = "A giant ship is sinking, and orcas are following it! Swim inside the wreck and hide before they arrive!",
+		},
 	} :: { EventDef },
 	glowingMultiplier = 3, -- Bioluminescent Night: Glowing mutation weight x this
 	fishSpawnMultiplier = 2, -- Feeding Frenzy: fish spawn clock runs this much faster
@@ -253,6 +267,31 @@ ReefConfig.Events = {
 ReefConfig.EventById = {} :: { [string]: EventDef }
 for _, event in ReefConfig.Events.list do
 	ReefConfig.EventById[event.id] = event
+end
+
+-- The Shipwreck event: a liner sinks onto the seabed in front of the stands, then a pod of
+-- orcas hunts everyone who isn't hiding inside it. Everyone who was there when the hunt
+-- began and didn't get eaten wins the reward seed.
+ReefConfig.Shipwreck = {
+	landing = Vector3.new(0, 0, -88), -- where the wreck comes to rest, on open seabed
+	length = 120, -- the hull, which you can swim into through its holes and hatches
+	width = 22,
+	height = 18,
+	sinkSeconds = 9,
+	huntStartsAt = 20, -- seconds into the event when the orcas arrive
+	huntSeconds = 30, -- then 5 more seconds for them to swim off
+	orcas = 6,
+	orcaSpeed = 40, -- studs/s, faster than swimming: hiding is the way to survive
+	catchRadius = 8,
+	reward = { seed = "seagrass", count = 1 },
+}
+
+-- Whether a point is inside the wreck's hull, where the orcas can't reach. shipCFrame is
+-- the middle of the hull at keel level.
+function ReefConfig.insideShipwreck(shipCFrame: CFrame, point: Vector3): boolean
+	local s = ReefConfig.Shipwreck
+	local p = shipCFrame:PointToObjectSpace(point)
+	return math.abs(p.X) < s.length / 2 - 1.5 and p.Y > 0 and p.Y < s.height and math.abs(p.Z) < s.width / 2 - 1
 end
 
 -- Fully grown coral attracts fish that the plot owner can click to catch.

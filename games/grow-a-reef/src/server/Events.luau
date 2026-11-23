@@ -19,6 +19,7 @@ local Plots = require(script.Parent.Plots)
 local EventState = require(script.Parent.EventState)
 local Currents = require(script.Parent.Currents)
 local TreasureStorm = require(script.Parent.TreasureStorm)
+local Shipwreck = require(script.Parent.Shipwreck)
 
 type Handler = {
 	start: (() -> ())?,
@@ -169,6 +170,7 @@ function Events.start(worldParts: World.WorldParts)
 				Plots.boostGrowth(SETTINGS.growthMultiplier - 1)
 			end,
 		},
+		Shipwreck = { start = Shipwreck.start, stop = Shipwreck.stop },
 	}
 
 	-- In Studio, set Workspace's DebugSeaEvent attribute to an event id (from the Command
