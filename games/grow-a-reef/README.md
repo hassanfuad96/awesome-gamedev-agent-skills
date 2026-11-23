@@ -12,11 +12,11 @@ repository (`skills/other-engines/roblox-*`).
 | Do this | How |
 |---|---|
 | Buy seeds | Walk to the **Seed Shop** (green stand) and press the prompt (E / tap). |
-| Plant | Pick a seed in the hotbar at the bottom, then click or tap an empty tile on your reef. |
+| Plant | Pick a seed in the hotbar at the bottom, then click or tap anywhere on your reef bed (the round brown patch). With a mouse, a ring shows where it goes: green fits, red is too close to other coral or the edge. |
 | Harvest | Click fully grown coral (its label says "Ready!"). It goes into your bag. |
 | Sell | Walk to **Sell Coral** (orange stand) and press the prompt. Everything in your bag sells. |
 | Catch fish | Fish swim around grown coral on your reef. Click them before they swim off. |
-| Grow your reef | In the Seed Shop, "Unlock a reef tile" adds one of 6 locked tiles. |
+| Grow your reef | You start with 6 coral slots. In the Seed Shop, "Grow your reef" adds a slot (up to 12) and widens your bed. |
 
 Each stand has a shopkeeper: Captain Coralie, a diver behind the Seed Shop counter, and Pinch,
 a crab on the Sell Coral counter. They turn to face you and greet you when you walk up. Their
@@ -83,7 +83,7 @@ src/server/                 -> ServerScriptService.Server
   Main.server.luau          starts everything in order
   World.luau                builds the seabed, lighting, stands, shopkeepers, leaderboard board and 6 plots
   PlayerData.luau           DataStore load/save with a session lock, data repair, leaderstats
-  Plots.luau                plot assignment, planting, growth, harvesting (ClickDetectors)
+  Plots.luau                plot assignment, free planting (PlantAt), growth, harvesting
   CoralVisuals.luau         coral models made from Parts, plus mutation effects
   ShopkeeperVisuals.luau    the shopkeeper models made from Parts, tagged "Shopkeeper"
   Shop.luau                 shared stock, buying, expanding, seed selection, selling
@@ -93,10 +93,11 @@ src/server/                 -> ServerScriptService.Server
   RateLimit.luau            per-player token bucket for every request
 src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   Main.client.luau          connects remotes and UI
+  CoralLabels.luau          name and growth countdown over each coral
   Hud.luau                  shells, bag, current timer, toasts, seed hotbar
+  Planter.luau              placement preview ring and click/tap to plant
   ShopPanel.luau            seed shop window
   Shopkeepers.luau          shopkeeper idle animation, turning and greetings (client only)
-  TileLabels.luau           growth countdowns over each tile
   Ui.luau                   shared colours and UI helpers
 ```
 
@@ -104,19 +105,23 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
 
 - The server owns every number. Remotes carry only ids ("buy `brain`"); prices, stock, growth
   and rewards come from `ReefConfig` on the server.
-- Planting, harvesting and fish catching use `ClickDetector.MouseClick`, which fires on the
-  server with the real player, so the client never says which tile it owns.
+- Planting sends only the clicked point. The server checks that it is on your own bed, within
+  reach, spaced from other coral and inside a free slot, using the same `plantProblem` rules the
+  client preview uses. Harvesting and fish catching use `ClickDetector.MouseClick`, which fires
+  on the server with the real player.
 - Buying and expanding check that the player is standing at the Seed Shop.
 - Every request goes through a per-player rate limit.
 - Saves use `UpdateAsync` with a session lease, so two servers can't overwrite each other's
-  progress during a fast rejoin. Loaded data is repaired (bad numbers, unknown seeds, tiles in
-  the future) instead of erroring.
+  progress during a fast rejoin. Loaded data is repaired (bad numbers, unknown seeds, coral
+  outside the bed, planting times in the future) instead of erroring. Version 1 saves, from the
+  old tile grid, are converted to the same layout.
 
 ## Tuning
 
 Change numbers in `src/shared/ReefConfig.luau`. Things you might want to change first:
 `STARTING_SHELLS`, seed prices and grow times, `Mutations` weights, `Current.interval`,
-`Fish.spawnChance`, and `EXPAND` (tile prices are 200, 500, 1,250, 3,125, 7,812, 19,531).
+`Fish.spawnChance`, `EXPAND` (slot prices are 200, 500, 1,250, 3,125, 7,812, 19,531), and the bed:
+`BED_RADIUS`, `BED_RADIUS_PER_SLOT` and `PLANT_SPACING`.
 
 To change the economy with the pacing calculator, see
 `skills/other-engines/roblox-simulator-economy/SKILL.md`.
@@ -127,30 +132,34 @@ To change the economy with the pacing calculator, see
 
 ```bash
 rojo build default.project.json -o GrowAReef.rbxlx   # builds
-lune run tests/compile_check.luau src                # all 19 scripts compile
-lune run tests/check_place.luau GrowAReef.rbxlx      # 87 checks pass
+lune run tests/compile_check.luau src                # all 20 scripts compile
+lune run tests/check_place.luau GrowAReef.rbxlx      # 96 checks pass
 ```
 
 `check_place` confirms that the remotes exist, that each script has the right class and every
 `require` points at a real module, and it runs the config and economy maths (sell values,
 expand prices, mutation odds over 200,000 rolls).
 
-**Checked in Studio** (solo Play through the Studio MCP server, on 2026-11-23): items 1, 2 and
-5 below, plus the shopkeepers turning, bobbing and greeting. Output showed no game errors, only
-the expected DataStore warning. Items 3 and 4 still need a published place and two clients.
+**Checked in Studio** (solo Play through the Studio MCP server, on 2026-11-23): items 1 and 2
+below with the free-planting reef (mouse planting with the green and red preview, the
+too-close and edge refusals, harvesting, fish), and the shopkeepers turning, bobbing and
+greeting. Output showed no game errors, only the expected DataStore warning. Item 5 was checked
+before the reef redesign. Not yet checked: tap-to-plant on a phone, growing the reef (the bed
+widening), and items 3 and 4, which need a published place and two clients.
 
 Roblox engine behaviour (parts, UI, DataStores, ClickDetectors) only runs inside Studio.
 After changes, run these and check Output:
 
 1. **Solo Play:** you spawn at your reef. Buy kelp, plant it, watch it grow, harvest it, sell it,
    then check that the Shells number changes. Click a growing coral (you should see a countdown
-   message) and a locked tile (you should see the "Expand" message).
+   message), and try planting next to a coral and at the bed edge (red ring, and a message
+   saying why).
 2. **Fish:** leave grown coral on the reef for about a minute; fish should appear and be
    catchable.
 3. **Saving (published test place with API access):** earn shells, stop, play again. The shells,
    seeds, bag and planted coral should all be back, and coral should have kept growing.
-4. **Server & Clients with 2 players** (Test tab): each gets their own reef; clicking the other
-   reef says it's theirs. To test currents quickly, set `Current.interval = 20` and raise the
+4. **Server & Clients with 2 players** (Test tab): each gets their own reef; trying to plant on the
+   other reef says it's theirs. To test currents quickly, set `Current.interval = 20` and raise the
    Glowing weight, then check that a mutation crosses to the other reef.
 5. **Phone:** Device Simulator, check the hotbar and shop fit and can be tapped.
 

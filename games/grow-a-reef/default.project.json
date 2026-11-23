@@ -18,6 +18,9 @@
         "ExpandReef": {
           "$className": "RemoteEvent"
         },
+        "PlantAt": {
+          "$className": "RemoteEvent"
+        },
         "RequestSync": {
           "$className": "RemoteEvent"
         },

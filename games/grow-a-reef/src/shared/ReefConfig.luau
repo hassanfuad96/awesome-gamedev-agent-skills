@@ -36,20 +36,23 @@ export type ShopkeeperDef = {
 
 local ReefConfig = {}
 
-ReefConfig.DATA_VERSION = 1
+ReefConfig.DATA_VERSION = 2 -- 2: coral planted anywhere in a round bed (1 used a tile grid)
 ReefConfig.STARTING_SHELLS = 40
 ReefConfig.STARTING_SEEDS = { kelp = 3 } :: { [string]: number }
 ReefConfig.MAX_SEEDS_PER_TYPE = 999
 
--- Plot layout
-ReefConfig.TILE_COLUMNS = 4
-ReefConfig.TILE_ROWS = 3
-ReefConfig.TILE_COUNT = 12
-ReefConfig.STARTING_TILES = 6
-ReefConfig.TILE_SIZE = 8
+-- Plot layout. Coral is planted anywhere inside the plot's round reef bed; each coral
+-- uses one slot, and every slot bought also widens the bed.
+ReefConfig.STARTING_SLOTS = 6
+ReefConfig.MAX_SLOTS = 12
+ReefConfig.BED_RADIUS = 11 -- studs, with the starting slots
+ReefConfig.BED_RADIUS_PER_SLOT = 0.75 -- extra radius for each slot bought
+ReefConfig.PLANT_SPACING = 5 -- minimum studs between two corals
+ReefConfig.PLANT_EDGE = 1.5 -- keep coral this far inside the bed's edge
+ReefConfig.PLANT_REACH = 50 -- how far from your character you can plant
 ReefConfig.PLOT_COUNT = 6 -- one plot per player; set the place's max players to 6
 
--- Unlocking extra tiles: price of the n-th extra tile = floor(baseCost * costGrowth ^ n)
+-- Growing the reef: price of the n-th extra slot = floor(baseCost * costGrowth ^ n)
 ReefConfig.EXPAND = { baseCost = 200, costGrowth = 2.5 }
 
 ReefConfig.SEED_ORDER = { "kelp", "brain", "fan", "anemone", "clam", "star" }
@@ -137,7 +140,7 @@ ReefConfig.Shopkeepers = {
 			"Welcome, diver! Fresh seeds, straight from the deep.",
 			"New here? Bubble Kelp grows in 20 seconds.",
 			"Rare seeds sell out fast. Come back after a restock!",
-			"Short on space? I can unlock more reef tiles for you.",
+			"Short on space? I can grow your reef bigger.",
 		},
 	},
 	Sell = {
@@ -152,9 +155,38 @@ ReefConfig.Shopkeepers = {
 	},
 } :: { [string]: ShopkeeperDef }
 
+ReefConfig.CORAL_TAG = "Coral" -- every planted coral model, for the client's labels and preview
+
 function ReefConfig.expandCost(unlocked: number): number
-	local extra = unlocked - ReefConfig.STARTING_TILES
+	local extra = unlocked - ReefConfig.STARTING_SLOTS
 	return math.floor(ReefConfig.EXPAND.baseCost * ReefConfig.EXPAND.costGrowth ^ extra)
+end
+
+function ReefConfig.bedRadius(unlocked: number): number
+	return ReefConfig.BED_RADIUS + ReefConfig.BED_RADIUS_PER_SLOT * (unlocked - ReefConfig.STARTING_SLOTS)
+end
+
+-- Why a coral can't be planted at (x, z) from the plot centre, or nil if it can. Shared so
+-- the client's placement preview agrees with the server, which makes the real decision.
+function ReefConfig.plantProblem(x: number, z: number, unlocked: number, plants: { [any]: { x: number, z: number } }): string?
+	local count = 0
+	for _ in plants do
+		count += 1
+	end
+	if count >= unlocked then
+		return "Your reef is full. Harvest coral, or grow your reef at the Seed Shop."
+	end
+	local reach = ReefConfig.bedRadius(unlocked) - ReefConfig.PLANT_EDGE
+	if x * x + z * z > reach * reach then
+		return "Plant inside your reef bed."
+	end
+	for _, plant in plants do
+		local dx, dz = plant.x - x, plant.z - z
+		if dx * dx + dz * dz < ReefConfig.PLANT_SPACING * ReefConfig.PLANT_SPACING then
+			return "Too close to another coral."
+		end
+	end
+	return nil
 end
 
 function ReefConfig.harvestValue(seedId: string, mutationId: string): number

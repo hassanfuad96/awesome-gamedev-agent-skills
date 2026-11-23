@@ -236,12 +236,15 @@ function Hud.setData(self: Hud, data: any)
 		end
 	end
 
+	local slots = `{data.planted or 0}/{data.unlocked} coral planted`
 	if not any then
-		self.hint.Text = "No seeds. Buy some at the Seed Shop!"
+		self.hint.Text = `No seeds. Buy some at the Seed Shop! ({slots})`
+	elseif (data.planted or 0) >= data.unlocked then
+		self.hint.Text = `Reef full ({slots}). Harvest, or grow your reef at the Seed Shop`
 	elseif data.selected then
-		self.hint.Text = `Click an empty tile on your reef to plant {ReefConfig.Seeds[data.selected].name}`
+		self.hint.Text = `Click your reef bed to plant {ReefConfig.Seeds[data.selected].name} ({slots})`
 	else
-		self.hint.Text = "Pick a seed, then click an empty tile on your reef"
+		self.hint.Text = `Pick a seed, then click your reef bed to plant it ({slots})`
 	end
 end
 

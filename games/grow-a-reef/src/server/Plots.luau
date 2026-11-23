@@ -1,10 +1,12 @@
 --!nonstrict
--- Plot ownership, planting, growth and harvesting. Tiles and coral are clicked through
--- ClickDetectors, whose MouseClick event fires on the server with the real player, so
--- the client never tells the server which tile it owns or what it planted.
+-- Plot ownership, planting, growth and harvesting. Coral can be planted anywhere inside the
+-- owner's round reef bed: the client sends only the clicked point (PlantAt), and the server
+-- checks the plot, reach, slots, spacing and seed before planting. Coral is harvested by
+-- clicking it; ClickDetector.MouseClick fires on the server with the real player.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
 local EconomyMath = require(ReplicatedStorage.Shared.EconomyMath)
@@ -17,21 +19,21 @@ local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 type PlotParts = World.PlotParts
 type Profile = PlayerData.Profile
+type Plant = PlayerData.Plant
 
-export type ReadyCoral = { tileIndex: number, seed: string, mutation: string, position: Vector3 }
+export type ReadyCoral = { plantId: string, seed: string, mutation: string, position: Vector3 }
 
 local Plots = {}
 
 local plots: { PlotParts } = {}
 local ownerByPlot: { [number]: Player } = {}
 local plotByPlayer: { [Player]: PlotParts } = {}
-local coralModels: { [Player]: { [number]: Model } } = {}
+local coralModels: { [Player]: { [string]: Model } } = {}
 local spawnConnections: { [Player]: RBXScriptConnection } = {}
 local rng = Random.new()
 
 local MIN_SCALE = 0.25
-local EMPTY_COLOR = Color3.fromRGB(140, 100, 66) -- matches the tile colour World.luau builds
-local LOCKED_COLOR = Color3.fromRGB(60, 56, 52)
+local BED_TWEEN = TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
 local function notify(player: Player, text: string, tone: string?)
 	Remotes.Notify:FireClient(player, text, tone or "info")
@@ -45,61 +47,69 @@ local function displayName(seedId: string, mutationId: string): string
 end
 Plots.displayName = displayName
 
-local function growthOf(tile: PlayerData.Tile): number
-	local seed = ReefConfig.Seeds[tile.seed]
+local function growthOf(plant: Plant): number
+	local seed = ReefConfig.Seeds[plant.seed]
 	if not seed then
 		return 1
 	end
-	return math.clamp((os.time() - tile.plantedAt) / seed.growSeconds, 0, 1)
+	return math.clamp((os.time() - plant.plantedAt) / seed.growSeconds, 0, 1)
 end
 
-local function tileBase(tilePart: BasePart): CFrame
-	return tilePart.CFrame * CFrame.new(0, tilePart.Size.Y / 2, 0)
+local function worldPosition(plot: PlotParts, plant: Plant): Vector3
+	return Vector3.new(plot.center.X + plant.x, plot.bedTop, plot.center.Z + plant.z)
 end
 
-local handleTileClick: (Player, PlotParts, number) -> ()
+-- The point's plot, if it lies on one of the reef mounds.
+local function plotAt(point: Vector3): PlotParts?
+	for _, plot in plots do
+		local dx, dz = point.X - plot.center.X, point.Z - plot.center.Z
+		if dx * dx + dz * dz <= plot.radius * plot.radius then -- false for NaN
+			return plot
+		end
+	end
+	return nil
+end
 
-local function setCoral(player: Player, plot: PlotParts, tileIndex: number, tile: PlayerData.Tile?)
+local function setBedRadius(plot: PlotParts, radius: number)
+	local size = Vector3.new(plot.bed.Size.X, radius * 2, radius * 2)
+	if (plot.bed.Size - size).Magnitude > 0.01 then
+		TweenService:Create(plot.bed, BED_TWEEN, { Size = size }):Play()
+	end
+end
+
+local handleCoralClick: (Player, PlotParts, string) -> ()
+
+local function setCoral(player: Player, plot: PlotParts, plantId: string, plant: Plant?)
 	local models = coralModels[player]
 	if not models then
 		return
 	end
-	local existing = models[tileIndex]
+	local existing = models[plantId]
 	if existing then
 		existing:Destroy()
-		models[tileIndex] = nil
+		models[plantId] = nil
+	end
+	if not plant then
+		return
 	end
 
-	local tilePart = plot.tiles[tileIndex]
-	if tile then
-		local model = CoralVisuals.build(tile.seed, tile.mutation, tileBase(tilePart))
-		model:ScaleTo(MIN_SCALE + (1 - MIN_SCALE) * growthOf(tile))
-		-- Coral covers the tile, so it needs its own click target.
-		local click = Instance.new("ClickDetector")
-		click.MaxActivationDistance = 40
-		click.Parent = model
-		click.MouseClick:Connect(function(clicker)
-			handleTileClick(clicker, plot, tileIndex)
-		end)
-		model.Parent = plot.model
-		models[tileIndex] = model
-
-		local seed = ReefConfig.Seeds[tile.seed]
-		tilePart:SetAttribute("Seed", tile.seed)
-		tilePart:SetAttribute("Mutation", tile.mutation)
-		tilePart:SetAttribute("ReadyAt", tile.plantedAt + (if seed then seed.growSeconds else 0))
-	else
-		tilePart:SetAttribute("Seed", nil)
-		tilePart:SetAttribute("Mutation", nil)
-		tilePart:SetAttribute("ReadyAt", nil)
-	end
-end
-
-local function paintTile(plot: PlotParts, tileIndex: number, unlocked: boolean)
-	local tilePart = plot.tiles[tileIndex]
-	tilePart.Color = if unlocked then EMPTY_COLOR else LOCKED_COLOR
-	tilePart.Transparency = if unlocked then 0 else 0.4
-	tilePart:SetAttribute("Locked", not unlocked)
+	-- A steady turn per plant (the golden angle) so a reef doesn't look stamped out.
+	local turn = math.rad(((tonumber(plantId) or 0) * 137.5) % 360)
+	local model = CoralVisuals.build(plant.seed, plant.mutation, CFrame.new(worldPosition(plot, plant)) * CFrame.Angles(0, turn, 0))
+	model:ScaleTo(MIN_SCALE + (1 - MIN_SCALE) * growthOf(plant))
+	local click = Instance.new("ClickDetector")
+	click.MaxActivationDistance = 40
+	click.Parent = model
+	click.MouseClick:Connect(function(clicker)
+		handleCoralClick(clicker, plot, plantId)
+	end)
+	local seed = ReefConfig.Seeds[plant.seed]
+	model:SetAttribute("ReadyAt", plant.plantedAt + (if seed then seed.growSeconds else 0))
+	-- Arrive whole on clients, so their labels and placement preview see a complete coral.
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+	model:AddTag(ReefConfig.CORAL_TAG)
+	model.Parent = plot.model
+	models[plantId] = model
 end
 
 local function renderPlot(player: Player, profile: Profile)
@@ -107,13 +117,13 @@ local function renderPlot(player: Player, profile: Profile)
 	if not plot then
 		return
 	end
-	for tileIndex = 1, ReefConfig.TILE_COUNT do
-		paintTile(plot, tileIndex, tileIndex <= profile.data.unlocked)
-		setCoral(player, plot, tileIndex, profile.data.tiles[tostring(tileIndex)])
+	setBedRadius(plot, ReefConfig.bedRadius(profile.data.unlocked))
+	for plantId, plant in profile.data.plants do
+		setCoral(player, plot, plantId, plant)
 	end
 end
 
-local function plant(player: Player, profile: Profile, plot: PlotParts, tileIndex: number)
+local function plant(player: Player, profile: Profile, plot: PlotParts, x: number, z: number)
 	local seedId = profile.selected
 	if not seedId then
 		notify(player, "Pick a seed from your hotbar first.")
@@ -130,54 +140,83 @@ local function plant(player: Player, profile: Profile, plot: PlotParts, tileInde
 	end
 
 	local mutation = EconomyMath.pickWeighted(ReefConfig.Mutations, rng:NextNumber())
-	local tile = { seed = seedId, plantedAt = os.time(), mutation = mutation }
-	profile.data.tiles[tostring(tileIndex)] = tile
-	setCoral(player, plot, tileIndex, tile)
+	profile.data.plantSeq += 1
+	local plantId = tostring(profile.data.plantSeq)
+	local newPlant = { seed = seedId, plantedAt = os.time(), mutation = mutation, x = x, z = z }
+	profile.data.plants[plantId] = newPlant
+	setCoral(player, plot, plantId, newPlant)
 	if mutation ~= "None" then
 		notify(player, `Lucky! A {displayName(seedId, mutation)} sprouted!`, "rare")
 	end
 	PlayerData.sync(player)
 end
 
-local function harvest(player: Player, profile: Profile, plot: PlotParts, tileIndex: number, tile: PlayerData.Tile)
-	profile.data.tiles[tostring(tileIndex)] = nil
-	local key = ReefConfig.inventoryKey(tile.seed, tile.mutation)
+local function harvest(player: Player, profile: Profile, plot: PlotParts, plantId: string, grown: Plant)
+	profile.data.plants[plantId] = nil
+	local key = ReefConfig.inventoryKey(grown.seed, grown.mutation)
 	profile.data.inventory[key] = (profile.data.inventory[key] or 0) + 1
 	profile.data.harvested += 1
-	setCoral(player, plot, tileIndex, nil)
-	local value = ReefConfig.harvestValue(tile.seed, tile.mutation)
-	notify(player, `+1 {displayName(tile.seed, tile.mutation)} (sells for {EconomyMath.formatNumber(value)} shells)`, "good")
+	setCoral(player, plot, plantId, nil)
+	local value = ReefConfig.harvestValue(grown.seed, grown.mutation)
+	notify(player, `+1 {displayName(grown.seed, grown.mutation)} (sells for {EconomyMath.formatNumber(value)} shells)`, "good")
 	PlayerData.sync(player)
 end
 
-handleTileClick = function(player: Player, plot: PlotParts, tileIndex: number)
+local function notifyNotYours(player: Player, plot: PlotParts)
+	local owner = ownerByPlot[plot.index]
+	notify(player, if owner then `That's {owner.DisplayName}'s reef.` else "Nobody owns this reef.")
+end
+
+handleCoralClick = function(player: Player, plot: PlotParts, plantId: string)
 	if ownerByPlot[plot.index] ~= player then
-		local owner = ownerByPlot[plot.index]
-		notify(player, if owner then `That's {owner.DisplayName}'s reef.` else "Nobody owns this reef.")
+		notifyNotYours(player, plot)
 		return
 	end
 	if not RateLimit.consume(player) then
 		return
 	end
 	local profile = PlayerData.get(player)
-	if not profile then
+	local clicked = profile and profile.data.plants[plantId]
+	if not profile or not clicked then
 		return
 	end
-	if tileIndex > profile.data.unlocked then
-		notify(player, "Locked tile. Expand your reef at the Seed Shop.")
-		return
-	end
-
-	local tile = profile.data.tiles[tostring(tileIndex)]
-	if not tile then
-		plant(player, profile, plot, tileIndex)
-	elseif growthOf(tile) >= 1 then
-		harvest(player, profile, plot, tileIndex, tile)
+	if growthOf(clicked) >= 1 then
+		harvest(player, profile, plot, plantId, clicked)
 	else
-		local seed = ReefConfig.Seeds[tile.seed]
-		local left = tile.plantedAt + seed.growSeconds - os.time()
-		notify(player, `{displayName(tile.seed, tile.mutation)}: {left}s until it's ready.`)
+		local seed = ReefConfig.Seeds[clicked.seed]
+		local left = clicked.plantedAt + seed.growSeconds - os.time()
+		notify(player, `{displayName(clicked.seed, clicked.mutation)}: {left}s until it's ready.`)
 	end
+end
+
+local function onPlantAt(player: Player, point: unknown)
+	if typeof(point) ~= "Vector3" or not RateLimit.consume(player) then
+		return
+	end
+	local position = point :: Vector3
+	local profile = PlayerData.get(player)
+	local plot = plotAt(position)
+	if not profile or not plot then
+		return
+	end
+	if ownerByPlot[plot.index] ~= player then
+		notifyNotYours(player, plot)
+		return
+	end
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root or (root.Position - position).Magnitude > ReefConfig.PLANT_REACH then
+		notify(player, "Swim closer to your reef to plant.")
+		return
+	end
+	local x = math.round((position.X - plot.center.X) * 10) / 10
+	local z = math.round((position.Z - plot.center.Z) * 10) / 10
+	local problem = ReefConfig.plantProblem(x, z, profile.data.unlocked, profile.data.plants)
+	if problem then
+		notify(player, problem)
+		return
+	end
+	plant(player, profile, plot, x, z)
 end
 
 function Plots.assign(player: Player, profile: Profile)
@@ -223,10 +262,10 @@ function Plots.release(player: Player)
 	if not plot then
 		return
 	end
-	for tileIndex = 1, ReefConfig.TILE_COUNT do
-		setCoral(player, plot, tileIndex, nil)
-		paintTile(plot, tileIndex, tileIndex <= ReefConfig.STARTING_TILES)
+	for _, model in coralModels[player] or {} do
+		model:Destroy()
 	end
+	setBedRadius(plot, ReefConfig.bedRadius(ReefConfig.STARTING_SLOTS))
 	plot.sign.Text = "Empty reef"
 	plot.model:SetAttribute("OwnerUserId", nil)
 	ownerByPlot[plot.index] = nil
@@ -234,10 +273,12 @@ function Plots.release(player: Player)
 	coralModels[player] = nil
 end
 
+-- Called after the reef grows: widens the bed to the new slot count.
 function Plots.refresh(player: Player)
 	local profile = PlayerData.get(player)
-	if profile then
-		renderPlot(player, profile)
+	local plot = plotByPlayer[player]
+	if profile and plot then
+		setBedRadius(plot, ReefConfig.bedRadius(profile.data.unlocked))
 	end
 end
 
@@ -261,14 +302,13 @@ function Plots.readyCorals(player: Player): { ReadyCoral }
 	if not profile or not plot then
 		return result
 	end
-	for key, tile in profile.data.tiles do
-		local tileIndex = tonumber(key)
-		if tileIndex and growthOf(tile) >= 1 then
+	for plantId, grown in profile.data.plants do
+		if growthOf(grown) >= 1 then
 			table.insert(result, {
-				tileIndex = tileIndex,
-				seed = tile.seed,
-				mutation = tile.mutation,
-				position = plot.tiles[tileIndex].Position,
+				plantId = plantId,
+				seed = grown.seed,
+				mutation = grown.mutation,
+				position = worldPosition(plot, grown),
 			})
 		end
 	end
@@ -276,49 +316,38 @@ function Plots.readyCorals(player: Player): { ReadyCoral }
 end
 
 -- Planted coral without a mutation, grown or not (currents can mutate these).
-function Plots.unmutatedTiles(player: Player): { number }
-	local result: { number } = {}
+function Plots.unmutatedPlants(player: Player): { string }
+	local result: { string } = {}
 	local profile = PlayerData.get(player)
 	if not profile then
 		return result
 	end
-	for key, tile in profile.data.tiles do
-		local tileIndex = tonumber(key)
-		if tileIndex and tile.mutation == "None" then
-			table.insert(result, tileIndex)
+	for plantId, growing in profile.data.plants do
+		if growing.mutation == "None" then
+			table.insert(result, plantId)
 		end
 	end
 	return result
 end
 
-function Plots.setMutation(player: Player, tileIndex: number, mutationId: string): boolean
+function Plots.setMutation(player: Player, plantId: string, mutationId: string): boolean
 	local profile = PlayerData.get(player)
 	local plot = plotByPlayer[player]
 	if not profile or not plot or not ReefConfig.MutationById[mutationId] then
 		return false
 	end
-	local tile = profile.data.tiles[tostring(tileIndex)]
-	if not tile then
+	local target = profile.data.plants[plantId]
+	if not target then
 		return false
 	end
-	tile.mutation = mutationId
-	setCoral(player, plot, tileIndex, tile)
+	target.mutation = mutationId
+	setCoral(player, plot, plantId, target)
 	return true
 end
 
 function Plots.start(worldParts: World.WorldParts)
 	plots = worldParts.plots
-	for _, plot in plots do
-		for tileIndex, tilePart in plot.tiles do
-			local click = tilePart:FindFirstChildOfClass("ClickDetector")
-			if click then
-				click.MouseClick:Connect(function(player)
-					handleTileClick(player, plot, tileIndex)
-				end)
-			end
-		end
-	end
-
+	Remotes.PlantAt.OnServerEvent:Connect(onPlantAt)
 	PlayerData.onLoaded(Plots.assign)
 	Players.PlayerRemoving:Connect(Plots.release)
 
@@ -329,10 +358,10 @@ function Plots.start(worldParts: World.WorldParts)
 			for player, models in coralModels do
 				local profile = PlayerData.get(player)
 				if profile then
-					for tileIndex, model in models do
-						local tile = profile.data.tiles[tostring(tileIndex)]
-						if tile and model.Parent then
-							local target = MIN_SCALE + (1 - MIN_SCALE) * growthOf(tile)
+					for plantId, model in models do
+						local growing = profile.data.plants[plantId]
+						if growing and model.Parent then
+							local target = MIN_SCALE + (1 - MIN_SCALE) * growthOf(growing)
 							if math.abs(model:GetScale() - target) > 0.01 then
 								model:ScaleTo(target)
 							end

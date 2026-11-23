@@ -12,7 +12,7 @@ local function check(cond, msg) if cond then print("ok   " .. msg) else failures
 -- 1. Place structure
 local game = roblox.deserializePlace(fs.readFile(process.args[1]))
 local rs = game:GetService("ReplicatedStorage")
-for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "RequestSync", "DataSync", "ShopSync", "Notify" } do
+for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "RequestSync", "DataSync", "ShopSync", "Notify" } do
 	local r = rs.Remotes:FindFirstChild(name)
 	check(r and r.ClassName == "RemoteEvent", "remote " .. name)
 end
@@ -48,6 +48,13 @@ local Econ = load("src/shared/EconomyMath.luau")
 check(Config.harvestValue("brain", "Golden") == 375, "Golden Brain Coral sells for 375")
 check(Config.harvestValue("nope", "None") == 0, "unknown seed sells for 0")
 check(Config.expandCost(6) == 200 and Config.expandCost(7) == 500 and Config.expandCost(11) == 19531, "expand costs 200, 500 ... 19531")
+check(Config.bedRadius(6) == 11 and Config.bedRadius(12) == 15.5, "reef bed grows from 11 to 15.5 studs")
+check(Config.plantProblem(0, 0, 6, {}) == nil, "coral fits in the middle of an empty bed")
+check(Config.plantProblem(10, 0, 6, {}) ~= nil and Config.plantProblem(9.4, 0, 6, {}) == nil, "coral must stay 1.5 studs inside the bed edge")
+check(Config.plantProblem(4.9, 0, 6, { { x = 0, z = 0 } }) ~= nil and Config.plantProblem(5, 0, 6, { { x = 0, z = 0 } }) == nil, "coral needs 5 studs of spacing")
+local full = {}
+for i = 1, 6 do full[tostring(i)] = { x = (i - 3.5) * 100, z = 0 } end
+check(string.find(Config.plantProblem(0, 0, 6, full) or "", "full") ~= nil, "a full reef refuses more coral")
 local s, m = Config.splitInventoryKey(Config.inventoryKey("star", "Prismatic"))
 check(s == "star" and m == "Prismatic", "inventory key round trip")
 check(Config.splitInventoryKey("bad key") == nil, "malformed inventory key rejected")

@@ -16,8 +16,10 @@ export type PlotParts = {
 	index: number,
 	model: Model,
 	center: Vector3,
+	radius: number, -- the whole mound; points within it belong to this plot
+	bed: BasePart, -- the round plantable bed (a cylinder lying flat)
+	bedTop: number, -- world Y of the bed's top surface
 	sign: TextLabel,
-	tiles: { BasePart },
 	spawn: CFrame,
 }
 
@@ -32,7 +34,11 @@ export type WorldParts = {
 local World = {}
 
 local SAND = Color3.fromRGB(214, 196, 150)
+local REEF_SAND = Color3.fromRGB(196, 172, 128)
+-- Slate, because Ground renders almost black under the underwater lighting.
+local BED_SOIL = Color3.fromRGB(140, 100, 66)
 local ROCK = Color3.fromRGB(96, 104, 112)
+local SEA_GRASS = Color3.fromRGB(70, 150, 90)
 local PLOT_SPACING = 50
 local PLOT_ROW_Z = 45
 
@@ -48,6 +54,35 @@ local function part(props: { [string]: any }): Part
 	end
 	p.Parent = props.Parent
 	return p
+end
+
+-- A flat round slab. Roblox cylinders run along X, so it is rolled onto its side.
+local function disc(parent: Instance, name: string, radius: number, height: number, position: Vector3, color: Color3, material: Enum.Material): Part
+	return part({
+		Name = name,
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(height, radius * 2, radius * 2),
+		CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = color,
+		Material = material,
+		Parent = parent,
+	})
+end
+
+local function seaGrass(parent: Instance, position: Vector3, rng: Random)
+	for blade = 1, 3 do
+		local height = rng:NextNumber(1.8, 3.2)
+		local lean = CFrame.Angles(rng:NextNumber(-0.25, 0.25), (blade / 3) * math.pi * 2, rng:NextNumber(-0.25, 0.25))
+		part({
+			Name = "SeaGrass",
+			Size = Vector3.new(0.25, height, 0.1),
+			CFrame = CFrame.new(position) * lean * CFrame.new(0, height / 2, 0),
+			Color = SEA_GRASS:Lerp(Color3.new(0, 0, 0), rng:NextNumber(0, 0.25)),
+			Material = Enum.Material.Grass,
+			CanCollide = false,
+			Parent = parent,
+		})
+	end
 end
 
 local function surfaceLabel(target: BasePart, face: Enum.NormalId, text: string, color: Color3): TextLabel
@@ -178,66 +213,78 @@ end
 
 local function buildPlot(parent: Instance, index: number): PlotParts
 	local center = Vector3.new(-((ReefConfig.PLOT_COUNT - 1) * PLOT_SPACING) / 2 + (index - 1) * PLOT_SPACING, 0, PLOT_ROW_Z)
-	local size = ReefConfig.TILE_SIZE
-	local width = ReefConfig.TILE_COLUMNS * size + 4
-	local depth = ReefConfig.TILE_ROWS * size + 4
+	-- The mound reaches a little past the largest bed, leaving room for the rocky rim.
+	local radius = ReefConfig.bedRadius(ReefConfig.MAX_SLOTS) + 3
+	-- Each reef gets its own outline, the same every time the server starts.
+	local rng = Random.new(index * 7919)
 
 	local model = Instance.new("Model")
 	model.Name = "Plot_" .. index
 	model:SetAttribute("PlotIndex", index)
 	model.Parent = parent
 
-	part({
-		Name = "Base",
-		Size = Vector3.new(width, 1, depth),
-		Position = center + Vector3.new(0, 0.5, 0),
-		Color = Color3.fromRGB(196, 172, 128),
-		Material = Enum.Material.Sand,
-		Parent = model,
-	})
+	-- A round sand mound with a lumpy edge: one big disc plus smaller ones around the rim.
+	disc(model, "Base", radius, 1, center + Vector3.new(0, 0.5, 0), REEF_SAND, Enum.Material.Sand)
+	for i = 1, 7 do
+		local angle = (i / 7) * math.pi * 2 + rng:NextNumber(-0.3, 0.3)
+		local lump = rng:NextNumber(4, 7)
+		local at = center + Vector3.new(math.cos(angle), 0, math.sin(angle)) * (radius - lump * 0.5)
+		disc(model, "Base", lump, 1, at + Vector3.new(0, 0.5, 0), REEF_SAND, Enum.Material.Sand)
+	end
 
+	-- The bed is where coral goes. Plots resizes it to the owner's slots.
+	local bed = disc(model, "Bed", ReefConfig.bedRadius(ReefConfig.STARTING_SLOTS), 0.4, center + Vector3.new(0, 1.2, 0), BED_SOIL, Enum.Material.Slate)
+
+	-- Rocks and sea grass around the rim, with a gap at the front (-Z) to walk in.
+	for i = 1, 16 do
+		local angle = (i / 16) * math.pi * 2 + rng:NextNumber(-0.12, 0.12)
+		local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
+		if direction.Z > -0.85 then
+			local s = rng:NextNumber(1.6, 3.2)
+			part({
+				Name = "Rock",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(s, s * 0.7, s),
+				Position = center + direction * (radius - rng:NextNumber(0.6, 1.8)) + Vector3.new(0, 1 + s * 0.15, 0),
+				Color = ROCK:Lerp(REEF_SAND, rng:NextNumber(0, 0.35)),
+				Material = Enum.Material.Rock,
+				Parent = model,
+			})
+			if i % 2 == 0 then
+				seaGrass(model, center + direction * (radius - 3.2) + Vector3.new(0, 1, 0), rng)
+			end
+		end
+	end
+
+	local front = center + Vector3.new(0, 0, -radius - 2)
+	for _, x in { -6.5, 6.5 } do
+		part({
+			Name = "SignPost",
+			Size = Vector3.new(0.6, 6, 0.6),
+			Position = front + Vector3.new(x, 3, 0.3),
+			Color = Color3.fromRGB(120, 90, 60),
+			Material = Enum.Material.Wood,
+			Parent = model,
+		})
+	end
 	local signPart = part({
 		Name = "Sign",
-		Size = Vector3.new(16, 4, 0.5),
-		Position = center + Vector3.new(0, 4, -depth / 2 - 1),
+		Size = Vector3.new(14, 3.5, 0.5),
+		Position = front + Vector3.new(0, 4.6, 0),
 		Color = Color3.fromRGB(40, 90, 120),
 		Parent = model,
 	})
 	local sign = surfaceLabel(signPart, Enum.NormalId.Front, "Empty reef", Color3.fromRGB(200, 240, 255))
 
-	local tiles: { BasePart } = {}
-	for row = 1, ReefConfig.TILE_ROWS do
-		for column = 1, ReefConfig.TILE_COLUMNS do
-			local tileIndex = (row - 1) * ReefConfig.TILE_COLUMNS + column
-			local offset = Vector3.new(
-				(column - (ReefConfig.TILE_COLUMNS + 1) / 2) * size,
-				1.2,
-				(row - (ReefConfig.TILE_ROWS + 1) / 2) * size
-			)
-			local tile = part({
-				Name = "Tile_" .. tileIndex,
-				Size = Vector3.new(size - 1, 0.4, size - 1),
-				Position = center + offset,
-				-- Ground renders almost black under the underwater lighting; Slate stays brown.
-				Color = Color3.fromRGB(140, 100, 66),
-				Material = Enum.Material.Slate,
-				Parent = model,
-			})
-			tile:SetAttribute("TileIndex", tileIndex)
-			local click = Instance.new("ClickDetector")
-			click.MaxActivationDistance = 40
-			click.Parent = tile
-			tiles[tileIndex] = tile
-		end
-	end
-
-	local spawnPosition = center + Vector3.new(0, 3, -depth / 2 - 6)
+	local spawnPosition = center + Vector3.new(0, 3, -radius - 7)
 	return {
 		index = index,
 		model = model,
 		center = center,
+		radius = radius,
+		bed = bed,
+		bedTop = bed.Position.Y + 0.2,
 		sign = sign,
-		tiles = tiles,
 		spawn = CFrame.lookAt(spawnPosition, center + Vector3.new(0, 3, 0)),
 	}
 end
@@ -306,7 +353,7 @@ function World.build(): WorldParts
 		local x = rng:NextNumber(-210, 210)
 		local z = rng:NextNumber(-110, 150)
 		-- Keep the play area (stands and plots) clear.
-		if math.abs(z - PLOT_ROW_Z) > 22 and not (math.abs(x) < 60 and z > -60 and z < 10) then
+		if math.abs(z - PLOT_ROW_Z) > 30 and not (math.abs(x) < 60 and z > -60 and z < 10) then
 			local s = rng:NextNumber(3, 10)
 			local rock = part({
 				Name = "Rock",

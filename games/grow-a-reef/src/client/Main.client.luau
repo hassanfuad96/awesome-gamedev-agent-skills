@@ -7,10 +7,11 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local CoralLabels = require(script.Parent.CoralLabels)
 local Hud = require(script.Parent.Hud)
+local Planter = require(script.Parent.Planter)
 local ShopPanel = require(script.Parent.ShopPanel)
 local Shopkeepers = require(script.Parent.Shopkeepers)
-local TileLabels = require(script.Parent.TileLabels)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local player = Players.LocalPlayer
@@ -27,6 +28,7 @@ Remotes.DataSync.OnClientEvent:Connect(function(data)
 	end
 	hud:setData(data)
 	shop:setData(data)
+	Planter.setData(data)
 end)
 
 Remotes.ShopSync.OnClientEvent:Connect(function(payload)
@@ -61,7 +63,8 @@ RunService.Heartbeat:Connect(function(dt)
 	shop:update()
 end)
 
-task.spawn(TileLabels.start, playerGui)
+CoralLabels.start(playerGui)
+Planter.start()
 Shopkeepers.start(playerGui)
 
 -- Ask for a snapshot in case DataSync fired before these handlers connected.

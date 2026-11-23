@@ -16,15 +16,17 @@ local RateLimit = require(script.Parent.RateLimit)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 
-export type Tile = { seed: string, plantedAt: number, mutation: string }
+-- A planted coral. x and z are studs from the plot centre.
+export type Plant = { seed: string, plantedAt: number, mutation: string, x: number, z: number }
 
 export type Data = {
 	version: number,
 	shells: number,
 	seeds: { [string]: number },
 	inventory: { [string]: number },
-	tiles: { [string]: Tile },
-	unlocked: number,
+	plants: { [string]: Plant }, -- keyed by plant id
+	plantSeq: number, -- the last plant id handed out
+	unlocked: number, -- coral slots
 	totalEarned: number,
 	harvested: number,
 	fishCaught: number,
@@ -64,8 +66,9 @@ local function defaultData(): Data
 		shells = ReefConfig.STARTING_SHELLS,
 		seeds = table.clone(ReefConfig.STARTING_SEEDS),
 		inventory = {},
-		tiles = {},
-		unlocked = ReefConfig.STARTING_TILES,
+		plants = {},
+		plantSeq = 0,
+		unlocked = ReefConfig.STARTING_SLOTS,
 		totalEarned = 0,
 		harvested = 0,
 		fishCaught = 0,
@@ -84,9 +87,10 @@ local function sanitize(raw: any): Data
 	data.fishCaught = EconomyMath.sanitizeAmount(raw.fishCaught)
 	data.unlocked = math.clamp(
 		EconomyMath.sanitizeAmount(raw.unlocked),
-		ReefConfig.STARTING_TILES,
-		ReefConfig.TILE_COUNT
+		ReefConfig.STARTING_SLOTS,
+		ReefConfig.MAX_SLOTS
 	)
+	data.plantSeq = math.min(EconomyMath.sanitizeAmount(raw.plantSeq), 1e6)
 
 	data.seeds = {}
 	if type(raw.seeds) == "table" then
@@ -114,27 +118,54 @@ local function sanitize(raw: any): Data
 		end
 	end
 
-	if type(raw.tiles) == "table" then
-		local now = os.time()
+	local now = os.time()
+	local count = 0
+	local bedRadius = ReefConfig.bedRadius(data.unlocked)
+	local function addPlant(key: any, saved: any, x: any, z: any)
+		if
+			count >= data.unlocked
+			or type(saved) ~= "table"
+			or type(saved.seed) ~= "string"
+			or not ReefConfig.Seeds[saved.seed]
+			or type(saved.mutation) ~= "string"
+			or not ReefConfig.MutationById[saved.mutation]
+			or type(x) ~= "number"
+			or type(z) ~= "number"
+			or not (x * x + z * z <= bedRadius * bedRadius) -- also false for NaN
+		then
+			return
+		end
+		local plantedAt = EconomyMath.sanitizeAmount(saved.plantedAt)
+		-- A planted time in the future (clock skew, edited data) counts as now.
+		if plantedAt == 0 or plantedAt > now then
+			plantedAt = now
+		end
+		-- Keep the saved id when it is a usable whole number; otherwise hand out a new one.
+		local id = tonumber(key)
+		if not id or id ~= math.floor(id) or id < 1 or id > 1e6 or data.plants[tostring(id)] then
+			id = data.plantSeq + 1
+		end
+		data.plantSeq = math.max(data.plantSeq, id)
+		data.plants[tostring(id)] =
+			{ seed = saved.seed, plantedAt = plantedAt, mutation = saved.mutation, x = x, z = z }
+		count += 1
+	end
+
+	if type(raw.plants) == "table" then
+		for key, plant in raw.plants do
+			if type(plant) == "table" then
+				addPlant(key, plant, plant.x, plant.z)
+			end
+		end
+	elseif type(raw.tiles) == "table" then
+		-- Version 1 saves used a 4 x 3 grid of 8-stud tiles. Keep the same layout, pulled in
+		-- a little so every coral lands inside the starting bed and stays 5.6 studs apart.
 		for key, tile in raw.tiles do
 			local index = tonumber(key)
-			if
-				index
-				and index == math.floor(index)
-				and index >= 1
-				and index <= data.unlocked
-				and type(tile) == "table"
-				and type(tile.seed) == "string"
-				and ReefConfig.Seeds[tile.seed]
-				and type(tile.mutation) == "string"
-				and ReefConfig.MutationById[tile.mutation]
-			then
-				local plantedAt = EconomyMath.sanitizeAmount(tile.plantedAt)
-				-- A planted time in the future (clock skew, edited data) counts as now.
-				if plantedAt == 0 or plantedAt > now then
-					plantedAt = now
-				end
-				data.tiles[tostring(index)] = { seed = tile.seed, plantedAt = plantedAt, mutation = tile.mutation }
+			if index and index == math.floor(index) and index >= 1 and index <= 12 then
+				local column = (index - 1) % 4 + 1
+				local row = (index - 1) // 4 + 1
+				addPlant(index, tile, (column - 2.5) * 8 * 0.7, (row - 2) * 8 * 0.7)
 			end
 		end
 	end
@@ -327,6 +358,10 @@ function PlayerData.sync(player: Player)
 		return
 	end
 	local data = profile.data
+	local planted = 0
+	for _ in data.plants do
+		planted += 1
+	end
 	local stats = player:FindFirstChild("leaderstats")
 	if stats then
 		local shells = stats:FindFirstChild("Shells") :: NumberValue?
@@ -344,7 +379,8 @@ function PlayerData.sync(player: Player)
 		inventory = data.inventory,
 		inventoryValue = inventoryValue(data),
 		unlocked = data.unlocked,
-		expandCost = if data.unlocked < ReefConfig.TILE_COUNT then ReefConfig.expandCost(data.unlocked) else nil,
+		planted = planted,
+		expandCost = if data.unlocked < ReefConfig.MAX_SLOTS then ReefConfig.expandCost(data.unlocked) else nil,
 		selected = profile.selected,
 		fishCaught = data.fishCaught,
 	})

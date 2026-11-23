@@ -40,11 +40,11 @@ local function spreadOnce()
 				end
 			end
 			local target = owners[i % #owners + 1]
-			local candidates = Plots.unmutatedTiles(target)
+			local candidates = Plots.unmutatedPlants(target)
 			if #mutated > 0 and #candidates > 0 then
 				local from = mutated[rng:NextInteger(1, #mutated)]
-				local tileIndex = candidates[rng:NextInteger(1, #candidates)]
-				if Plots.setMutation(target, tileIndex, from.mutation) then
+				local plantId = candidates[rng:NextInteger(1, #candidates)]
+				if Plots.setMutation(target, plantId, from.mutation) then
 					Plots.notify(target, `The current carried a {from.mutation} mutation from {source.DisplayName}'s reef onto your coral!`, "rare")
 					Plots.notify(source, `Your {from.mutation} coral drifted onto {target.DisplayName}'s reef.`)
 				end

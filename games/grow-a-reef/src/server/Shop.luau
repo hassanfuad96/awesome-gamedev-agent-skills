@@ -106,7 +106,7 @@ local function onExpand(player: Player)
 	if not profile then
 		return
 	end
-	if profile.data.unlocked >= ReefConfig.TILE_COUNT then
+	if profile.data.unlocked >= ReefConfig.MAX_SLOTS then
 		Plots.notify(player, "Your reef is already full size.")
 		return
 	end
@@ -123,7 +123,7 @@ local function onExpand(player: Player)
 	profile.data.shells = wallet.shells
 	profile.data.unlocked += 1
 	Plots.refresh(player)
-	Plots.notify(player, "Your reef grew by one tile!", "good")
+	Plots.notify(player, "Your reef grew! One more coral slot.", "good")
 	PlayerData.sync(player)
 end
 

@@ -176,7 +176,7 @@ function ShopPanel.new(playerGui: PlayerGui): ShopPanel
 
 	local expand = Ui.button({
 		Name = "Expand",
-		Text = "Unlock a reef tile",
+		Text = "Grow your reef",
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, 0),
 		Size = UDim2.new(1, 0, 0, 48),
@@ -250,10 +250,10 @@ function ShopPanel.render(self: ShopPanel)
 
 	local cost = self.data and self.data.expandCost
 	if cost then
-		self.expand.Text = `Unlock a reef tile ({self.data.unlocked}/{ReefConfig.TILE_COUNT}) - {EconomyMath.formatNumber(cost)} shells`
+		self.expand.Text = `Grow your reef to {self.data.unlocked + 1} coral slots - {EconomyMath.formatNumber(cost)} shells`
 		self.expand.BackgroundColor3 = if shells >= cost then Color3.fromRGB(60, 120, 200) else Ui.Colors.buttonDisabled
 	else
-		self.expand.Text = "Reef fully expanded"
+		self.expand.Text = "Reef fully grown"
 		self.expand.BackgroundColor3 = Ui.Colors.buttonDisabled
 	end
 end
