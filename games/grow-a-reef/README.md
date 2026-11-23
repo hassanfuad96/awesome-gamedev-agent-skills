@@ -221,7 +221,8 @@ x12, also on the fish it attracts); the Reef Index recording harvests and catche
 eggs at the Pet Hatchery (shells charged, odds shown), taking pets out (the third refused),
 the Seahorse (1.25x growth), Octopus (harvest within a minute) and Pufferfish (x1.5 catch)
 perks, and releasing. Output showed no game errors, only the expected DataStore warning.
-Item 5 was checked before the reef redesign. Not yet checked: tap-to-plant on a phone, the
+Item 5 was checked on an iPhone 14 (the HUD and windows draw at 70% there, see `Ui.autoScale`)
+and on a 1366 x 768 laptop (full size). Not yet checked: tap-to-plant on a real phone, the
 random odds over many tries, a mutation drifting between two players' reefs, completing an
 Index set, and items 3 and 4, which need a published place and two clients.
 
@@ -239,7 +240,8 @@ After changes, run these and check Output:
 4. **Server & Clients with 2 players** (Test tab): each gets their own reef; trying to plant on the
    other reef says it's theirs. Start a current (see item 6) and raise the Glowing weight, then
    check that a mutation crosses to the other reef.
-5. **Phone:** Device Simulator, check the hotbar and shop fit and can be tapped.
+5. **Phone:** Device Simulator on a phone. The HUD and the Shop, Index and Pets windows shrink
+   to 70% (see `Ui.screenScale`); check the hotbar and shop fit and can be tapped.
 6. **Sea events:** in Studio you don't have to wait. In the Command Bar, in the server view, run
    `workspace:SetAttribute("DebugSeaEvent", "Whale")` (or `Current`, `Night`, `Frenzy`,
    `Treasure`) to start that event now. This only works in Studio.

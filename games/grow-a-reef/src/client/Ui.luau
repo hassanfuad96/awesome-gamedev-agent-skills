@@ -1,6 +1,8 @@
 --!nonstrict
 -- Small helpers and the shared look for every Grow a Reef screen.
 
+local Workspace = game:GetService("Workspace")
+
 local Ui = {}
 
 Ui.Colors = {
@@ -110,6 +112,54 @@ function Ui.viewport(props: { [string]: any }, model: Model): ViewportFrame
 	local distance = (size.Magnitude / 2) / math.tan(math.rad(camera.FieldOfView / 2)) * 1.05
 	camera.CFrame = CFrame.new(center.Position) * CFrame.Angles(0, math.rad(25), 0) * CFrame.Angles(math.rad(-15), 0, 0) * CFrame.new(0, 0, distance)
 	return frame
+end
+
+-- How much to shrink the UI on this screen: 1 on a laptop, tablet or console, down to 0.7
+-- on a landscape phone (about 750 x 390), where full-size bars and buttons cover the game.
+function Ui.screenScale(): number
+	local camera = Workspace.CurrentCamera
+	local size = if camera then camera.ViewportSize else Vector2.new(1280, 720)
+	return math.clamp(math.min(size.X / 900, size.Y / 560), 0.7, 1)
+end
+
+-- Gives each object a UIScale that follows the screen size. onChange(scale) runs whenever
+-- it changes, so callers can resize anything that should keep its share of the screen.
+function Ui.autoScale(objects: { GuiObject }, onChange: ((number) -> ())?)
+	local uiScales = {}
+	for _, object in objects do
+		table.insert(uiScales, Ui.new("UIScale", { Parent = object }))
+	end
+	local function update()
+		local scale = Ui.screenScale()
+		for _, uiScale in uiScales do
+			uiScale.Scale = scale
+		end
+		if onChange then
+			onChange(scale)
+		end
+	end
+	local watching: RBXScriptConnection?
+	local function watch()
+		if watching then
+			watching:Disconnect()
+		end
+		local camera = Workspace.CurrentCamera
+		watching = if camera then camera:GetPropertyChangedSignal("ViewportSize"):Connect(update) else nil
+		update()
+	end
+	Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watch)
+	watch()
+end
+
+-- A centred window that covers the same part of the screen at every scale (`size` of the
+-- screen, at most `maxSize` pixels). Only its contents shrink, so a phone fits more rows
+-- instead of showing a smaller window.
+function Ui.scaleWindow(root: GuiObject, size: Vector2, maxSize: Vector2)
+	local constraint = Ui.new("UISizeConstraint", { Parent = root })
+	Ui.autoScale({ root }, function(scale)
+		root.Size = UDim2.fromScale(size.X / scale, size.Y / scale)
+		constraint.MaxSize = maxSize / scale
+	end)
 end
 
 function Ui.formatTime(seconds: number): string

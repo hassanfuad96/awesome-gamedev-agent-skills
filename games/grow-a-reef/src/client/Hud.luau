@@ -180,6 +180,13 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 		}),
 	})
 
+	-- Smaller on phones. The hotbar keeps its share of the screen width so more seeds fit,
+	-- and toasts start just below the (scaled) status bar.
+	Ui.autoScale({ top, toasts, side, hotbarHolder }, function(scale)
+		hotbarHolder.Size = UDim2.new(0.55 / scale, 0, 0, 96)
+		toasts.Position = UDim2.new(0.5, 0, 0, 8 + 92 * scale)
+	end)
+
 	local self = setmetatable({
 		gui = gui,
 		shells = shells,

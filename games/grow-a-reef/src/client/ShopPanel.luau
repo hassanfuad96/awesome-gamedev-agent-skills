@@ -47,16 +47,15 @@ function ShopPanel.new(playerGui: PlayerGui): ShopPanel
 		Name = "Root",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		-- Nearly full height: a landscape phone is ~340 px tall, and 0.8 left room for one seed row.
-		Size = UDim2.fromScale(0.92, 0.94),
 		BackgroundColor3 = Ui.Colors.panel,
 		Parent = gui,
 	}, {
 		Ui.corner(16),
 		Ui.stroke(Ui.Colors.accent, 2),
 		Ui.padding(12),
-		Ui.new("UISizeConstraint", { MaxSize = Vector2.new(540, 560) }),
 	})
+	-- Nearly full height: a landscape phone is ~330 px tall below the top bar.
+	Ui.scaleWindow(root, Vector2.new(0.92, 0.94), Vector2.new(540, 560))
 
 	Ui.label({
 		Name = "Title",

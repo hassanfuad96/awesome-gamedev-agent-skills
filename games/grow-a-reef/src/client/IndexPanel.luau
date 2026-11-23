@@ -71,15 +71,14 @@ function IndexPanel.new(playerGui: PlayerGui): IndexPanel
 		Name = "Root",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(0.92, 0.94),
 		BackgroundColor3 = Ui.Colors.panel,
 		Parent = gui,
 	}, {
 		Ui.corner(16),
 		Ui.stroke(Ui.Colors.accent, 2),
 		Ui.padding(12),
-		Ui.new("UISizeConstraint", { MaxSize = Vector2.new(660, 600) }),
 	})
+	Ui.scaleWindow(root, Vector2.new(0.92, 0.94), Vector2.new(660, 600))
 	Ui.label({
 		Name = "Title",
 		Text = "Reef Index",
