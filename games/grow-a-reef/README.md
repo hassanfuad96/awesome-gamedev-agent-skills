@@ -16,16 +16,29 @@ Every new player starts in the middle of the lagoon, on the glowing dais in the 
 |---|---|---|
 | Spawn | Centre of the plaza | Where new players appear. |
 | Inky, the tutorial guide | Beside the spawn | A purple octopus. Talk to him (E) for your first seeds and the next tutorial step. |
-| Research Station | North | The glass dome from the concept art: the **Reef Index** hologram in the middle, the **Pet Hatchery** counter at the back, a submarine parked outside. |
-| Upgrade Station | North, next to the dome | Old Shellby the turtle: **grow your reef**, gear, fences and decorations. |
-| Coral Shop | East | Two counters: **Seeds** (Captain Coralie) and **Sell Coral** (Pinch). The Shop teleport lands in front of it. |
-| Ocean Gate | West | A huge stone arch out to the open ocean. Shipwrecks sink out past it. |
-| Reefs | All around | The six player reefs in a ring round the plaza, each gate facing the middle, with sand paths and jellyfish lamps leading to them. |
+| Research Laboratory | North-west, the biggest | A geodesic glass dome (from `5-athmosphere.jpg`) over a lit research tower, labs and coral garden beds, with a big glowing coral on top and a robot arm outside. Its counter: **research species**, **unlock planters**, **coral growth** research and **reef health**. |
+| Aquarium | North-east | The Collection Center: display tanks filled with the fish, coral and rare creatures you've discovered (each player sees their own), the **Reef Index** hologram and the **Pet Hatchery**. |
+| Coral Market | South-east | **Seeds** (Captain Coralie), **Sell Coral** (Pinch), **Decor & Fences**, and a case of rare species. The Shop teleport lands beside it. |
+| Equipment Station | South-west | Old Shellby the turtle: the **Bubble Wand**, **Bigger Bag**, **Oxygen Tank** and **Swim Fins**. |
+| Ocean Gate | West | A huge stone arch; the road through it leads to the **Main Reef**, where the reefs are. |
+| Roads | North, east, south | North to the **Kelp Forest** (or the whirlpool at the plaza's north edge), east to the **Sunken Ruins**, south past the leaderboards to the **Abyss**. |
 | Leaderboards | South | Top Reefs and Best Reefs, either side of the south path. |
 
-The layout lives in `ReefConfig.Lagoon` (north is -Z). Each reef is turned to face the plaza
-(`ReefConfig.plotFrame`), and coral and decoration positions are saved in the reef's own frame,
-so they stay put whichever reef a player gets.
+Each building is joined to the plaza by a walk-through glass tube corridor, like the concept art.
+
+**Species research.** Coral seeds in the Coral Market are locked until you research them at the
+Lab, in order: Bubble Kelp is known from the start; each next species needs the one before it
+researched and harvested at least once, plus shells (Brain Coral 150, Sea Fan 600, Glow Anemone
+2,500, Pearl Clam 10,000, Starlight Coral 50,000). Seeds from rewards can always be planted.
+Players from before research keep every species they had grown, planted or held seeds of.
+
+**Oxygen.** You breathe freely almost everywhere. Deep water uses up air: the Main Reef's caves
+and grotto, the Sunken Ruins' cave, and the Abyss below y = -15 (except its air pockets). An air
+bar appears while you dive and refills the moment you're out. Run out and a whirlpool carries you
+back to the plaza. You start with 60 seconds; the **Oxygen Tank** adds 45 a level (285 at the top).
+
+The layout lives in `ReefConfig.Lagoon` (north is -Z). The lagoon's rocky rim
+(`rimRadius`) is open at the Ocean Gate (west) and at the sand road to the Sunken Ruins (east).
 
 **Tutorial.** Inky walks every new player through five steps; a card at the top right shows the
 current one, and a glowing beam and marker point the way:
@@ -34,30 +47,200 @@ current one, and a glowing beam and marker point the way:
 2. Plant your first coral.
 3. Earn your first shells: harvest it and sell at the Coral Shop.
 4. Unlock your first fish: catch one at your reef (fish come to every grown coral on this step).
-5. Learn how to expand your reef: visit the Upgrade Station.
+5. Learn how to expand your reef: visit the Research Laboratory's counter.
 
 Finishing pays 150 shells. Players who already had progress before the tutorial existed skip it.
 Players still in the tutorial start at the plaza; everyone else starts at home.
+
+## The Main Reef
+
+Where players spend most of their time: the big coral garden through the Ocean Gate, built
+from the `images/*-zone2.jpg` concept art. Layout in `ReefConfig.MainReef`; scenery in
+`src/server/MainReef.luau`.
+
+| Feature | What's there |
+|---|---|
+| Reef road | A flagstone road west from the Ocean Gate, under a "THE MAIN REEF" arch, lined with orange coral trees with pink and purple canopies. |
+| Player reefs | Six reefs, three either side of the road, gates facing it. Each is a fenced bed of **30 sand planters**: 20 unlocked to start, the rest unlocked at the Upgrade Station. |
+| Coral bridges | Two coral arches over the road between the reefs; walk or swim over the top (a pearl sometimes sits up there). |
+| Fish nurseries | Four rings of glowing anemones in the gaps between reefs. **Wild fish** gather there (two at a time); anyone can click one to catch it. |
+| Rock ridges and caves | Low-poly rock ridges wall the reef in north and south, with three small **caves** lit by crystals. Pearls hide inside. |
+| Grand Reef Rock | A tall rock tower at the end of the road, coral on every ledge and bubbles streaming off the top, with a **grotto** in its foot. |
+| Coral gardens | Clusters of table, tube and branching coral, sea grass and rocks over the open sand. |
+
+**Planters and growth.** Each planter holds one coral. Tap a sand planter (glowing rim = empty
+and unlocked; dark rock = locked) to plant. Every coral grows through three stages, shown on the
+reef and in its label:
+
+1. **Seedling**: thin sprouts poking out of the sand (the first 35% of its grow time).
+2. **Growing**: the coral itself, filling out from half size.
+3. **Fully grown**: full size, with polyps round its foot and bubbles rising, and a burst of
+   bubbles when it gets there. Ready to harvest; fish gather round it.
+
+**Shells and pearls.** 18 shells and 4 pearls lie around the Main Reef at any time: shells on
+the open sand (5 to 25 shells each), pearls in the caves, the grotto, on the bridges and on top
+of the Grand Reef Rock. Swim into one to pick it up; another appears elsewhere a minute or two
+later. Pearls show next to your shells and are what unlocking planters 21 to 30 needs:
+
+| Planter | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Shells | 1,000 | 1,550 | 2,402 | 3,723 | 5,772 | 8,946 | 13,867 | 21,494 | 33,316 | 51,639 |
+| Pearls | 1 | 1 | 2 | 2 | 3 | 3 | 4 | 4 | 5 | 5 |
+
+Saves from before planters load safely: coral moves to the nearest free planter (or its seed
+goes back in your bag if none is left), reefs with fewer than 20 slots get 20, and slots past 30
+are paid back in shells at what they cost.
+
+## The Sunken Ruins
+
+The exploration zone, built from the `2-Sunken-Ruins.jpg` concept art. Follow the sand road east
+from the plaza, or press **Ruins** on the right. It is a disc of radius 175 centred at
+(430, 0, 0), x 255 to 605, and it is where the **Shipwreck** event's liner sinks. Its layout,
+rewards and missions are all in `src/shared/RuinsConfig.luau`.
+
+| Place | What's there |
+|---|---|
+| Entrance | Two great pillars under a "SUNKEN RUINS" plaque. **Marlo** the seal explorer (talk to him: E) gives the missions and opens your Journal. A whirlpool takes you back to the shops. |
+| Archway | A ruined stone arch over the road, with a chest on its cap stone. |
+| Wreck Basin | Open sand ringed by rocks and bubble vents (left as you walk in). The Shipwreck liner lands here, and the Giant Squid rises out of it every 6 minutes. |
+| Temple terrace | Up a flight of mossy steps (right): broken columns, the temple and its sanctum (an altar with the Stone Tablet, and the Relic Coral), the mermaid statue with her harp, and the tallest column, with the Old Spyglass on top. |
+| Pirate ship | Bow up on a rock, sails torn, the main mast snapped. Swim in through the holes in its sides or the deck hatches: the hold has a chest and the Golden Compass. |
+| Underwater cave | At the far end: a tunnel into a dark chamber lit by crystals and glowing mushrooms. Ghost Coral, a chest, the Crystal Trident and the Anglerfish. |
+| Coral garden | The treasure trove from the art (a huge open chest spilling gold), a giant anchor, and the ship's wheel with the Ship's Bell beside it. |
+
+What you can find, all saved per player:
+
+- **8 treasure chests.** Each one refills for you 20 minutes after you open it. Each opening gives
+  120 to 450 shells (scaled with your reef like daily quests, up to x3), or, 40% of the time, seeds: Brain Coral up to
+  Starlight Coral, and 4% of seed drops are Ghost Coral.
+- **Hidden coral**, two species sold nowhere: **Ghost Coral** (Mythic: 15 min, sells for 9,000)
+  grows at two spots in the cave, and **Relic Coral** (Ancient: 30 min, sells for 45,000) grows
+  in the sanctum. Take one cutting (a seed) from each spot a day (UTC). The Relic Coral only
+  lets divers who have found all six relics take a cutting.
+- **6 relics** (Golden Compass, Pearl Crown, Stone Tablet, Ship's Bell, Crystal Trident, Old
+  Spyglass): 500 shells each, found once.
+- **4 rare creatures** (Coelacanth, Anglerfish, Leafy Sea Dragon, Giant Squid): swim close to
+  one to spot it, for 750 shells the first time. Their paths depend only on the server time,
+  so every player sees them in the same place, and the server checks sightings against that path.
+
+**Exploration missions.** Marlo's nine missions run in order; each one finishes as soon as it's
+done and pays its reward. A card at the top right shows the current one once the tutorial is
+over, with a marker while you're in the ruins.
+
+| # | Mission | Reward |
+|---|---|---|
+| 1 | Find the Sunken Ruins | 200 shells |
+| 2 | Open a treasure chest | 400 shells |
+| 3 | Find a lost relic | 600 shells, 1 Sea Fan |
+| 4 | Explore the underwater cave | 800 shells |
+| 5 | Take a hidden coral cutting | 1,000 shells, 1 Glow Anemone |
+| 6 | Spot a rare sea creature | 1,500 shells |
+| 7 | Board the pirate ship | 2,000 shells, 1 Pearl Clam |
+| 8 | Find all six relics | 5,000 shells, 1 Relic Coral, the "Ruin Explorer" title |
+| 9 | Spot all four rare creatures | 8,000 shells, 1 Relic Coral, 2 Ghost Coral |
+
+The **Journal** button on the left (or talking to Marlo) opens the Explorer's Journal: the
+missions, where each relic and creature is, when each chest refills and when the coral regrows,
+and a **Go to Ruins** button. Each player sees their own state in the world: a chest you've
+emptied shows its refill time, relics you've found are gone, and cut coral says when it regrows.
+
+## The Abyss
+
+Zone 3, built from the `3-athmosphere.jpg` concept art: a dark, bioluminescent trench south of
+the plaza. Follow the sand road south through the gap in the lagoon's rim to the **Pressure
+Gate**, then take the glowing ramp down the pit's north wall to the floor, 45 studs below the
+seabed. Once it's unlocked, the Journal's **Go to Abyss** button takes you straight to the floor.
+Its layout, unlock rules and creatures are in `src/shared/AbyssConfig.luau`.
+
+**Unlocking.** Reach either **Exploration Level 5** (5 Sunken Ruins missions done) or **Reef
+Health 200** (200 coral harvested, ever). It opens for good the moment you qualify, and the
+Journal shows how close you are. Until then the server turns you back at the gate if you swim
+down into the pit, and refuses the teleport.
+
+**The look.** The sea gets darker and bluer as you go down (a tint and bloom of each player's
+own, so sea events' lighting is untouched), and everything down there glows: violet and teal
+branching coral with bright tips, anemones, glowing kelp, a giant brain coral wrapped in a
+shimmering glow, a forest of giant glowing mushrooms, crystal formations, and the 42-stud
+**Crystal Spire** in the middle. Twenty-two glowing jellyfish drift round the pit, most of them
+in the jellyfish garden, and faint violet light falls from far above.
+
+| What | Where | |
+|---|---|---|
+| Lumi's Deep Seeds | By the foot of the ramp | Lumi the lanternfish sells the high-value abyssal coral (below) at fixed prices, as many as you can afford. |
+| Whirlpool | Beside Lumi's stall | Back to the shops; where Go to Abyss lands you. |
+| Air pockets | At the whirlpool, Lumi's stall and the Crystal Spire | Columns of bubbles rising from glowing vents (`AbyssConfig.AirPockets`): your air refills inside them. |
+| Ghost Shark | High over the whole pit | 1,500 shells for your first sighting of each creature. |
+| Vampire Squid | Close round the Crystal Spire | |
+| Gulper Eel | Low along the south wall | |
+| Dumbo Octopus | In the mushroom forest | Spot all four for the "Abyss Diver" title and a Glowcap seed. |
+
+| Abyssal coral | Price | Grows in | Sells for | Index set reward |
+|---|---|---|---|---|
+| Glowcap | 45,000 | 25 min | 120,000 | 3 Lantern Posts |
+| Lumen Brain | 180,000 | 40 min | 480,000 | "Deep Glow" title, a Bubble Vent |
+| Void Bloom | 750,000 | 1 h | 2,000,000 | "Void Walker" title, a Golden Octopus |
+
+**Checked in Studio** (solo Play through the Studio MCP server, on 2026-11-24): the zone builds
+with no errors. A new player is refused the Abyss teleport with the reason, and is put back at
+the gate after swimming into the pit. Finishing the fifth Sunken Ruins mission unlocks it on
+the spot. Go to Abyss lands on the floor pad. Lumi's window opens; a purchase is refused
+without enough shells and goes through with them; an unknown seed id is ignored. All four
+deep-sea creatures were spotted (each paid, then the all-four reward). The lighting holds steady
+on the shelf, returns to normal in the other zones, and reaches full darkness on the floor.
+Not yet checked: walking down the ramp, sea-event lighting (Bioluminescent Night) while inside,
+and the Abyss on a phone.
+
+## The Kelp Forest
+
+A different ecosystem from the coral reefs, built from the `4-athmosphere.jpg` concept art: a
+sunlit forest of giant kelp north of the lagoon. Take the sand road north from the plaza
+(between the dome and the Upgrade Station), or the whirlpool at the plaza's north edge. It is a
+disc of radius 215 centred at (-80, 0, -470); layout and challenges are in
+`src/shared/KelpConfig.luau`.
+
+| Feature | What's there |
+|---|---|
+| Giant kelp | About 70 kelp stalks, 45 to 95 studs tall, with long translucent blades, gas bladders and golden fronds at the top. They sway, the water turns a sunlit green while you're inside, and shafts of light pour down through them. Schools of dark fish drift between the stalks. |
+| Sunlit clearing | Open sand in the middle of the forest, where the main trail loops round. |
+| Hidden paths | Faint trails of glowing pebbles leave the main trail, one of them under a rock overhang, and lead through gaps in walls of dense kelp to three hidden glades: the **Statue Glade**, the **Moonpool** and the **Diver's Camp**. Pearls can turn up inside them. |
+| Sea turtle habitats | **Turtle Cove** and **Turtle Reef**: sandy clearings with nests, turtles resting on the sand and swimming round. Hold the prompt at a nest to guide a hatchling out to sea (60 shells; each nest rests 10 minutes for you afterwards). |
+| Seagrass restoration | The **East** and **West Meadows**, 10 patches each, shared by everyone on the server. Hold the prompt on a bare mud patch to plant seagrass (30 shells). It grows for 2 minutes, stays lush for 15, then wilts back to bare. |
+| New fish | Five kelp forest species caught only here: Garibaldi, Kelp Bass, Opaleye, Sheephead and the rare Giant Sea Bass. They're wild fish (anyone can catch them) at the clearing and the turtle cove, and by each meadow while it's at least half restored: healthy seagrass brings the fish back. They're in the Reef Index too. |
+| Otto the sea otter | The forest's ranger, at the entrance. Talk to him for his Ranger Journal of challenges, with progress and the meadows' health. |
+
+**Exploration challenges** (any order; each pays once, the moment it's done):
+
+| Challenge | How | Reward |
+|---|---|---|
+| Into the Kelp | Reach the forest | 250 shells |
+| Canopy Climber | Swim up to the kelp canopy | 500 shells |
+| Turtle Friend | Visit both turtle habitats | 600 shells |
+| Hatchling Helper | Guide 3 hatchlings to the sea | 900 shells, 1 Glow Anemone |
+| Off the Beaten Path | Find a hidden glade | 800 shells |
+| Meadow Mender | Plant 10 seagrass patches | 1,500 shells, 1 Sea Fan |
+| Kelp Naturalist | Catch all five kelp fish | 3,000 shells, 1 Pearl Clam |
+| Kelp Ranger | Find all three hidden glades | 4,000 shells, 1 Starlight Coral, the "Kelp Ranger" title |
 
 ## How to play
 
 | Do this | How |
 |---|---|
-| Buy seeds | Walk to the **Coral Shop** (east), press the prompt at the green **Seeds** counter (E / tap). |
-| Plant | Pick a seed in the hotbar at the bottom, then click or tap anywhere on your reef bed (the round brown patch). With a mouse, a ring shows where it goes: green fits, red is too close to other coral or the edge. |
+| Buy seeds | Walk to the **Coral Market** (south-east), press the prompt at the green **Seeds** counter (E / tap). Species you haven't researched yet show as locked. |
+| Plant | Pick a seed in the hotbar at the bottom, then click or tap a sand planter on your reef. With a mouse, a ring snaps onto the planter: green fits, red is locked or taken. |
 | Harvest | Click fully grown coral (its label says "Ready!"). It goes into your bag. |
-| Sell | Press the prompt at the orange **Sell Coral** counter in the Coral Shop. Everything in your bag sells. |
-| Catch fish | Fish swim around grown coral on your reef. Click them before they swim off. |
-| Grow your reef | You start with 10 coral slots. At the **Upgrade Station**, the Reef tab adds a slot (up to 50) and widens your bed, from 74 studs across to 108. |
-| Fences and decorations | At the **Upgrade Station** (north, kept by Old Shellby the turtle) buy fence styles and decorations. Press **Place** on a decoration, go home, and tap anywhere inside your fence (not on coral or the gateway). Hold the prompt on a placed one to pick it up. |
-| Gear | Also at the Upgrade Station: **Fertilizer** (coral grows faster), **Bubble Wand** (click a growing coral to speed it up) and **Bigger Bag** (your bag holds 30 coral, +30 a level). |
+| Sell | Press the prompt at the orange **Sell Coral** counter in the Coral Market. Everything in your bag sells. |
+| Catch fish | Fish swim around grown coral on your reef: click them before they swim off. Wild fish at the Main Reef's fish nurseries can be caught by anyone. |
+| Collect | Swim into shells and pearls lying around the Main Reef. |
+| Grow your reef | You start with 20 planters. At the **Research Laboratory**, the Reef tab unlocks the next one (up to 30) for shells and pearls, and researches faster coral growth. |
+| Fences and decorations | At the Coral Market's **Decor & Fences** counter buy fence styles and decorations. Press **Place** on a decoration, go home, and tap anywhere inside your fence (not on coral or the gateway). Hold the prompt on a placed one to pick it up. |
+| Gear | At the **Equipment Station**: **Bubble Wand** (click a growing coral to speed it up), **Bigger Bag** (your bag holds 30 coral, +30 a level), **Oxygen Tank** (+45 seconds of air a level) and **Swim Fins** (+8% swim speed a level). Coral growth (the old Fertilizer) is research at the Lab. |
 | Quests | **Quests** on the left: three daily quests, the same for everyone, new each day (UTC). Claim the reward when one is done; a red "!" shows when one is waiting. |
 | Rebirth | In the Quests window. Pay the rebirth cost to start over for +25% shells from coral and fish, forever. You keep pets, the Index, fences, decorations, gear and titles. |
 | Titles | Pick one in the Quests window; it shows over your head. Earned from Reef Index sets and from rebirthing. |
 | Like a reef | Visit someone's reef and press **F** at the sign over its gate (once a day per reef). The sign shows its likes, and the **Best Reefs** board ranks them. |
-| Reef Index | Press **Index** on the left, or use the hologram in the Research Station. Every coral in every mutation combo, and every fish. |
-| Pets | Hatch eggs at the **Pet Hatchery** counter inside the Research Station, then take pets out from **Pets** on the left. |
-| Teleport | **Shop** and **Home** on the right take you to the Coral Shop or your reef (3 s cooldown). The glowing whirlpool pads in front of the Coral Shop and each reef gate do the same. |
+| Reef Index | Press **Index** on the left, or use the hologram in the Aquarium. Every coral in every mutation combo, and every fish. |
+| Pets | Hatch eggs at the **Pet Hatchery** counter inside the Aquarium, then take pets out from **Pets** on the left. |
+| Teleport | **Shop**, **Home** and **Ruins** on the right take you to the Coral Market, your reef or the Sunken Ruins entrance (3 s cooldown). The glowing whirlpool pads beside the Coral Market and at each reef gate do the same; the one at the plaza's north edge goes to the Kelp Forest. |
 | Swim | Jump to start swimming: about twice walking speed, in the direction the camera points (tilt it well down or up to dive or rise). Hold jump to swim up; let go of everything to drift down and land. |
 
 The whole map is underwater: deep-blue haze instead of sky, a glowing surface with light shafts
@@ -105,12 +288,12 @@ shows the event running.
 | Feeding Frenzy | 60 s | Fish come to grown coral twice as fast. |
 | Treasure Storm | 40 s | Chests sink onto the plaza and reefs. Anyone can hold E (or tap) to open one for 30-200 shells, or sometimes rare seeds. Unopened chests wash away after 45 s. |
 | Whale Pass | 50 s | A giant whale crosses overhead, and all coral grows twice as fast while it's there. |
-| Shipwreck (5%) | 55 s | A liner sinks onto the seabed out past the Ocean Gate. 20 s after it starts, six orcas arrive and hunt for 30 s. They are faster than swimming, so swim inside the wreck (through the holes in its sides or the deck hatches) and stay there. Anyone caught is eaten and respawns at home. Everyone who was there when the orcas came and wasn't eaten gets a **Seagrass** seed. The HUD says whether you are hidden. |
+| Shipwreck (5%) | 55 s | A liner sinks into the Wreck Basin in the **Sunken Ruins** (press **Ruins** to get there fast). 20 s after it starts, six orcas arrive and hunt for 30 s. They are faster than swimming, so swim inside the wreck (through the holes in its sides or the deck hatches) and stay there. Anyone caught is eaten and respawns at home. Everyone who was there when the orcas came and wasn't eaten gets a **Seagrass** seed. The HUD says whether you are hidden. |
 
 ### Reef Index
 
-The **Index** button opens a collection book of every seed in all 16 mutation combinations
-and every fish, 116 entries in all. Entries you haven't found are black silhouettes. Harvesting
+The **Index** button opens a collection book of every seed in all 22 mutation combinations
+and every fish, 202 entries in all. Entries you haven't found are black silhouettes. Harvesting
 a coral or catching a fish records it. Completing a seed's set pays 10x that seed's sell value
 (180 shells for Bubble Kelp, up to 320,000 for Starlight Coral) and the fish set pays 1,000.
 To also award a badge, create it on the Creator Dashboard and put its id in
@@ -150,6 +333,11 @@ section of `skills/other-engines/roblox-simulator-economy/SKILL.md` first.
 | Pearl Clam | 2,500 | 10 min | 6,000 | 20% |
 | Starlight Coral | 12,000 | 20 min | 32,000 | 7% |
 | Seagrass (Transcendent) | not sold | 30 min | 150,000 | Shipwreck survivors only |
+| Ghost Coral (Mythic) | not sold | 15 min | 9,000 | Sunken Ruins cave cuttings and chests |
+| Relic Coral (Ancient) | not sold | 30 min | 45,000 | Sunken Ruins sanctum cuttings and missions |
+| Glowcap (Abyssal) | 45,000 | 25 min | 120,000 | Lumi's stall in the Abyss |
+| Lumen Brain (Abyssal) | 180,000 | 40 min | 480,000 | Lumi's stall in the Abyss |
+| Void Bloom (Abyssal) | 750,000 | 1 h | 2,000,000 | Lumi's stall in the Abyss |
 
 The shop stock is shared by everyone on the server and restocks every 5 minutes. Growth is
 stored as a timestamp, so coral keeps growing while you're offline.
@@ -238,6 +426,10 @@ Studio); if a publish fails, the message still shows on the server that sent it.
 default.project.json        Rojo mapping; also creates the RemoteEvents and sets Gravity = 70
 src/shared/                 -> ReplicatedStorage.Shared
   ReefConfig.luau           every tunable number: seeds, mutations, fish, sea events, index, pets
+  RuinsConfig.luau          the Sunken Ruins: layout, chests, hidden coral, relics, creature
+                            paths, missions, and the saved state's repair
+  AbyssConfig.luau          the Abyss: layout, unlock rules, the darkness, Lumi's seeds,
+                            deep-sea creature paths, and the saved state's repair
   CoralVisuals.luau         coral models made from Parts, plus mutation effects (server and Index)
   FenceVisuals.luau         reef fences made from Parts: planks, hedge, wall, ribs or crystal
   DecorVisuals.luau         the reef decorations made from Parts
@@ -245,9 +437,19 @@ src/shared/                 -> ReplicatedStorage.Shared
   EconomyMath.luau          copied unchanged from skills/other-engines/roblox-simulator-economy
 src/server/                 -> ServerScriptService.Server
   Main.server.luau          starts everything in order
+  WorldKit.luau             shared building blocks: parts, boulders, coral, lamps, labels, paths
+  MainReef.luau             the Main Reef's scenery: road, coral trees, bridges, nurseries,
+                            ridges, caves, Grand Reef Rock; picks the shell and pearl spots
+  Collectibles.luau         the shells and pearls to pick up in the Main Reef
+  KelpWorld.luau            builds the Kelp Forest: giant kelp, trail, glades, habitats, meadows
+  Kelp.luau                 the Kelp Forest: meadows, nests, places found, Otto's challenges
+  Hub.luau                  the hub's four buildings and their glass corridors
+  Research.luau             species research at the Lab (ResearchSpecies)
+  Oxygen.luau               air in deep water: drains, refills, whisks you home when it runs out
   World.luau                builds the Starter Lagoon: seabed, lighting, surface, plaza and
                             spawn, Inky, Research Station, Upgrade Station, Coral Shop, Ocean
-                            Gate, paths, leaderboards and the ring of 6 reefs
+                            Gate, paths and leaderboards, then the 6 reefs and their planters
+                            in the Main Reef
   Tutorial.luau             the Starter Lagoon tutorial steps, Inky's lines and the reward
   SeabedDecor.luau          kelp forests, coral clusters, starfish and urchins
   PlayerData.luau           DataStore load/save with a session lock, data repair, leaderstats
@@ -269,6 +471,14 @@ src/server/                 -> ServerScriptService.Server
   TreasureStorm.luau        treasure chests: dropping, opening, rewards
   Shipwreck.luau            the Shipwreck event: sinking, the orca hunt, eating, rewards
   ShipwreckVisuals.luau     the wreck and orca models made from Parts
+  RuinsWorld.luau           builds the Sunken Ruins: terrace and temple, mermaid statue, pirate
+                            ship, cave, coral garden, Wreck Basin, Marlo, and the chests, relics
+                            and hidden coral
+  Ruins.luau                the ruins' gameplay: chests, relics, cuttings, sightings, missions
+  AbyssWorld.luau           builds the Abyss: road, shelf, Pressure Gate, ramp, pit, glowing
+                            coral, mushrooms, crystals, the Crystal Spire, Lumi's stall
+  Abyss.luau                the Abyss's gameplay: unlocking, turning locked players back,
+                            Lumi's sales (BuyAbyssSeed), deep-sea creature sightings
   Volcano.luau              the Volcano Vent event: the volcano and its lava rocks
   GiantOctopus.luau         the Giant Octopus event: hits, health and prizes
   Merchant.luau             the Mermaid Merchant event: Marina's stall and offers (BuyMerchant)
@@ -280,11 +490,17 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   Main.client.luau          connects remotes and UI
   OceanEffects.luau         marine snow around the camera, bubbles from divers
   CoralLabels.luau          name and growth countdown over each coral
-  Hud.luau                  shells, bag, sea-event timer, toasts, seed hotbar, side and Shop/Home buttons
+  Hud.luau                  shells, bag, sea-event timer, toasts, seed hotbar, side and Shop/Home/Ruins buttons
   SuppliesPanel.luau        the Upgrade Station window (Reef, Gear, Fences, Decor)
   MerchantPanel.luau        Marina the Mermaid Merchant's trade window
   Audio.luau                music, ambience and sound effects (and the Music button)
   TutorialPanel.luau        the Starter Lagoon tutorial card, beam and marker
+  RuinsPanel.luau           the Explorer's Journal, the ruins mission card, and each player's
+                            own view of chests, relics and cut coral
+  RuinsLife.luau            the ruins' rare creatures on their shared paths (client only)
+  AbyssLife.luau            the Abyss's darkness, glowing jellyfish and deep-sea creatures
+                            (client only)
+  AbyssPanel.luau           Lumi's Deep Seeds window
   QuestsPanel.luau          the Quests window: daily quests, rebirth, titles
   NameTags.luau             titles and rebirths over players' heads
   Swimming.luau             jump-to-swim movement and animation (client only)
@@ -358,6 +574,16 @@ Item 5 was checked on an iPhone 14 (the HUD and windows draw at 70% there, see `
 and on a 1366 x 768 laptop (full size). Not yet checked: tap-to-plant on a real phone, the
 random odds over many tries, a mutation drifting between two players' reefs, completing an
 Index set, and items 3 and 4, which need a published place and two clients.
+
+**Sunken Ruins, checked in Studio** (solo Play through the Studio MCP server, on 2026-11-24):
+the zone builds (about 3,900 parts, 17 interactive spots) with no errors; the Ruins button lands
+on the entrance pad; opening the gate chest, picking up the Ship's Bell (it disappears for that
+player), entering the cave, taking a Ghost Coral cutting (it arrives in the hotbar), spotting
+the Anglerfish and boarding the pirate ship each finished their mission in order and paid out;
+the Journal shows missions, relics, creatures and timers; and a forced Shipwreck landed in the
+Wreck Basin, where a player hidden in the hull survived the orcas and got the Seagrass seed.
+Not yet checked: the Giant Squid's visit, the Relic Coral cutting after all six relics, chests
+refilling after 20 minutes, and the mission card (it only shows once the tutorial is done).
 
 Roblox engine behaviour (parts, UI, DataStores, ClickDetectors) only runs inside Studio.
 After changes, run these and check Output:

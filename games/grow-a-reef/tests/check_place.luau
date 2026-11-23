@@ -12,22 +12,22 @@ local function check(cond, msg) if cond then print("ok   " .. msg) else failures
 -- 1. Place structure
 local game = roblox.deserializePlace(fs.readFile(process.args[1]))
 local rs = game:GetService("ReplicatedStorage")
-for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify", "Teleport", "Teleported", "AdminAction", "Announcement", "BuyFence", "EquipFence", "BuyDecor", "PlaceDecor", "UpgradeGear", "ClaimQuest", "Rebirth", "EquipTitle", "GuideLine", "BuyMerchant" } do
+for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify", "Teleport", "Teleported", "AdminAction", "Announcement", "BuyFence", "EquipFence", "BuyDecor", "PlaceDecor", "UpgradeGear", "ClaimQuest", "Rebirth", "EquipTitle", "GuideLine", "BuyMerchant", "BuyAbyssSeed", "ResearchSpecies" } do
 	local r = rs.Remotes:FindFirstChild(name)
 	check(r and r.ClassName == "RemoteEvent", "remote " .. name)
 end
 local server = game:GetService("ServerScriptService").Server
 check(server.Main.ClassName == "Script", "server Main is a Script")
-for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport", "Shipwreck", "ShipwreckVisuals", "Admin", "Quests", "Supplies", "Likes", "Rebirth", "Tutorial", "Volcano", "GiantOctopus", "Merchant", "TreasureHunt", "EventVisuals" } do
+for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport", "Shipwreck", "ShipwreckVisuals", "Admin", "Quests", "Supplies", "Likes", "Rebirth", "Tutorial", "RuinsWorld", "Ruins", "AbyssWorld", "Abyss", "WorldKit", "MainReef", "Collectibles", "Volcano", "GiantOctopus", "Merchant", "TreasureHunt", "EventVisuals", "KelpWorld", "Kelp", "Hub", "Research", "Oxygen" } do
 	check(server:FindFirstChild(m) and server[m].ClassName == "ModuleScript", "server module " .. m)
 end
 local client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 check(client.Main.ClassName == "LocalScript", "client Main is a LocalScript")
-for _, m in { "Swimming", "AdminPanel", "SuppliesPanel", "QuestsPanel", "NameTags", "TutorialPanel", "MerchantPanel", "Audio" } do
+for _, m in { "Swimming", "AdminPanel", "SuppliesPanel", "QuestsPanel", "NameTags", "TutorialPanel", "MerchantPanel", "RuinsPanel", "RuinsLife", "AbyssPanel", "AbyssLife", "Audio", "KelpPanel", "KelpLife", "LabPanel", "OxygenBar", "AquariumDisplay" } do
 	check(client:FindFirstChild(m) and client[m].ClassName == "ModuleScript", "client module " .. m)
 end
 check(rs.Shared.ReefConfig.ClassName == "ModuleScript", "shared ReefConfig")
-for _, m in { "CoralVisuals", "FenceVisuals", "DecorVisuals", "ReefSounds" } do
+for _, m in { "CoralVisuals", "FenceVisuals", "DecorVisuals", "RuinsConfig", "ReefSounds" } do
 	check(rs.Shared:FindFirstChild(m) and rs.Shared[m].ClassName == "ModuleScript", "shared " .. m)
 end
 check(math.abs(game:GetService("Workspace").Gravity - 70) < 0.01, "Workspace.Gravity = 70")
@@ -53,8 +53,21 @@ local Econ = load("src/shared/EconomyMath.luau")
 
 check(Config.harvestValue("brain", "Golden") == 375, "Golden Brain Coral sells for 375")
 check(Config.harvestValue("nope", "None") == 0, "unknown seed sells for 0")
-check(Config.expandCost(10) == 200 and Config.expandCost(11) == 240 and Config.expandCost(49) == 244961, "expand costs 200, 240 ... 244,961")
-check(Config.bedRadius(10) == 37 and math.abs(Config.bedRadius(50) - 54) < 1e-9, "reef bed grows from 37 to 54 studs")
+check(Config.STARTING_SLOTS == 20 and Config.MAX_SLOTS == 30 and #Config.Planters == 30, "reefs start with 20 planters and unlock up to 30")
+check(Config.expandCost(20) == 1000 and Config.expandCost(21) == 1550 and Config.expandCost(29) == 51639, "planters cost 1,000, 1,550 ... 51,639 shells")
+check(Config.expandPearls(20) == 1 and Config.expandPearls(21) == 1 and Config.expandPearls(22) == 2 and Config.expandPearls(29) == 5, "planters cost 1, 1, 2, 2 ... 5 pearls")
+local plantersApart, plantersInside = true, true
+for i, a in Config.Planters do
+	plantersInside = plantersInside and math.sqrt(a.x * a.x + a.z * a.z) + Config.PLANTER_RADIUS <= Config.BED_RADIUS
+	for j, b in Config.Planters do
+		if i < j then
+			plantersApart = plantersApart and math.sqrt((a.x - b.x) ^ 2 + (a.z - b.z) ^ 2) >= Config.PLANTER_RADIUS * 2 + 2
+		end
+	end
+end
+check(plantersApart and plantersInside, "planters sit on the bed with room to walk between them")
+check(Config.Planters[1].x == 0 and Config.Planters[1].z == 0 and Config.planterAt(0.5, 0.5) == 1 and Config.planterAt(5, 0) == nil, "the first planter is in the middle; between planters is no planter")
+check(Config.growthStage(0) == 1 and Config.growthStage(0.34) == 1 and Config.growthStage(0.5) == 2 and Config.growthStage(0.999) == 2 and Config.growthStage(1) == 3, "coral grows through seedling, growing and fully grown")
 local maxReach = Config.bedRadius(Config.MAX_SLOTS) + 7
 -- The Starter Lagoon: reefs in a ring round the plaza, buildings in between.
 local Lagoon = Config.Lagoon
@@ -65,22 +78,64 @@ for i = 1, Config.PLOT_COUNT do
 	local frame = Config.plotFrame(i)
 	local nextFrame = Config.plotFrame(i % Config.PLOT_COUNT + 1)
 	ringOk = ringOk and (frame.Position - nextFrame.Position).Magnitude >= maxReach * 2 + 4
-	local toPlaza = flat(Lagoon.center - frame.Position).Unit
-	gatesOk = gatesOk and frame.LookVector:Dot(toPlaza) > 0.999
-	local far = (frame.Position - Lagoon.center).Magnitude + maxReach
-	insideOk = insideOk and far < Config.SeaLife.area.maxX and far < 600
+	local toRoad = roblox.Vector3.new(0, 0, -frame.Position.Z).Unit
+	gatesOk = gatesOk and frame.LookVector:Dot(toRoad) > 0.999
+	local p = frame.Position
+	insideOk = insideOk and p.X - maxReach > Config.SeaLife.area.minX and p.X + maxReach < Config.MainReef.roadFrom
+		and math.abs(p.Z) + maxReach < Config.MainReef.ridgeZ and math.abs(p.Z) - maxReach > Config.MainReef.roadWidth / 2
 end
 check(ringOk, "neighbouring reef mounds don't overlap")
-check(gatesOk, "every reef's gate (local -Z) faces the plaza")
-check(insideOk, "the ring of reefs fits inside the sea area and the seabed")
-local buildings = { guide = 4, research = 26, upgrade = 16, coralShop = 30, oceanGate = 30, boards = 34 }
+check(gatesOk, "every reef's gate (local -Z) faces the Main Reef's road")
+check(insideOk, "the reefs fit between the road and the ridges, inside the sea area")
+local spotsOk = true
+for _, spot in Config.MainReef.fishSpots do
+	spotsOk = spotsOk and not Config.nearPlot(spot.X, spot.Z, 6) and math.abs(spot.Z) < Config.MainReef.ridgeZ - 20
+end
+for _, x in Config.MainReef.bridges do
+	spotsOk = spotsOk and not Config.nearPlot(x, 0, 0) and x < Config.MainReef.roadFrom and x > Config.MainReef.roadTo
+end
+check(spotsOk, "fish nurseries and coral bridges stand clear of the reefs")
+local buildings = { guide = 4, research = Lagoon.labRadius + 4, aquarium = 30, upgrade = 26, coralShop = 30, oceanGate = 30, boards = 34 }
 for name, radius in buildings do
 	local at = Lagoon[name]
 	check(not Config.nearPlot(at.X, at.Z, radius), "the " .. name .. " stands clear of every reef")
 end
 check((Lagoon.guide - Lagoon.center).Magnitude < Config.SHOPKEEPER_GREET_DISTANCE, "Inky is close enough to the spawn to greet new players")
-check(Lagoon.research.Z < -40 and Lagoon.upgrade.Z < -40 and (Lagoon.upgrade - Lagoon.research).Magnitude < 100, "the Research and Upgrade Stations are on the north side, near each other")
-check(Lagoon.coralShop.X > 60 and math.abs(Lagoon.coralShop.Z) < 10, "the Coral Shop is on the east side")
+-- The hub: four buildings in the four quadrants, the Lab the biggest, the roads on the axes.
+check(Lagoon.research.X < -40 and Lagoon.research.Z < -40, "the Research Laboratory is north-west")
+check(Lagoon.aquarium.X > 40 and Lagoon.aquarium.Z < -40, "the Aquarium is north-east")
+check(Lagoon.coralShop.X > 40 and Lagoon.coralShop.Z > 40, "the Coral Market is south-east")
+check(Lagoon.upgrade.X < -40 and Lagoon.upgrade.Z > 40, "the Equipment Station is south-west")
+local hubRadii = { research = Lagoon.labRadius, aquarium = 25, coralShop = 25, upgrade = 22 }
+local hubClear = true
+for key, radius in hubRadii do
+	local at = Lagoon[key]
+	hubClear = hubClear and math.abs(at.X) - radius > 12 and math.abs(at.Z) - radius > 12
+		and roblox.Vector3.new(at.X, 0, at.Z).Magnitude + radius < Lagoon.rimRadius - 10
+		and roblox.Vector3.new(at.X, 0, at.Z).Magnitude - radius > Lagoon.plazaRadius + 10
+	if key ~= "research" then
+		hubClear = hubClear and radius < Lagoon.labRadius
+	end
+end
+check(hubClear, "the hub's buildings sit between the plaza and the rim, clear of the roads, the Lab the biggest")
+-- Species research and the new gear.
+local fresh = { research = {}, index = { coral = {} } }
+check(Config.speciesUnlocked(fresh, "kelp") and not Config.speciesUnlocked(fresh, "brain"), "only Bubble Kelp is known at the start")
+check(Config.researchProblem(fresh, "brain") ~= nil and Config.researchProblem({ research = {}, index = { coral = { [Config.inventoryKey("kelp", "None")] = true } } }, "brain") == nil, "researching a species needs the one before it grown")
+check(Config.researchProblem({ research = {}, index = { coral = {} } }, "fan") ~= nil and Config.researchProblem(fresh, "ghost") ~= nil, "species research goes in order, and special coral can't be researched")
+local researchOk = true
+for _, seedId in Config.Research.order do
+	researchOk = researchOk and Config.Seeds[seedId] ~= nil and Config.Seeds[seedId].shop ~= false
+	researchOk = researchOk and (seedId == Config.Research.free or (Config.Research.costs[seedId] or 0) > 0)
+end
+check(researchOk, "every researchable species is a shop coral with a research cost")
+check(Config.oxygenCapacity(0) == Config.Oxygen.base and Config.oxygenCapacity(#Config.Gear.oxygen.costs) > Config.Oxygen.base * 3, "the Oxygen Tank gives several times the air")
+check(Config.swimSpeedMultiplier(0) == 1 and Config.swimSpeedMultiplier(#Config.Gear.fins.costs) > 1.3, "Swim Fins make you faster")
+local stationsOk = true
+for _, gearId in Config.GEAR_ORDER do
+	stationsOk = stationsOk and (Config.GearStation[gearId] == "lab" or Config.GearStation[gearId] == "equipment")
+end
+check(stationsOk and Config.GearStation.fertilizer == "lab" and Config.GearStation.fins == "equipment", "every piece of gear is sold at the Lab or the Equipment Station")
 check(Lagoon.oceanGate.X < -60 and math.abs(Lagoon.oceanGate.Z) < 10, "the Ocean Gate is on the west side")
 local frame3 = Config.plotFrame(3)
 local x3, z3 = Config.plotOffset(frame3, Config.plotPoint(frame3, 12.5, -7.25, 1.4))
@@ -90,7 +145,8 @@ local actions = {}
 for _, step in Config.Tutorial.steps do table.insert(actions, step.action) end
 check(table.concat(actions, ",") == "guide,plant,sell,fish,upgrade", "tutorial: seed, plant, sell, fish, expand")
 check(Config.plantProblem(0, 0, 10, {}) == nil, "coral fits in the middle of an empty bed")
-check(Config.plantProblem(35.6, 0, 10, {}) ~= nil and Config.plantProblem(35.4, 0, 10, {}) == nil, "coral must stay 1.5 studs inside the bed edge")
+local p20, p21 = Config.Planters[20], Config.Planters[21]
+check(Config.plantProblem(p20.x, p20.z, 20, {}) == nil and Config.plantProblem(p21.x, p21.z, 20, {}) ~= nil, "coral goes in unlocked planters only")
 check(Config.Swim.speed > 16 and Config.Swim.rise > 0 and Config.Swim.sink > 0, "swimming is faster than walking (16)")
 local pad = Config.Teleport.shopsPad
 check(Config.Teleport.cooldown > 0 and (pad - Lagoon.coralShop).Magnitude < 40 and (pad - Lagoon.coralShop).Magnitude > 20, "teleport has a cooldown and the shops pad sits in front of the Coral Shop")
@@ -103,10 +159,9 @@ check(fence ~= nil and fence.name == "Shipwreck Wood" and #fence.plankColors > 0
 for _, style in Config.Fences do
 	check(style.height > 0 and style.postSpacing > 0 and style.rails >= 1 and type(style.material) == "string", "fence " .. style.id .. " has a height, post spacing, rails and a material")
 end
-check(Config.plantProblem(4.9, 0, 6, { { x = 0, z = 0 } }) ~= nil and Config.plantProblem(5, 0, 6, { { x = 0, z = 0 } }) == nil, "coral needs 5 studs of spacing")
-local full = {}
-for i = 1, 6 do full[tostring(i)] = { x = (i - 3.5) * 100, z = 0 } end
-check(string.find(Config.plantProblem(0, 0, 6, full) or "", "full") ~= nil, "a full reef refuses more coral")
+local taken, takenSlot = Config.plantProblem(0, 0, 20, { { slot = 1 } })
+check(taken ~= nil and takenSlot == 1 and Config.plantProblem(0, 0, 20, { { slot = 2 } }) == nil, "one coral per planter")
+check(Config.plantProblem(5, 0, 20, {}) ~= nil, "coral can't go between planters")
 local s, m = Config.splitInventoryKey(Config.inventoryKey("star", "Prismatic"))
 check(s == "star" and m == "Prismatic", "inventory key round trip")
 check(Config.splitInventoryKey("bad key") == nil, "malformed inventory key rejected")
@@ -120,7 +175,9 @@ local counts = {}
 math.randomseed(1)
 for _ = 1, 200000 do local id = Econ.pickWeighted(Config.Mutations, math.random()); counts[id] = (counts[id] or 0) + 1 end
 check(math.abs(counts.Golden / 200000 * 100 - odds.Golden) < 0.2, string.format("200k rolls: Golden %.2f%% vs %.2f%% expected", counts.Golden / 2000, odds.Golden))
-local fishWeights = Econ.oddsPercent(Config.Fish.kinds)
+local reefFish = {}
+for _, kind in Config.Fish.kinds do if kind.weight > 0 then table.insert(reefFish, kind) end end
+local fishWeights = Econ.oddsPercent(reefFish)
 check(fishWeights.Moonfish == 2, "Moonfish odds 2%")
 local eventIds = {}
 for _, event in Config.Events.list do
@@ -170,7 +227,7 @@ local landingClear = true
 for dx = -ship.length / 2, ship.length / 2, 10 do
 	landingClear = landingClear and not Config.nearPlot(ship.landing.X + dx, ship.landing.Z, ship.width / 2)
 end
-check(landingClear and ship.landing.X < Lagoon.oceanGate.X and ship.landing.X - ship.length / 2 > Config.SeaLife.area.minX, "the wreck lands on open seabed out past the Ocean Gate")
+check(landingClear and ship.landing.X - ship.length / 2 > 255 and ship.landing.X + ship.length / 2 < Config.SeaLife.area.maxX, "the wreck lands in the Sunken Ruins, east of the lagoon, inside the sea area")
 
 -- Stacked mutations
 check(Config.harvestValue("kelp", "Glowing+Golden") == 180, "Glowing + Golden Bubble Kelp sells at x10 (180)")
@@ -190,7 +247,9 @@ local indexEntries = 0
 for _, set in Config.IndexSets do
 	indexEntries += #set.entries
 end
-check(#Config.IndexSets == 8 and indexEntries == 7 * 22 + 4, "Reef Index: 8 sets, 158 entries")
+-- One set per seed (every mutation key) plus the fish set, whatever seeds and fish exist.
+local expectedEntries = #Config.SEED_ORDER * #Config.MUTATION_KEYS + #Config.Fish.kinds
+check(#Config.IndexSets == #Config.SEED_ORDER + 1 and indexEntries == expectedEntries, string.format("Reef Index: %d sets (every seed and the fish), %d entries", #Config.IndexSets, indexEntries))
 
 -- Pet eggs: every outcome is a real pet and the shown odds sum to 100
 for _, egg in Config.Pets.eggs do
@@ -218,12 +277,11 @@ for _, item in Config.Decor.items do
 	check(Config.DecorById[item.id] == item and item.price > 0 and item.footprint > 0, "decoration " .. item.id .. " has a price and footprint")
 end
 local mound = Config.moundRadius()
-check(Config.decorProblem("anchor", 30, 20, {}, {}) == nil, "a decoration fits on open reef")
+check(Config.decorProblem("anchor", 38, 10, {}, {}) == nil, "a decoration fits round the planters")
 check(Config.decorProblem("anchor", mound, 0, {}, {}) ~= nil, "decorations stay inside the fence")
 check(Config.decorProblem("lantern", 0, -mound + 4, {}, {}) ~= nil, "the gateway stays clear")
-check(Config.decorProblem("anchor", 0, 0, { { x = 1, z = 0 } }, {}) ~= nil, "decorations can't go on coral")
-check(Config.decorProblem("anchor", 0, 0, {}, { { item = "chest", x = 3, z = 0 } }) ~= nil and Config.decorProblem("anchor", 0, 0, {}, { { item = "chest", x = 6, z = 0 } }) == nil, "decorations keep their footprints apart")
-check(Config.plantProblem(0, 0, 10, {}, { { item = "statue", x = 2, z = 0 } }) ~= nil and Config.plantProblem(0, 0, 10, {}, { { item = "statue", x = 6, z = 0 } }) == nil, "coral can't grow on a decoration")
+check(Config.decorProblem("anchor", 0, 0, {}, {}) ~= nil and Config.decorProblem("lantern", 5, 0, {}, {}) ~= nil, "decorations can't go on or right beside a planter")
+check(Config.decorProblem("anchor", 38, 10, {}, { { item = "chest", x = 38, z = 13 } }) ~= nil and Config.decorProblem("anchor", 38, 10, {}, { { item = "chest", x = 38, z = 16 } }) == nil, "decorations keep their footprints apart")
 local manyDecor = {}
 for i = 1, Config.Decor.maxPlaced do manyDecor[tostring(i)] = { item = "lantern", x = 100 * i, z = 0 } end
 check(Config.decorProblem("lantern", 0, 0, {}, manyDecor) ~= nil, "a reef holds at most " .. Config.Decor.maxPlaced .. " decorations")
@@ -246,7 +304,8 @@ check(valid, "a day's quests are real and all different")
 local varied = false
 for day = 20001, 20010 do varied = varied or table.concat(Config.dailyQuests(day), ",") ~= table.concat(q1, ",") end
 check(varied, "quests change from day to day")
-check(Config.questShells(Config.QuestById.plant, 10) == 150 and Config.questShells(Config.QuestById.plant, 50) == 750, "quest rewards grow with your reef (x1 at 10 slots, x5 at 50)")
+check(Config.questShells(Config.QuestById.plant, 20) == 150 and Config.questShells(Config.QuestById.plant, 30) == 450, "quest rewards grow with your reef (x1 at 20 planters, x3 at 30)")
+check(Config.Collectibles.shells.min > 0 and Config.Collectibles.shells.max >= Config.Collectibles.shells.min and Config.Collectibles.pearls.count > 0, "shells and pearls to collect in the Main Reef")
 for _, quest in Config.Quests.pool do
 	check(quest.goal > 0 and quest.shells > 0 and string.find(quest.text, "%%d") ~= nil and (not quest.seed or Config.Seeds[quest.seed.id] ~= nil), "quest " .. quest.id .. " has a goal, reward and text")
 end
@@ -269,6 +328,57 @@ for _, set in Config.IndexSets do
 end
 check(Config.FenceById.crystal.shop == false and Config.IndexRewards.anemone.fence == "crystal", "the Glow Crystal fence comes only from the Index")
 
+-- The Sunken Ruins (RuinsConfig): layout, the save, missions and the creatures' paths
+local Ruins = load("src/shared/RuinsConfig.luau")
+check((Ruins.Places.basin - ship.landing).Magnitude < 1e-6, "the Shipwreck lands in the ruins' Wreck Basin")
+check(Ruins.inRuins(ship.landing) and Ruins.inRuins(Ruins.Places.entrance) and not Ruins.inRuins(Lagoon.center), "the basin and entrance are in the ruins; the plaza isn't")
+check(Ruins.center.X - Ruins.radius >= 250 and Ruins.Places.entrance.X < Ruins.center.X and Ruins.roadFromX < Ruins.Places.entrance.X, "the ruins sit east of the lagoon (x > 250), entrance and road on the lagoon side")
+check(Ruins.center.X + Ruins.radius <= Config.SeaLife.area.maxX + 5, "the ruins fit inside the sea area")
+local allIn = true
+for _, spot in Ruins.Chests.spots do allIn = allIn and Ruins.inRuins(spot.at) end
+for _, spot in Ruins.HiddenCoral do allIn = allIn and Ruins.inRuins(spot.at) and Config.Seeds[spot.seed] ~= nil and Config.Seeds[spot.seed].shop == false end
+for _, relic in Ruins.Relics.list do allIn = allIn and Ruins.inRuins(relic.at) end
+check(allIn, "every chest, hidden coral and relic is in the ruins, and hidden coral is a seed sold nowhere")
+check(Ruins.inCave(Ruins.Places.cave + V3.new(3, 4, 2)) and not Ruins.inCave(Ruins.Places.cave + V3.new(0, 30, 0)) and Ruins.inCave(Ruins.HiddenCoral[1].at), "the cave holds its Ghost Coral; above it isn't inside")
+check(Ruins.aboardShip(Ruins.shipPoint(0, 5, 0)) and not Ruins.aboardShip(Ruins.shipPoint(0, 5, 20)) and Ruins.aboardShip(Ruins.Relics.list[1].at + V3.new(0, 1, 0)), "the ship's hold counts as aboard (the compass is in it); beside it doesn't")
+local ok = true
+for _, entry in Ruins.Chests.seeds do ok = ok and Config.Seeds[entry.id] ~= nil and entry.count >= 1 end
+check(ok and Ruins.Chests.cooldown > 0, "ruins chest seeds exist")
+local fresh = Ruins.newState()
+check(fresh.mission == 1 and Ruins.Missions[1].done(fresh) == false, "a new diver starts on the first mission, not done")
+local bad = Ruins.sanitize({ mission = 99, opened = -5, relics = { crown = true, nope = true }, chests = { gate = 123, fake = 1 }, cuttings = { cave1 = "x" }, visited = { reach = true, moon = true }, sighted = { squid = 1 } })
+check(bad.mission == #Ruins.Missions + 1 and bad.opened == 0 and bad.relics.crown and not bad.relics.nope and bad.chests.gate == 123 and bad.chests.fake == nil and bad.cuttings.cave1 == nil and bad.visited.reach and not bad.visited.moon and not bad.sighted.squid, "a bad ruins save is repaired")
+check(Ruins.sanitize(nil).mission == 1, "a missing ruins save starts fresh")
+check(Ruins.chestWait({ chests = { gate = 1000 } }, "gate", 1000 + Ruins.Chests.cooldown - 5) == 5 and Ruins.chestWait({ chests = {} }, "gate", 0) == 0, "chests refill after the cooldown")
+local cave1, sanctum = Ruins.HiddenCoral[1], Ruins.HiddenCoral[3]
+check(Ruins.cuttingProblem(fresh, cave1, 100) == nil and Ruins.cuttingProblem({ cuttings = { cave1 = 100 }, relics = {} }, cave1, 100) ~= nil and Ruins.cuttingProblem({ cuttings = { cave1 = 99 }, relics = {} }, cave1, 100) == nil, "one cutting a day from each spot")
+local allRelics = {}
+for _, relic in Ruins.Relics.list do allRelics[relic.id] = true end
+check(Ruins.cuttingProblem(fresh, sanctum, 100) ~= nil and Ruins.cuttingProblem({ cuttings = {}, relics = allRelics }, sanctum, 100) == nil, "the Relic Coral needs every relic")
+local missionsOk, ids = true, {}
+for _, mission in Ruins.Missions do
+	table.insert(ids, mission.id)
+	missionsOk = missionsOk and mission.reward.shells > 0 and (not mission.reward.title or Config.TitleById[mission.reward.title] ~= nil)
+	for seedId in mission.reward.seeds or {} do missionsOk = missionsOk and Config.Seeds[seedId] ~= nil end
+end
+check(missionsOk and table.concat(ids, ",") == "reach,chest,relic,cave,coral,creature,ship,relics,creatures", "nine exploration missions with real rewards")
+local everything = { mission = 1, visited = { reach = true, cave = true, ship = true }, opened = 1, cut = 1, relics = allRelics, sighted = { coelacanth = true, angler = true, seadragon = true, squid = true }, chests = {}, cuttings = {} }
+local allDone = true
+for _, mission in Ruins.Missions do allDone = allDone and mission.done(everything) end
+check(allDone, "doing everything finishes every mission")
+local inPlace, squidUp, squidDown = true, Ruins.creaturePosition("squid", 30), Ruins.creaturePosition("squid", Ruins.Creatures.squidSeconds + 10)
+for _, creature in Ruins.Creatures.list do
+	for t = 0, 600, 7 do
+		local p = Ruins.creaturePosition(creature.id, t)
+		inPlace = inPlace and (p == nil or (Ruins.inRuins(p) and p.Y < 80))
+	end
+end
+check(inPlace and squidUp ~= nil and squidDown == nil and squidUp.Y > 20, "creatures stay in the ruins; the squid comes up only for part of each cycle")
+local anglerIn = true
+for t = 0, 120, 3 do anglerIn = anglerIn and Ruins.inCave(Ruins.creaturePosition("angler", t)) end
+check(anglerIn, "the Anglerfish never leaves the cave")
+check(Config.Shopkeepers.Explorer ~= nil and Config.Seeds.ghost.rarity == "Mythic" and Config.Seeds.relic.rarity == "Ancient" and Config.IndexRewards.ghost and Config.IndexRewards.relic, "Marlo, the two hidden seeds and their Index rewards are configured")
+
 -- Sounds: every id is a real asset number, and event music belongs to real events
 local Sounds = load("src/shared/ReefSounds.luau")
 local soundDefs = { Sounds.ambience, Sounds.orcaMusic }
@@ -286,6 +396,94 @@ end
 for _, name in { "plant", "harvest", "sell", "buy", "hatch", "teleport", "swim", "place", "lava", "octopusHit", "dig", "reward", "bigReward", "eventStart", "clue" } do
 	check(Sounds.effects[name] ~= nil, "sound effect " .. name)
 end
+
+-- The Abyss (AbyssConfig): layout, unlock, Lumi's seeds, creatures, the save
+local Abyss = load("src/shared/AbyssConfig.luau")
+local A = Abyss
+check(A.Shelf.minZ >= 450 and A.Shelf.minZ > Lagoon.center.Z + 180, "the Abyss starts south of the lagoon and the shared seabed (z >= 450)")
+check(A.Pit.minX > A.Shelf.minX and A.Pit.maxX < A.Shelf.maxX and A.Pit.minZ > A.Shelf.minZ and A.Pit.maxZ < A.Shelf.maxZ and A.FLOOR < -30, "the pit sits inside the shelf and goes deep")
+local ruinsFar = math.abs(Ruins.center.X - A.center.X) > Ruins.radius + (A.Shelf.maxX - A.Shelf.minX) / 2 or math.abs(Ruins.center.Z - A.center.Z) > Ruins.radius + (A.Shelf.maxZ - A.Shelf.minZ) / 2
+check(ruinsFar, "the Abyss and the Sunken Ruins don't overlap")
+check(A.inPit(A.Places.spire + V3.new(0, 5, 0)) and A.inPit(A.Places.pad + V3.new(0, 3, 0)) and A.inPit(A.Places.shop) and not A.inPit(A.gate + V3.new(0, 3, 0)), "the spire, pad and Lumi's stall are in the pit; the gate isn't")
+check(A.darkness(Lagoon.center) == 0 and A.darkness(A.gate) > 0 and A.darkness(A.Places.spire + V3.new(0, 3, 0)) > 0.95, "the sea darkens from the gate to the pit floor")
+local slope = math.deg(math.atan2(A.Ramp.top.Y - A.Ramp.bottom.Y, (A.Ramp.bottom - A.Ramp.top).Magnitude))
+check(A.Ramp.bottom.Y == A.FLOOR and A.Ramp.top.Y == 0 and slope < 25 and A.Ramp.top.Z > A.Pit.minZ, string.format("the ramp runs from the shelf to the floor at a walkable %.0f degrees", slope))
+check(not A.meetsUnlock({ harvested = 0, ruins = { mission = 1 } }), "a new player can't enter the Abyss")
+check(A.meetsUnlock({ harvested = 0, ruins = { mission = A.Unlock.exploration + 1 } }) and not A.meetsUnlock({ harvested = 0, ruins = { mission = A.Unlock.exploration } }), "Exploration Level " .. A.Unlock.exploration .. " (Ruins missions done) unlocks it")
+check(A.meetsUnlock({ harvested = A.Unlock.reefHealth, ruins = { mission = 1 } }) and not A.meetsUnlock({ harvested = A.Unlock.reefHealth - 1 }), "Reef Health " .. A.Unlock.reefHealth .. " (coral harvested) unlocks it")
+local shopOk = #A.SHOP_SEEDS == 3
+local lastPrice = 0
+for _, id in A.SHOP_SEEDS do
+	local seed = Config.Seeds[id]
+	shopOk = shopOk and seed ~= nil and seed.shop == false and seed.price > Config.Seeds.star.price and seed.price > lastPrice and seed.sellValue > seed.price and seed.rarity == "Abyssal" and Config.IndexRewards[id] ~= nil
+	lastPrice = seed and seed.price or 0
+end
+check(shopOk, "Lumi sells three high-value Abyssal seeds, pricier than Starlight, never in the Coral Shop")
+check(Config.Shopkeepers.Abyss ~= nil and Config.TitleById[A.Creatures.allReward.title] ~= nil and Config.Seeds[A.Creatures.allReward.seed] ~= nil, "Lumi and the all-creatures reward are configured")
+local inAbyss = true
+for _, creature in A.Creatures.list do
+	for t = 0, 600, 5 do
+		local p = A.creaturePosition(creature.id, t)
+		inAbyss = inAbyss and p ~= nil and A.inZone(p) and p.Y > A.FLOOR and p.Y < 0
+	end
+end
+check(inAbyss, "every deep-sea creature stays in the pit, above the floor")
+local fixed = A.sanitize({ unlocked = true, sighted = { gulper = true, nessie = true, dumbo = 1 }, allRewarded = "yes" })
+local pocketsOk = #A.AirPockets >= 2 and A.inAirPocket(A.Places.pad + V3.new(0, 3, 0)) and A.inAirPocket(A.Places.shop + V3.new(0, 3, 0)) and not A.inAirPocket(A.Places.brain + V3.new(0, 3, 0))
+for _, pocket in A.AirPockets do pocketsOk = pocketsOk and A.inPit(pocket.position) and pocket.position.Y < -15 and pocket.radius > 0 end
+check(pocketsOk, "air pockets sit in the deep part of the pit, at the pad and Lumi's stall")
+check(fixed.unlocked and fixed.sighted.gulper and not fixed.sighted.nessie and not fixed.sighted.dumbo and fixed.allRewarded == false and A.sanitize(nil).unlocked == false, "a bad Abyss save is repaired")
+
+-- Kelp Forest (zone 4): north of the lagoon, its own ecosystem.
+local Kelp = load("src/shared/KelpConfig.luau")
+local KV = roblox.Vector3
+local function flatDistance(a, b) return KV.new(a.X - b.X, 0, a.Z - b.Z).Magnitude end
+check(Kelp.center.Z + Kelp.radius < -(Config.Lagoon.rimRadius + 30), "the Kelp Forest sits north of the lagoon's rim")
+check(not Kelp.inForest(Config.Volcano.vent) and flatDistance(Kelp.center, Config.Volcano.vent) > Kelp.radius + 40, "the Kelp Forest stays clear of the Volcano")
+check(flatDistance(Kelp.center, Ruins.center) > Kelp.radius + Ruins.radius, "the Kelp Forest stays clear of the Sunken Ruins")
+local kelpClearOfReefs = true
+for i = 1, Config.PLOT_COUNT do
+	kelpClearOfReefs = kelpClearOfReefs and flatDistance(Kelp.center, Config.plotFrame(i).Position) > Kelp.radius + Config.moundRadius()
+end
+check(kelpClearOfReefs and Kelp.center.Z + Kelp.radius < -Config.MainReef.ridgeZ - 20, "the Kelp Forest stays clear of the Main Reef")
+check(Kelp.entrance.Z > Kelp.center.Z and math.abs(Kelp.entrance.X) < 25 and flatDistance(Kelp.entrance, Kelp.center) <= Kelp.radius + 15, "the entrance is on the lagoon side, on the road north from the plaza")
+local placesInside = true
+for _, list in { Kelp.Glades, Kelp.Habitats, Kelp.Meadows } do
+	for _, place in list do
+		placesInside = placesInside and flatDistance(place.at, Kelp.center) + place.radius <= Kelp.radius + 15
+	end
+end
+check(placesInside, "every glade, habitat and meadow is inside the forest")
+local apart = true
+local places = {}
+for _, list in { Kelp.Glades, Kelp.Habitats, Kelp.Meadows } do
+	for _, place in list do table.insert(places, place) end
+end
+for i, a in places do
+	for j, b in places do
+		if i < j then apart = apart and flatDistance(a.at, b.at) > a.radius + b.radius + 10 end
+	end
+end
+check(apart, "glades, habitats and meadows don't overlap")
+local kelpFish = 0
+for _, kind in Config.Fish.kinds do
+	if kind.kelpWeight then
+		kelpFish += 1
+		check(kind.weight == 0 and kind.kelpWeight > 0 and table.find(Kelp.FISH_IDS, kind.id) ~= nil, "kelp fish " .. kind.id .. " lives only in the forest")
+	end
+end
+check(kelpFish == #Kelp.FISH_IDS and kelpFish == 5, "five kelp forest fish")
+local rewardsOk = true
+for _, challenge in Kelp.Challenges do
+	for seedId in challenge.reward.seeds or {} do rewardsOk = rewardsOk and Config.Seeds[seedId] ~= nil end
+	if challenge.reward.title then rewardsOk = rewardsOk and Config.TitleById[challenge.reward.title] ~= nil end
+	rewardsOk = rewardsOk and challenge.reward.shells > 0
+end
+check(rewardsOk and #Kelp.Challenges == 8, "eight kelp challenges, every reward a real seed or title")
+check(Config.Shopkeepers.Otto ~= nil, "Otto the sea otter is a shopkeeper")
+local saved = Kelp.sanitize({ done = { reach = true, nope = true }, glades = { statue = true, x = true }, nests = { cove1 = 100, bad = 5 }, hatchlings = 2.7, restored = -3 })
+check(saved.done.reach and not saved.done.nope and saved.glades.statue and not saved.glades.x and saved.nests.cove1 == 100 and saved.nests.bad == nil and saved.hatchlings == 2 and saved.restored == 0, "kelp saves are repaired, not trusted")
+check(Kelp.nestWait(Kelp.newState(), "cove1", 1000) == 0 and Kelp.nestWait({ nests = { cove1 = 1000 } }, "cove1", 1000 + Kelp.nestCooldown - 5) == 5, "turtle nests rest between hatchlings")
 
 print(failures == 0 and "ALL PASSED" or (failures .. " FAILED"))
 process.exit(if failures > 0 then 1 else 0)

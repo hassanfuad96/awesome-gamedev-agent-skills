@@ -42,8 +42,8 @@ local TONE_COLORS = {
 	bad = Ui.Colors.bad,
 }
 
--- onOpen is called with "index", "pets", "quests" or "admin" when a side button is pressed,
--- onTeleport with "shops" or "home" for the teleport buttons on the right, and
+-- onOpen is called with "index", "pets", "quests", "journal" or "admin" when a side button is pressed,
+-- onTeleport with "shops", "home" or "ruins" for the teleport buttons on the right, and
 -- onStopPlacing when the player is done placing decorations.
 function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (string) -> (), onTeleport: (string) -> (), onStopPlacing: () -> ()): Hud
 	local gui = Ui.new("ScreenGui", {
@@ -131,7 +131,7 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 		Name = "SideButtons",
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 10, 0.5, -30),
-		Size = UDim2.fromOffset(66, 288),
+		Size = UDim2.fromOffset(66, 362),
 		BackgroundTransparency = 1,
 		Parent = gui,
 	}, { Ui.new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) }) })
@@ -139,6 +139,7 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 		{ id = "index", text = "Index", color = Ui.Colors.accent },
 		{ id = "pets", text = "Pets", color = Ui.Colors.accent },
 		{ id = "quests", text = "Quests", color = Ui.Colors.rare },
+		{ id = "journal", text = "Journal", color = Color3.fromRGB(240, 200, 130) }, -- the Sunken Ruins
 		{ id = "admin", text = "Admin", color = Ui.Colors.bad }, -- only shown to admins
 	}
 	local questBadge
@@ -227,11 +228,11 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 		Name = "TeleportButtons",
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -10, 0.5, -30),
-		Size = UDim2.fromOffset(72, 152),
+		Size = UDim2.fromOffset(72, 232),
 		BackgroundTransparency = 1,
 		Parent = gui,
 	}, { Ui.new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) }) })
-	for order, place in { { id = "shops", text = "Shop" }, { id = "home", text = "Home" } } do
+	for order, place in { { id = "shops", text = "Shop" }, { id = "home", text = "Home" }, { id = "ruins", text = "Ruins" } } do
 		local button = Ui.button({
 			Name = place.text,
 			LayoutOrder = order,
@@ -267,7 +268,7 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 	}, { Ui.new("UISizeConstraint", { MaxSize = Vector2.new(620, 96) }) })
 	local hint = Ui.label({
 		Name = "Hint",
-		Text = "Buy seeds at the Coral Shop",
+		Text = "Buy seeds at the Coral Market",
 		MaxTextSize = 16,
 		Size = UDim2.new(1, 0, 0, 20),
 		TextStrokeTransparency = 0.5,
@@ -390,7 +391,8 @@ function Hud.setQuestReady(self: Hud, ready: boolean)
 end
 
 function Hud.setData(self: Hud, data: any)
-	self.shells.Text = `{EconomyMath.formatNumber(data.shells)} shells`
+	local pearls = data.pearls or 0
+	self.shells.Text = if pearls > 0 then `{EconomyMath.formatNumber(data.shells)} shells · {pearls} pearl{if pearls == 1 then "" else "s"}` else `{EconomyMath.formatNumber(data.shells)} shells`
 	local count = data.bagCount or 0
 	local capacity = data.bagCapacity or 0
 	self.bag.Text = if count == 0
@@ -472,13 +474,13 @@ function Hud.setData(self: Hud, data: any)
 
 	local slots = `{data.planted or 0}/{data.unlocked} coral planted`
 	if not any then
-		self.hint.Text = `No seeds. Buy some at the Coral Shop! ({slots})`
+		self.hint.Text = `No seeds. Buy some at the Coral Market! ({slots})`
 	elseif (data.planted or 0) >= data.unlocked then
-		self.hint.Text = `Reef full ({slots}). Harvest, or grow your reef at the Upgrade Station`
+		self.hint.Text = `Every planter is in use ({slots}). Harvest, or unlock more at the Research Laboratory`
 	elseif data.selected then
-		self.hint.Text = `Click your reef bed to plant {ReefConfig.Seeds[data.selected].name} ({slots})`
+		self.hint.Text = `Click a sand planter on your reef to plant {ReefConfig.Seeds[data.selected].name} ({slots})`
 	else
-		self.hint.Text = `Pick a seed, then click your reef bed to plant it ({slots})`
+		self.hint.Text = `Pick a seed, then click a sand planter to plant it ({slots})`
 	end
 end
 
@@ -566,7 +568,7 @@ local function shipwreckLine(now: number): (string?, Color3?)
 	local character = Players.LocalPlayer.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local hidden = typeof(ship) == "CFrame" and root ~= nil and ReefConfig.insideShipwreck(ship, root.Position)
-	local status = if hidden then "You're hidden" else "Hide inside the wreck by the shops!"
+	local status = if hidden then "You're hidden" else "Press Ruins and hide inside the wreck!"
 	if now < orcasAt then
 		return `Orcas in {Ui.formatTime(orcasAt - now)}! {status}`, if hidden then Ui.Colors.good else Ui.Colors.rare
 	end

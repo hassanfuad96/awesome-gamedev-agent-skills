@@ -51,6 +51,9 @@
         "GuideLine": {
           "$className": "RemoteEvent"
         },
+        "ResearchSpecies": {
+          "$className": "RemoteEvent"
+        },
         "AdminAction": {
           "$className": "RemoteEvent"
         },
@@ -82,6 +85,9 @@
           "$className": "RemoteEvent"
         },
         "BuyMerchant": {
+          "$className": "RemoteEvent"
+        },
+        "BuyAbyssSeed": {
           "$className": "RemoteEvent"
         }
       }

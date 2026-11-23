@@ -1,7 +1,7 @@
 --!nonstrict
 -- The Starter Lagoon tutorial tracker: a card under the top bar with the current step, and
--- a glowing beam plus a marker over the place to go next (Inky, your reef, the Coral Shop or
--- the Upgrade Station). Only shows what the server synced (data.tutorial); the server
+-- a glowing beam plus a marker over the place to go next (Inky, your reef, the Coral Market or
+-- the Research Laboratory). Only shows what the server synced (data.tutorial); the server
 -- decides when a step is done (Tutorial).
 -- Landmark positions come from attributes on Workspace.Reef, which reach every client even
 -- when the buildings themselves haven't streamed in yet.
@@ -54,7 +54,7 @@ local function target(): (Vector3?, string?, number)
 		end
 		return home(), "Your reef", ON_REEF
 	elseif step.action == "upgrade" then
-		return reef:GetAttribute("Landmark_Upgrade"), "Upgrade Station", ARRIVED
+		return reef:GetAttribute("Landmark_Upgrade"), "Research Lab", ARRIVED
 	end
 	return nil, nil, ARRIVED
 end
@@ -77,6 +77,9 @@ local function build(playerGui: PlayerGui)
 		Name = "TutorialGui",
 		ResetOnSpawn = false,
 		DisplayOrder = -1, -- under the shop windows and toasts
+		-- Up in Roblox's top bar row, which is empty on the right, so the card stays clear of
+		-- the teleport buttons below it.
+		IgnoreGuiInset = true,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		Parent = playerGui,
 	})
@@ -85,7 +88,7 @@ local function build(playerGui: PlayerGui)
 	card = Ui.new("Frame", {
 		Name = "Card",
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -12, 0, 8),
+		Position = UDim2.new(1, -12, 0, 10),
 		Size = UDim2.fromOffset(290, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundColor3 = Ui.Colors.panel,

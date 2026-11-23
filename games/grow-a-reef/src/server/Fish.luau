@@ -1,6 +1,9 @@
 --!nonstrict
 -- Fully grown coral attracts fish. Only the reef's owner can click a fish to catch it;
 -- the value comes from the coral that attracted it, decided when the fish spawns.
+-- Wild fish also gather at the Main Reef's fish nurseries (ReefConfig.MainReef.fishSpots)
+-- and in the Kelp Forest (KelpConfig.FishSpots, its own species); anyone can catch those,
+-- first click wins. Kelp spots by a seagrass meadow only have fish while it's half restored.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,11 +18,15 @@ local Pets = require(script.Parent.Pets)
 local ReefIndex = require(script.Parent.ReefIndex)
 local Quests = require(script.Parent.Quests)
 local Tutorial = require(script.Parent.Tutorial)
+local Kelp = require(script.Parent.Kelp)
+local KelpConfig = require(ReplicatedStorage.Shared.KelpConfig)
 local RateLimit = require(script.Parent.RateLimit)
 
 local Fish = {}
 
 local fishByPlayer: { [Player]: { [Model]: true } } = {}
+local wildBySpot: { [string]: { [Model]: true } } = {}
+local wildFolder: Folder
 local rng = Random.new()
 
 local function countFish(player: Player): number
@@ -85,18 +92,101 @@ local function buildFish(kind: ReefConfig.FishDef, at: CFrame): (Model, BasePart
 	return model, body
 end
 
+-- Reef fish (weight > 0) and Kelp Forest fish (kelpWeight), as weighted outcomes.
+local REEF_ODDS, KELP_ODDS = {}, {}
+local KIND_BY_ID: { [string]: ReefConfig.FishDef } = {}
+for _, kind in ReefConfig.Fish.kinds do
+	KIND_BY_ID[kind.id] = kind
+	if kind.weight > 0 then
+		table.insert(REEF_ODDS, { id = kind.id, weight = kind.weight })
+	end
+	if kind.kelpWeight then
+		table.insert(KELP_ODDS, { id = kind.id, weight = kind.kelpWeight })
+	end
+end
+
+local function pickKind(forest: boolean?): ReefConfig.FishDef?
+	return KIND_BY_ID[EconomyMath.pickWeighted(if forest then KELP_ODDS else REEF_ODDS, rng:NextNumber())]
+end
+
+-- Swims the fish between random points from randomPoint until it expires or is caught.
+-- Returns when it's gone; the caller cleans up.
+local function swimAbout(model: Model, body: BasePart, randomPoint: () -> Vector3, lifetime: number)
+	local expires = os.clock() + lifetime
+	while model.Parent and os.clock() < expires do
+		local target = randomPoint()
+		local from = body.Position
+		local direction = target - from
+		if direction.Magnitude > 0.5 then
+			body.CFrame = CFrame.lookAt(from, target)
+			TweenService:Create(body, TweenInfo.new(2.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+				CFrame = CFrame.lookAt(target, target + direction.Unit),
+			}):Play()
+		end
+		-- A fixed wait (not tween.Completed) so a destroyed fish can't stall this loop.
+		task.wait(2.6)
+	end
+end
+
+-- Pays the catcher for a fish worth `value` before their own bonuses.
+local function reward(clicker: Player, kind: ReefConfig.FishDef, value: number)
+	local profile = PlayerData.get(clicker)
+	if not profile then
+		return
+	end
+	-- A pufferfish makes the catch worth more, and so do rebirths.
+	local earned = math.floor(value * Pets.fishMultiplier(clicker) * ReefConfig.shellMultiplier(profile.data.rebirths))
+	PlayerData.addShells(clicker, earned)
+	profile.data.fishCaught += 1
+	Quests.progress(clicker, "fish", 1)
+	Plots.notify(clicker, `Caught a {kind.id}! +{EconomyMath.formatNumber(earned)} shells`, if kind.multiplier >= 4 then "rare" else "good")
+	ReefIndex.discoverFish(clicker, profile, kind.id)
+	PlayerData.sync(clicker)
+end
+
+-- A wild fish at spot `key` (a Main Reef nursery or a Kelp Forest spot): anyone can click it.
+local function spawnWild(key: string, spot: Vector3, forest: boolean)
+	local kind = pickKind(forest)
+	if not kind then
+		return
+	end
+	local fishKind = kind :: ReefConfig.FishDef
+	local settings = ReefConfig.Fish.wild
+	local function randomPoint(): Vector3
+		return spot + Vector3.new(rng:NextNumber(-settings.roam, settings.roam), rng:NextNumber(2.5, 7), rng:NextNumber(-settings.roam, settings.roam))
+	end
+	local model, body = buildFish(fishKind, CFrame.new(randomPoint()))
+	model:SetAttribute("Wild", true)
+	local caught = false
+	local click = Instance.new("ClickDetector")
+	click.MaxActivationDistance = 40
+	click.Parent = model
+	click.MouseClick:Connect(function(clicker)
+		if caught or not RateLimit.consume(clicker) or not PlayerData.get(clicker) then
+			return
+		end
+		caught = true
+		reward(clicker, fishKind, settings.value * fishKind.multiplier)
+		model:Destroy()
+	end)
+	model.Parent = wildFolder
+	local here = wildBySpot[key]
+	here[model] = true
+	task.spawn(function()
+		swimAbout(model, body, randomPoint, ReefConfig.Fish.lifetime)
+		here[model] = nil
+		if model.Parent then
+			model:Destroy()
+		end
+	end)
+end
+
 local function spawnFish(player: Player, coral: Plots.ReadyCoral)
 	local plot = Plots.plotOf(player)
 	if not plot then
 		return
 	end
-	local kindId = EconomyMath.pickWeighted(ReefConfig.Fish.kinds, rng:NextNumber())
-	local kind: ReefConfig.FishDef? = nil
-	for _, candidate in ReefConfig.Fish.kinds do
-		if candidate.id == kindId then
-			kind = candidate
-		end
-	end
+	local kind = pickKind()
 	if not kind then
 		return
 	end
@@ -127,22 +217,11 @@ local function spawnFish(player: Player, coral: Plots.ReadyCoral)
 			Plots.notify(clicker, "Only the reef owner can catch these fish.")
 			return
 		end
-		if not RateLimit.consume(clicker) then
-			return
-		end
-		local profile = PlayerData.get(clicker)
-		if not profile then
+		if not RateLimit.consume(clicker) or not PlayerData.get(clicker) then
 			return
 		end
 		caught = true
-		-- A pufferfish makes the catch worth more, and so do rebirths.
-		local earned = math.floor(value * Pets.fishMultiplier(clicker) * ReefConfig.shellMultiplier(profile.data.rebirths))
-		PlayerData.addShells(clicker, earned)
-		profile.data.fishCaught += 1
-		Quests.progress(clicker, "fish", 1)
-		Plots.notify(clicker, `Caught a {fishKind.id}! +{EconomyMath.formatNumber(earned)} shells`, if fishKind.multiplier >= 4 then "rare" else "good")
-		ReefIndex.discoverFish(clicker, profile, fishKind.id)
-		PlayerData.sync(clicker)
+		reward(clicker, fishKind, value)
 		despawn(clicker, model)
 	end)
 
@@ -155,20 +234,7 @@ local function spawnFish(player: Player, coral: Plots.ReadyCoral)
 	(owned :: { [Model]: true })[model] = true
 
 	task.spawn(function()
-		local expires = os.clock() + ReefConfig.Fish.lifetime
-		while model.Parent and os.clock() < expires do
-			local target = randomPoint()
-			local from = body.Position
-			local direction = target - from
-			if direction.Magnitude > 0.5 then
-				body.CFrame = CFrame.lookAt(from, target)
-				TweenService:Create(body, TweenInfo.new(2.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-					CFrame = CFrame.lookAt(target, target + direction.Unit),
-				}):Play()
-			end
-			-- A fixed wait (not tween.Completed) so a destroyed fish can't stall this loop.
-			task.wait(2.6)
-		end
+		swimAbout(model, body, randomPoint, ReefConfig.Fish.lifetime)
 		if not caught then
 			despawn(player, model)
 		end
@@ -176,6 +242,36 @@ local function spawnFish(player: Player, coral: Plots.ReadyCoral)
 end
 
 function Fish.start()
+	wildFolder = Instance.new("Folder")
+	wildFolder.Name = "WildFish"
+	wildFolder.Parent = workspace:FindFirstChild("Reef") or workspace
+	-- Every wild fish spot: the Main Reef's nurseries and the Kelp Forest's spots.
+	local spots = {}
+	for index, at in ReefConfig.MainReef.fishSpots do
+		table.insert(spots, { key = `reef{index}`, at = at, forest = false })
+	end
+	for index, spot in KelpConfig.FishSpots do
+		table.insert(spots, { key = `kelp{index}`, at = spot.at, forest = true, meadow = spot.meadow })
+	end
+	for _, spot in spots do
+		wildBySpot[spot.key] = {}
+	end
+	-- Each spot tops up to perSpot, one fish at a time.
+	task.spawn(function()
+		while true do
+			task.wait(ReefConfig.Fish.wild.interval)
+			for _, spot in spots do
+				local count = 0
+				for _ in wildBySpot[spot.key] do
+					count += 1
+				end
+				local healthy = not spot.meadow or Kelp.meadowHealth(spot.meadow) >= 0.5
+				if count < ReefConfig.Fish.wild.perSpot and healthy then
+					spawnWild(spot.key, spot.at, spot.forest)
+				end
+			end
+		end
+	end)
 	Players.PlayerRemoving:Connect(function(player)
 		for model in fishByPlayer[player] or {} do
 			model:Destroy()

@@ -1,10 +1,14 @@
 --!nonstrict
--- The Upgrade Station: fences, decorations and gear upgrades (reef expansion is here too,
--- handled by Shop). Bought at the Upgrade Station counter, worldParts.suppliesStand.
+-- Upgrades and decorations, each bought at its own building in the hub:
+--   Research Laboratory   ExpandReef (unlock the next planter: shells and pearls) and the
+--                         Fertilizer ("coral growth" research)
+--   Equipment Station     the Bubble Wand, Bigger Bag, Oxygen Tank and Swim Fins
+--   Coral Market          fences and decorations
+--   ExpandReef                        unlock the next planter (shells and pearls)
 -- Remotes carry ids only; prices and limits come from ReefConfig.
 --   BuyFence <id> / EquipFence <id>   buy a fence style (it goes up at once) or swap styles
 --   BuyDecor <id> / PlaceDecor <id> <point>   buy a decoration, then place it on your reef
---   UpgradeGear <id>                  Fertilizer, Bubble Wand or Bigger Bag, one level a time
+--   UpgradeGear <id>                  one level of a piece of gear (ReefConfig.GearStation says where)
 -- Fertilizer works here (every second counts as extra growth, like a seahorse); the Bubble
 -- Wand and the bag size work in Plots.
 
@@ -23,12 +27,15 @@ local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 local Supplies = {}
 
-local stand: BasePart
+-- Each building's counter, by role.
+local stands: { [string]: BasePart } = {}
+local BUILDING = { lab = "the Research Laboratory", equipment = "the Equipment Station", market = "the Coral Market" }
 
-local function isNear(player: Player): boolean
+local function isNear(player: Player, role: string): boolean
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	return root ~= nil and (root.Position - stand.Position).Magnitude <= ReefConfig.INTERACT_DISTANCE
+	local stand = stands[role]
+	return root ~= nil and stand ~= nil and (root.Position - stand.Position).Magnitude <= ReefConfig.INTERACT_DISTANCE
 end
 
 -- Takes `price` shells if the player has them. No yields between the check and the write.
@@ -40,6 +47,41 @@ local function pay(player: Player, profile: PlayerData.Profile, price: number): 
 	end
 	profile.data.shells = wallet.shells
 	return true
+end
+
+-- Unlocks the next planter on the player's reef, for shells and pearls.
+local function onExpand(player: Player)
+	if not RateLimit.consume(player, 2) then
+		return
+	end
+	local profile = PlayerData.get(player)
+	if not profile then
+		return
+	end
+	local data = profile.data
+	if data.unlocked >= ReefConfig.MAX_SLOTS then
+		Plots.notify(player, "Every planter on your reef is unlocked.")
+		return
+	end
+	if not isNear(player, "lab") then
+		Plots.notify(player, "Walk over to the Research Laboratory to unlock planters.")
+		return
+	end
+	local price = ReefConfig.expandCost(data.unlocked)
+	local pearls = ReefConfig.expandPearls(data.unlocked)
+	if data.pearls < pearls then
+		Plots.notify(player, `The next planter needs {pearls} pearl{if pearls == 1 then "" else "s"}. Find them in the Main Reef's caves and high places!`)
+		return
+	end
+	if not pay(player, profile, price) then
+		return
+	end
+	-- No yields between the checks above and these writes.
+	data.pearls -= pearls
+	data.unlocked += 1
+	Plots.refresh(player)
+	Plots.notify(player, `Planter unlocked! Your reef has {data.unlocked} planters now.`, "good")
+	PlayerData.sync(player)
 end
 
 local function onBuyFence(player: Player, fenceId: unknown)
@@ -55,8 +97,8 @@ local function onBuyFence(player: Player, fenceId: unknown)
 		Plots.notify(player, `The {fence.name} fence can't be bought. Complete its Reef Index set!`)
 		return
 	end
-	if not isNear(player) then
-		Plots.notify(player, "Walk over to the Upgrade Station to buy fences.")
+	if not isNear(player, "market") then
+		Plots.notify(player, "Walk over to the Coral Market to buy fences.")
 		return
 	end
 	if not pay(player, profile, fence.price) then
@@ -91,8 +133,8 @@ local function onBuyDecor(player: Player, itemId: unknown)
 	if not item or not profile then
 		return
 	end
-	if not isNear(player) then
-		Plots.notify(player, "Walk over to the Upgrade Station to buy decorations.")
+	if not isNear(player, "market") then
+		Plots.notify(player, "Walk over to the Coral Market to buy decorations.")
 		return
 	end
 	local owned = (profile.data.decorStorage[itemId] or 0) + (PlayerData.placedCounts(profile.data)[itemId] or 0)
@@ -133,8 +175,9 @@ local function onUpgradeGear(player: Player, gearId: unknown)
 		Plots.notify(player, `Your {gear.name} is fully upgraded.`)
 		return
 	end
-	if not isNear(player) then
-		Plots.notify(player, "Walk over to the Upgrade Station to upgrade your gear.")
+	local role = ReefConfig.GearStation[gearId] or "equipment"
+	if not isNear(player, role) then
+		Plots.notify(player, `Walk over to {BUILDING[role]} for the {gear.name}.`)
 		return
 	end
 	if not pay(player, profile, gear.costs[level + 1]) then
@@ -146,7 +189,10 @@ local function onUpgradeGear(player: Player, gearId: unknown)
 end
 
 function Supplies.start(worldParts: World.WorldParts)
-	stand = worldParts.suppliesStand
+	stands.lab = worldParts.labStand
+	stands.equipment = worldParts.suppliesStand
+	stands.market = worldParts.marketDecorStand
+	Remotes.ExpandReef.OnServerEvent:Connect(onExpand)
 	Remotes.BuyFence.OnServerEvent:Connect(onBuyFence)
 	Remotes.EquipFence.OnServerEvent:Connect(onEquipFence)
 	Remotes.BuyDecor.OnServerEvent:Connect(onBuyDecor)

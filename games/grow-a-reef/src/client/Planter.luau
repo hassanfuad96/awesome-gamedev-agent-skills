@@ -1,9 +1,9 @@
 --!nonstrict
--- Free placement. With a seed selected, a ghost ring follows the mouse over your reef bed:
--- green where the coral fits, red where it doesn't (same rules as the server, from
--- ReefConfig.plantProblem). Clicking or tapping a bed sends only the point (PlantAt); the
--- server checks everything again and says why when it refuses.
--- Placing a decoration (startPlacing, from the Upgrade Station window) works the same way over
+-- Planting. With a seed selected, a ghost ring snaps onto the planter under the mouse: green
+-- when the coral fits, red when it doesn't (locked or taken: the same rules as the server,
+-- from ReefConfig.plantProblem). Clicking or tapping a planter sends only the point
+-- (PlantAt); the server checks everything again and says why when it refuses.
+-- Placing a decoration (startPlacing, from the Coral Market's Decor & Fences window) works the same way over
 -- your whole reef inside the fence, with ReefConfig.decorProblem and PlaceDecor.
 
 local CollectionService = game:GetService("CollectionService")
@@ -46,20 +46,23 @@ local function ghostPart(name: string, shape: Enum.PartType, size: Vector3): Par
 	return p
 end
 
--- The ring is the coral's footprint: two rings may touch but not overlap.
-local ring = ghostPart("Ring", Enum.PartType.Cylinder, Vector3.new(0.15, ReefConfig.PLANT_SPACING, ReefConfig.PLANT_SPACING))
+-- The ring outlines the planter (or, when placing, the decoration's footprint).
+local PLANTER_RING = ReefConfig.PLANTER_RADIUS * 2 + 0.6
+local ring = ghostPart("Ring", Enum.PartType.Cylinder, Vector3.new(0.15, PLANTER_RING, PLANTER_RING))
 local sprout = ghostPart("Sprout", Enum.PartType.Ball, Vector3.new(1.2, 1.2, 1.2))
 
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Exclude
 
--- Coral, decorations and fish are queryable, so a ray that reaches a bed passed over open
--- bed. Decorations also go on the mound round the bed ("Base").
+-- Coral, decorations and fish are queryable, so a ray that reaches a planter or the bed
+-- passed over open ground. Coral goes on planters; decorations go on the bed or the mound
+-- round it ("Base").
 local function groundUnder(origin: Vector3, direction: Vector3, mound: boolean): (BasePart?, Vector3?)
 	rayParams.FilterDescendantsInstances = { ghost, player.Character }
 	local result = Workspace:Raycast(origin, direction * 500, rayParams)
 	local hit = result and result.Instance
-	if hit and (hit.Name == "Bed" or (mound and hit.Name == "Base")) and hit.Parent and hit.Parent:GetAttribute("PlotIndex") then
+	local allowed = hit and (hit.Name == "Bed" or hit.Name == "Planter" or (mound and hit.Name == "Base"))
+	if allowed and hit.Parent and hit.Parent:GetAttribute("PlotIndex") then
 		return hit :: BasePart, result.Position
 	end
 	return nil, nil
@@ -70,12 +73,13 @@ local function bedUnder(origin: Vector3, direction: Vector3): (BasePart?, Vector
 end
 
 -- Positions on a reef are offsets in its frame (ReefConfig.plotFrame), as the server saves.
-local function plantsOn(plot: Instance, frame: CFrame): { { x: number, z: number } }
+-- Each coral stands in the middle of a planter, which gives its slot.
+local function plantsOn(plot: Instance, frame: CFrame): { { x: number, z: number, slot: number? } }
 	local result = {}
 	for _, coral in CollectionService:GetTagged(ReefConfig.CORAL_TAG) do
 		if coral.Parent == plot then
 			local x, z = ReefConfig.plotOffset(frame, coral:GetPivot().Position)
-			table.insert(result, { x = x, z = z })
+			table.insert(result, { x = x, z = z, slot = ReefConfig.planterAt(x, z) })
 		end
 	end
 	return result
@@ -122,19 +126,25 @@ local function updateGhost()
 	end
 	local x, z = ReefConfig.plotOffset(frame, point)
 	local fits, size, tint
+	local base = Vector3.new(point.X, point.Y + 0.08, point.Z)
 	if placing then
 		local item = ReefConfig.DecorById[placing]
 		fits = ReefConfig.decorProblem(placing, x, z, plantsOn(plot, frame), decorOn(plot, frame)) == nil
 		size = item.footprint * 2
 		tint = Ui.Colors.accent
 	else
-		fits = ReefConfig.plantProblem(x, z, unlocked, plantsOn(plot, frame), decorOn(plot, frame)) == nil
-		size = ReefConfig.PLANT_SPACING
+		local problem, slot = ReefConfig.plantProblem(x, z, unlocked, plantsOn(plot, frame))
+		fits = problem == nil
+		size = PLANTER_RING
 		local seed = ReefConfig.Seeds[selected]
 		tint = seed and seed.color
+		-- Snap onto the planter's sand top.
+		if slot and ground.Name == "Planter" then
+			local planter = ReefConfig.Planters[slot]
+			base = ReefConfig.plotPoint(frame, planter.x, planter.z, ground.Position.Y + ground.Size.X / 2 + 0.08)
+		end
 	end
 	local color = if fits then Ui.Colors.good else Ui.Colors.bad
-	local base = Vector3.new(point.X, point.Y + 0.08, point.Z)
 	ring.Size = Vector3.new(0.15, size, size)
 	ring.CFrame = CFrame.new(base) * CFrame.Angles(0, 0, math.rad(90))
 	ring.Color = color

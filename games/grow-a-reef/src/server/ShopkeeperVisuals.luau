@@ -132,6 +132,34 @@ local builders: { [string]: (Model, CFrame) -> () } = {
 			end
 		end
 	end,
+
+	-- Otto, the Kelp Forest ranger: a sea otter sitting up on his rock in a ranger's hat,
+	-- holding a sea urchin, with a pale face and whiskers.
+	Otto = function(model, base)
+		local fur = Color3.fromRGB(128, 90, 62)
+		local face = Color3.fromRGB(222, 196, 158)
+		local hat = Color3.fromRGB(70, 120, 60)
+		piece(model, "Body", Vector3.new(2.6, 3.4, 2.2), base * CFrame.new(0, 1.9, 0), fur, Enum.Material.Fabric)
+		piece(model, "Belly", Vector3.new(2, 2.4, 0.3), base * CFrame.new(0, 1.9, -1.05), face:Lerp(fur, 0.3), Enum.Material.Fabric)
+		piece(model, "Head", Vector3.new(2.3, 2.3, 2.3), base * CFrame.new(0, 4.4, 0), fur, Enum.Material.Fabric, Enum.PartType.Ball)
+		piece(model, "Muzzle", Vector3.new(1.5, 1.5, 1.5), base * CFrame.new(0, 4.1, -0.85), face, Enum.Material.Fabric, Enum.PartType.Ball)
+		piece(model, "Nose", Vector3.new(0.45, 0.45, 0.45), base * CFrame.new(0, 4.35, -1.55), DARK, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+		piece(model, "HatBrim", Vector3.new(0.2, 3.2, 3.2), base * CFrame.new(0, 5.3, 0) * UPRIGHT, hat, Enum.Material.Fabric, Enum.PartType.Cylinder)
+		piece(model, "HatTop", Vector3.new(1, 1.9, 1.9), base * CFrame.new(0, 5.8, 0) * UPRIGHT, hat:Lerp(Color3.new(0, 0, 0), 0.15), Enum.Material.Fabric, Enum.PartType.Cylinder)
+		piece(model, "HatBand", Vector3.new(0.3, 1.95, 1.95), base * CFrame.new(0, 5.45, 0) * UPRIGHT, Color3.fromRGB(214, 170, 80), Enum.Material.Fabric, Enum.PartType.Cylinder)
+		for _, side in { -1, 1 } do
+			piece(model, "Eye", Vector3.new(0.35, 0.35, 0.35), base * CFrame.new(side * 0.5, 4.75, -0.95), DARK, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+			piece(model, "Ear", Vector3.new(0.5, 0.5, 0.5), base * CFrame.new(side * 0.95, 5.15, 0.1), fur, Enum.Material.Fabric, Enum.PartType.Ball)
+			piece(model, "Arm", Vector3.new(0.7, 1.6, 0.7), base * CFrame.new(side * 0.75, 2.6, -1.2) * CFrame.Angles(math.rad(-60), 0, side * 0.3), fur, Enum.Material.Fabric)
+			piece(model, "Foot", Vector3.new(0.9, 0.5, 1.4), base * CFrame.new(side * 0.8, 0.3, -0.8), fur:Lerp(Color3.new(0, 0, 0), 0.2), Enum.Material.Fabric)
+			for k = -1, 1 do
+				piece(model, "Whisker", Vector3.new(1.1, 0.05, 0.05), base * CFrame.new(side * 1.05, 4.05 + k * 0.15, -1.35) * CFrame.Angles(0, side * 0.25, k * 0.12 * side), face, Enum.Material.SmoothPlastic)
+			end
+		end
+		piece(model, "Tail", Vector3.new(0.8, 0.5, 2.4), base * CFrame.new(0, 0.3, 1.6), fur, Enum.Material.Fabric)
+		-- A sea urchin held up in both paws.
+		piece(model, "Urchin", Vector3.new(0.9, 0.9, 0.9), base * CFrame.new(0, 3.3, -1.75), Color3.fromRGB(110, 50, 130), Enum.Material.Slate, Enum.PartType.Ball)
+	end,
 }
 
 function ShopkeeperVisuals.build(kind: string, base: CFrame): Model

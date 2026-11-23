@@ -1,7 +1,8 @@
 --!nonstrict
--- Plot ownership, planting, growth and harvesting. Coral can be planted anywhere inside the
--- owner's round reef bed: the client sends only the clicked point (PlantAt), and the server
--- checks the plot, reach, slots, spacing and seed before planting. Coral is harvested by
+-- Plot ownership, planting, growth and harvesting. Each reef is a bed of sand planters, one
+-- coral per planter: the client sends only the clicked point (PlantAt), and the server finds
+-- the planter and checks the plot, reach, lock and seed before planting. Coral shows three
+-- growth stages (ReefConfig.growthStage): seedling, growing, fully grown. Coral is harvested by
 -- clicking it (if the bag has room); ClickDetector.MouseClick fires on the server with the
 -- real player. Clicking growing coral with a Bubble Wand speeds it up. Plots also draws each
 -- reef's fence style, placed decorations and the name and likes on its sign.
@@ -41,8 +42,11 @@ local spawnConnections: { [Player]: RBXScriptConnection } = {}
 local wandReadyAt: { [Player]: number } = {} -- os.clock() when the Bubble Wand can be used again
 local rng = Random.new()
 
-local MIN_SCALE = 0.25
-local BED_TWEEN = TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+-- Growing coral (stage 2) fills out from this scale to GROWN_SCALE before it's fully grown.
+local GROWING_SCALE = 0.5
+local GROWN_SCALE = 0.9
+local PLANTER_SAND = Color3.fromRGB(232, 204, 150)
+local PLANTER_LOCKED = Color3.fromRGB(84, 92, 104)
 
 local function notify(player: Player, text: string, tone: string?)
 	Remotes.Notify:FireClient(player, text, tone or "info")
@@ -60,7 +64,18 @@ local function growthOf(plant: Plant): number
 end
 
 local function worldPosition(plot: PlotParts, plant: Plant): Vector3
-	return ReefConfig.plotPoint(plot.frame, plant.x, plant.z, plot.bedTop)
+	local planter = ReefConfig.Planters[plant.slot]
+	return ReefConfig.plotPoint(plot.frame, planter.x, planter.z, plot.planterTop)
+end
+
+-- The model scale for a coral at `progress` (0 to 1) of its growth.
+local function scaleFor(progress: number): number
+	local stage = ReefConfig.growthStage(progress)
+	if stage ~= 2 then
+		return 1
+	end
+	local within = (progress - ReefConfig.SEEDLING_UNTIL) / (1 - ReefConfig.SEEDLING_UNTIL)
+	return GROWING_SCALE + (GROWN_SCALE - GROWING_SCALE) * within
 end
 
 -- The point's plot, if it lies on one of the reef mounds.
@@ -74,10 +89,18 @@ local function plotAt(point: Vector3): PlotParts?
 	return nil
 end
 
-local function setBedRadius(plot: PlotParts, radius: number)
-	local size = Vector3.new(plot.bed.Size.X, radius * 2, radius * 2)
-	if (plot.bed.Size - size).Magnitude > 0.01 then
-		TweenService:Create(plot.bed, BED_TWEEN, { Size = size }):Play()
+-- Shows which planters are unlocked: sand with a glowing rim while empty, sand with no rim
+-- once planted, dark rock while still locked.
+local function paintPlanters(plot: PlotParts, unlocked: number, plants: { [string]: Plant }?)
+	local used = {}
+	for _, growing in plants or {} do
+		used[growing.slot] = true
+	end
+	for slot, planter in plot.planters do
+		local open = slot <= unlocked
+		planter.top.Color = if open then PLANTER_SAND else PLANTER_LOCKED
+		planter.top.Material = if open then Enum.Material.Sand else Enum.Material.Slate
+		planter.glow.Transparency = if open and not used[slot] then 0.25 else 1
 	end
 end
 
@@ -99,8 +122,9 @@ local function setCoral(player: Player, plot: PlotParts, plantId: string, plant:
 
 	-- A steady turn per plant (the golden angle) so a reef doesn't look stamped out.
 	local turn = math.rad(((tonumber(plantId) or 0) * 137.5) % 360)
-	local model = CoralVisuals.build(plant.seed, plant.mutation, CFrame.new(worldPosition(plot, plant)) * CFrame.Angles(0, turn, 0))
-	model:ScaleTo(MIN_SCALE + (1 - MIN_SCALE) * growthOf(plant))
+	local progress = growthOf(plant)
+	local model = CoralVisuals.build(plant.seed, plant.mutation, CFrame.new(worldPosition(plot, plant)) * CFrame.Angles(0, turn, 0), ReefConfig.growthStage(progress))
+	model:ScaleTo(scaleFor(progress))
 	local click = Instance.new("ClickDetector")
 	click.MaxActivationDistance = 40
 	click.Parent = model
@@ -194,7 +218,7 @@ local function renderPlot(player: Player, profile: Profile)
 	if not plot then
 		return
 	end
-	setBedRadius(plot, ReefConfig.bedRadius(profile.data.unlocked))
+	paintPlanters(plot, profile.data.unlocked, profile.data.plants)
 	for plantId, plant in profile.data.plants do
 		setCoral(player, plot, plantId, plant)
 	end
@@ -205,7 +229,7 @@ local function renderPlot(player: Player, profile: Profile)
 	updateSign(player)
 end
 
-local function plant(player: Player, profile: Profile, plot: PlotParts, x: number, z: number)
+local function plant(player: Player, profile: Profile, plot: PlotParts, slot: number)
 	local seedId = profile.selected
 	if not seedId then
 		notify(player, "Pick a seed from your hotbar first.")
@@ -213,7 +237,7 @@ local function plant(player: Player, profile: Profile, plot: PlotParts, x: numbe
 	end
 	local owned = profile.data.seeds[seedId] or 0
 	if owned <= 0 then
-		notify(player, `You're out of {ReefConfig.Seeds[seedId].name} seeds. Buy more at the Coral Shop.`)
+		notify(player, `You're out of {ReefConfig.Seeds[seedId].name} seeds. Buy more at the Coral Market.`)
 		return
 	end
 	profile.data.seeds[seedId] = if owned > 1 then owned - 1 else nil
@@ -224,9 +248,11 @@ local function plant(player: Player, profile: Profile, plot: PlotParts, x: numbe
 	local mutation = EconomyMath.pickWeighted(EventState.mutationWeights(), rng:NextNumber())
 	profile.data.plantSeq += 1
 	local plantId = tostring(profile.data.plantSeq)
-	local newPlant = { seed = seedId, plantedAt = os.time(), mutation = mutation, x = x, z = z }
+	local planter = ReefConfig.Planters[slot]
+	local newPlant = { seed = seedId, plantedAt = os.time(), mutation = mutation, slot = slot, x = planter.x, z = planter.z }
 	profile.data.plants[plantId] = newPlant
 	setCoral(player, plot, plantId, newPlant)
+	paintPlanters(plot, profile.data.unlocked, profile.data.plants)
 	if mutation ~= "None" then
 		notify(player, `Lucky! A {displayName(seedId, mutation)} sprouted!`, "rare")
 	end
@@ -246,6 +272,7 @@ local function harvest(player: Player, profile: Profile, plot: PlotParts, plantI
 	profile.data.inventory[key] = (profile.data.inventory[key] or 0) + 1
 	profile.data.harvested += 1
 	setCoral(player, plot, plantId, nil)
+	paintPlanters(plot, profile.data.unlocked, profile.data.plants)
 	local value = math.floor(ReefConfig.harvestValue(grown.seed, grown.mutation) * ReefConfig.shellMultiplier(profile.data.rebirths))
 	local what = if by then `{by} harvested a` else "+1"
 	notify(player, `{what} {displayName(grown.seed, grown.mutation)} (sells for {EconomyMath.formatNumber(value)} shells)`, "good")
@@ -334,7 +361,7 @@ handleCoralClick = function(player: Player, plot: PlotParts, plantId: string)
 	if growthOf(clicked) >= 1 then
 		if bagFull(profile) then
 			local capacity = PlayerData.bagCapacity(profile.data)
-			notify(player, `Your bag is full ({capacity}/{capacity})! Sell your coral at Sell Coral, or get a Bigger Bag at the Upgrade Station.`, "bad")
+			notify(player, `Your bag is full ({capacity}/{capacity})! Sell your coral at Sell Coral, or get a Bigger Bag at the Equipment Station.`, "bad")
 			return
 		end
 		harvest(player, profile, plot, plantId, clicked)
@@ -365,15 +392,13 @@ local function onPlantAt(player: Player, point: unknown)
 		notify(player, "Swim closer to your reef to plant.")
 		return
 	end
-	local offsetX, offsetZ = ReefConfig.plotOffset(plot.frame, position)
-	local x = math.round(offsetX * 10) / 10
-	local z = math.round(offsetZ * 10) / 10
-	local problem = ReefConfig.plantProblem(x, z, profile.data.unlocked, profile.data.plants, profile.data.decor)
-	if problem then
-		notify(player, problem)
+	local x, z = ReefConfig.plotOffset(plot.frame, position)
+	local problem, slot = ReefConfig.plantProblem(x, z, profile.data.unlocked, profile.data.plants)
+	if problem or not slot then
+		notify(player, problem or "Tap one of the sand planters to plant.")
 		return
 	end
-	plant(player, profile, plot, x, z)
+	plant(player, profile, plot, slot)
 end
 
 function Plots.assign(player: Player, profile: Profile)
@@ -432,7 +457,7 @@ function Plots.release(player: Player)
 	for _, model in decorModels[player] or {} do
 		model:Destroy()
 	end
-	setBedRadius(plot, ReefConfig.bedRadius(ReefConfig.STARTING_SLOTS))
+	paintPlanters(plot, ReefConfig.STARTING_SLOTS)
 	buildFence(plot, ReefConfig.DEFAULT_FENCE)
 	plot.sign.Text = "Empty reef"
 	plot.likes.Text = ""
@@ -474,7 +499,7 @@ function Plots.placeDecor(player: Player, itemId: string, point: Vector3): boole
 	end
 	local stored = profile.data.decorStorage[itemId] or 0
 	if stored <= 0 then
-		notify(player, `You have no {item.name} to place. Buy one at the Upgrade Station.`)
+		notify(player, `You have no {item.name} to place. Buy one at the Coral Market.`)
 		return false
 	end
 	local offsetX, offsetZ = ReefConfig.plotOffset(plot.frame, point)
@@ -509,11 +534,11 @@ pickUpDecor = function(player: Player, decorId: string)
 	profile.data.decor[decorId] = nil
 	profile.data.decorStorage[placed.item] = (profile.data.decorStorage[placed.item] or 0) + 1
 	setDecor(player, plot, decorId, nil)
-	notify(player, `Picked up your {ReefConfig.DecorById[placed.item].name}. Place it again from the Upgrade Station.`)
+	notify(player, `Picked up your {ReefConfig.DecorById[placed.item].name}. Place it again from the Coral Market.`)
 	PlayerData.sync(player)
 end
 
--- After a rebirth: the coral is gone and the bed is back to its starting size.
+-- After a rebirth: the coral is gone and only the starting planters are unlocked.
 function Plots.resetReef(player: Player)
 	local plot = plotByPlayer[player]
 	local models = coralModels[player]
@@ -524,7 +549,7 @@ function Plots.resetReef(player: Player)
 		model:Destroy()
 		models[plantId] = nil
 	end
-	setBedRadius(plot, ReefConfig.bedRadius(ReefConfig.STARTING_SLOTS))
+	paintPlanters(plot, ReefConfig.STARTING_SLOTS)
 end
 
 -- Where the player arrives home: on the pad in front of their reef's gate.
@@ -533,12 +558,16 @@ function Plots.homeFor(player: Player): CFrame?
 	return plot and plot.spawn
 end
 
--- Called after the reef grows: widens the bed to the new slot count.
+-- Called after a planter is unlocked: shows it, with a burst of bubbles.
 function Plots.refresh(player: Player)
 	local profile = PlayerData.get(player)
 	local plot = plotByPlayer[player]
 	if profile and plot then
-		setBedRadius(plot, ReefConfig.bedRadius(profile.data.unlocked))
+		paintPlanters(plot, profile.data.unlocked, profile.data.plants)
+		local newest = plot.planters[profile.data.unlocked]
+		if newest then
+			wandBurst(newest.top.Position)
+		end
 	end
 end
 
@@ -673,19 +702,31 @@ function Plots.start(worldParts: World.WorldParts)
 	PlayerData.onLoaded(Plots.assign)
 	Players.PlayerRemoving:Connect(Plots.release)
 
-	-- Grow coral visibly. Growth itself is just a timestamp, so it continues while offline.
+	-- Grow coral visibly: swap the model when it reaches a new stage (with a burst of bubbles
+	-- when it's fully grown), and fill it out while it grows. Growth itself is just a
+	-- timestamp, so it continues while offline.
 	task.spawn(function()
 		while true do
 			task.wait(0.5)
 			for player, models in coralModels do
 				local profile = PlayerData.get(player)
-				if profile then
+				local plot = plotByPlayer[player]
+				if profile and plot then
 					for plantId, model in models do
 						local growing = profile.data.plants[plantId]
 						if growing and model.Parent then
-							local target = MIN_SCALE + (1 - MIN_SCALE) * growthOf(growing)
-							if math.abs(model:GetScale() - target) > 0.01 then
-								model:ScaleTo(target)
+							local progress = growthOf(growing)
+							local stage = ReefConfig.growthStage(progress)
+							if model:GetAttribute("Stage") ~= stage then
+								setCoral(player, plot, plantId, growing)
+								if stage == 3 then
+									wandBurst(worldPosition(plot, growing))
+								end
+							else
+								local target = scaleFor(progress)
+								if math.abs(model:GetScale() - target) > 0.01 then
+									model:ScaleTo(target)
+								end
 							end
 						end
 					end

@@ -1,7 +1,7 @@
 --!nonstrict
--- The Coral Shop's seed window. Opens from the seed counter's ProximityPrompt and closes
+-- The Coral Market's seed window. Opens from the seed counter's ProximityPrompt and closes
 -- when the player walks away. Buttons send seed ids only; the server checks price, stock and
--- distance. Growing the reef is at the Upgrade Station (SuppliesPanel).
+-- distance. Unlocking planters and researching species is at the Research Laboratory (LabPanel).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -59,7 +59,7 @@ function ShopPanel.new(playerGui: PlayerGui): ShopPanel
 
 	Ui.label({
 		Name = "Title",
-		Text = "Coral Shop · Seeds",
+		Text = "Coral Market · Seeds",
 		Font = Ui.TitleFont,
 		MaxTextSize = 30,
 		Size = UDim2.new(1, -50, 0, 34),
@@ -230,10 +230,13 @@ function ShopPanel.render(self: ShopPanel)
 		local left = self.stock[seedId] or 0
 		local owned = if self.data then (self.data.seeds[seedId] or 0) else 0
 		row.stock.Text = if left > 0 then `{left} in stock · own {owned}` else `Sold out · own {owned}`
-		local canBuy = left > 0 and shells >= seed.price
+		-- Species research (the Research Laboratory) comes first.
+		local known = not self.data or ReefConfig.speciesUnlocked(self.data, seedId)
+		local canBuy = known and left > 0 and shells >= seed.price
 		row.button.BackgroundColor3 = if canBuy then Ui.Colors.button else Ui.Colors.buttonDisabled
-		row.button.Text = if left > 0 then "Buy" else "Sold out"
-		row.price.TextColor3 = if shells >= seed.price then Ui.Colors.rare else Ui.Colors.bad
+		row.button.Text = if not known then "Locked" elseif left > 0 then "Buy" else "Sold out"
+		row.price.Text = if known then `{EconomyMath.formatNumber(seed.price)} shells` else "Research at the Lab"
+		row.price.TextColor3 = if not known then Ui.Colors.muted elseif shells >= seed.price then Ui.Colors.rare else Ui.Colors.bad
 	end
 end
 

@@ -1,5 +1,5 @@
 --!nonstrict
--- Floating labels over planted coral: name, mutation and a growth countdown, all read from
+-- Floating labels over planted coral: name, mutation, growth stage and countdown, all read from
 -- Attributes the server sets on each coral model (tagged ReefConfig.CORAL_TAG). Built on the
 -- client only, and tolerant of instance streaming (coral comes and goes as the player moves).
 
@@ -68,7 +68,9 @@ local function refresh(coral: Model, label: Label, now: number)
 	label.title.Text = ReefConfig.displayName(coral:GetAttribute("Seed"), mutationKey)
 	label.title.TextColor3 = if first then first.color or Ui.Colors.rare else Ui.Colors.text
 	if type(readyAt) == "number" and readyAt > now then
-		label.status.Text = Ui.formatTime(readyAt - now)
+		-- The growth stage (Seedling, Growing) and how long until it's ready.
+		local stage = ReefConfig.STAGE_NAMES[coral:GetAttribute("Stage") or 0]
+		label.status.Text = if stage then `{stage} · {Ui.formatTime(readyAt - now)}` else Ui.formatTime(readyAt - now)
 		label.status.TextColor3 = Ui.Colors.muted
 	else
 		label.status.Text = if mine then "Ready! Click to harvest" else "Ready!"

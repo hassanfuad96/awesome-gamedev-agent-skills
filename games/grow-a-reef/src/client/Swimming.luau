@@ -31,6 +31,21 @@ local parts: { Instance } = {}
 local tracks: { swim: AnimationTrack?, idle: AnimationTrack? } = {}
 local mover: LinearVelocity?
 local aligner: AlignOrientation?
+local finsLevel = 0 -- Swim Fins (Equipment Station), from the synced data
+local speedMultiplier = 1 -- for a faster-swimming game pass (setSpeedMultiplier)
+
+-- Swimming speed: the base, Swim Fins, and any game-pass multiplier.
+local function swimSpeed(): number
+	return SETTINGS.speed * ReefConfig.swimSpeedMultiplier(finsLevel) * speedMultiplier
+end
+
+function Swimming.setFinsLevel(level: number)
+	finsLevel = level
+end
+
+function Swimming.setSpeedMultiplier(multiplier: number)
+	speedMultiplier = multiplier
+end
 
 local function characterParts(): (Model?, Humanoid?, BasePart?)
 	local character = player.Character
@@ -158,7 +173,7 @@ local function step()
 		local level = if flatPart.Magnitude > 0.01 then flatPart.Unit * input.Magnitude else Vector3.zero
 		direction = level * math.sqrt(math.max(0, 1 - tilt * tilt)) + Vector3.new(0, tilt * input.Magnitude, 0)
 	end
-	local velocity = direction * SETTINGS.speed
+	local velocity = direction * swimSpeed()
 	if holdingJump then
 		velocity += Vector3.new(0, SETTINGS.rise, 0)
 	elseif not moving then

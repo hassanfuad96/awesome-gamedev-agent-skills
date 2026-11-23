@@ -128,7 +128,7 @@ local function onAction(player: Player, action: unknown, arg1: unknown, arg2: un
 		giveShells(player, arg1)
 	elseif action == "restock" then
 		Shop.restockNow()
-		notifyAll("The Coral Shop has been restocked!", "good")
+		notifyAll("The Coral Market has been restocked!", "good")
 	end
 end
 

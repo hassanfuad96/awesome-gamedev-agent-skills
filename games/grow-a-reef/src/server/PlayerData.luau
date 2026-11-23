@@ -12,13 +12,18 @@ local RunService = game:GetService("RunService")
 
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
 local EconomyMath = require(ReplicatedStorage.Shared.EconomyMath)
+local RuinsConfig = require(ReplicatedStorage.Shared.RuinsConfig)
+local AbyssConfig = require(ReplicatedStorage.Shared.AbyssConfig)
+local KelpConfig = require(ReplicatedStorage.Shared.KelpConfig)
 local RateLimit = require(script.Parent.RateLimit)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 -- A planted coral. x and z are studs from the plot centre.
 -- mutation is a mutation key: "None", "Golden" or "Glowing+Golden" (ReefConfig.mutationParts).
-export type Plant = { seed: string, plantedAt: number, mutation: string, x: number, z: number }
+-- slot is the planter (ReefConfig.Planters); x and z are that planter's offsets, kept for the
+-- code that only needs the position.
+export type Plant = { seed: string, plantedAt: number, mutation: string, slot: number, x: number, z: number }
 
 export type Pet = { species: string, golden: boolean }
 
@@ -31,6 +36,7 @@ export type QuestBook = { day: number, progress: { number }, claimed: { boolean 
 export type Data = {
 	version: number,
 	shells: number,
+	pearls: number, -- collected in the Main Reef; unlocking planters costs some
 	seeds: { [string]: number },
 	inventory: { [string]: number },
 	plants: { [string]: Plant }, -- keyed by plant id
@@ -57,6 +63,10 @@ export type Data = {
 	liked: { [string]: number }, -- reefs you liked (owner user id) and the day you did
 	indexRewarded: { [string]: true }, -- Reef Index sets whose IndexRewards were given
 	tutorial: number, -- the Starter Lagoon step you're on; past the last step = finished
+	ruins: RuinsConfig.State, -- Sunken Ruins: missions, chests, cuttings, relics, sightings
+	abyss: AbyssConfig.State, -- the Abyss: unlocked, deep-sea creatures spotted
+	kelp: KelpConfig.State, -- the Kelp Forest: places found, hatchlings, seagrass, challenges
+	research: { [string]: true }, -- coral species researched at the lab (ReefConfig.Research)
 }
 
 export type Profile = {
@@ -91,6 +101,7 @@ local function defaultData(): Data
 	return {
 		version = ReefConfig.DATA_VERSION,
 		shells = ReefConfig.STARTING_SHELLS,
+		pearls = 0,
 		seeds = table.clone(ReefConfig.STARTING_SEEDS),
 		inventory = {},
 		plants = {},
@@ -117,6 +128,10 @@ local function defaultData(): Data
 		liked = {},
 		indexRewarded = {},
 		tutorial = 1,
+		ruins = RuinsConfig.newState(),
+		abyss = AbyssConfig.newState(),
+		kelp = KelpConfig.newState(),
+		research = {},
 	}
 end
 
@@ -154,14 +169,17 @@ local function sanitize(raw: any): Data
 		return data
 	end
 	data.shells = EconomyMath.sanitizeAmount(raw.shells)
+	data.pearls = math.min(EconomyMath.sanitizeAmount(raw.pearls), 1e6)
 	data.totalEarned = EconomyMath.sanitizeAmount(raw.totalEarned)
 	data.harvested = EconomyMath.sanitizeAmount(raw.harvested)
 	data.fishCaught = EconomyMath.sanitizeAmount(raw.fishCaught)
-	data.unlocked = math.clamp(
-		EconomyMath.sanitizeAmount(raw.unlocked),
-		ReefConfig.STARTING_SLOTS,
-		ReefConfig.MAX_SLOTS
-	)
+	local savedSlots = EconomyMath.sanitizeAmount(raw.unlocked)
+	data.unlocked = math.clamp(savedSlots, ReefConfig.STARTING_SLOTS, ReefConfig.MAX_SLOTS)
+	-- Before planters, reefs grew to 50 free-planting slots. Slots past the planter limit are
+	-- paid back at what they cost then (200 shells x 1.2 per slot past 10).
+	for slot = ReefConfig.MAX_SLOTS, math.min(savedSlots, 50) - 1 do
+		data.shells += math.floor(200 * 1.2 ^ (slot - 10))
+	end
 	data.plantSeq = math.min(EconomyMath.sanitizeAmount(raw.plantSeq), 1e6)
 
 	data.seeds = {}
@@ -191,22 +209,41 @@ local function sanitize(raw: any): Data
 	end
 
 	local now = os.time()
-	local count = 0
-	local bedRadius = ReefConfig.bedRadius(data.unlocked)
+	-- Each coral goes in its saved planter; coral from before planters (or a clash) goes in the
+	-- nearest free unlocked one. With no planter left, its seed goes back in the seed bag.
+	local taken: { [number]: boolean } = {}
+	local function freePlanterNear(x: number, z: number): number?
+		local best, bestDistance = nil, math.huge
+		for slot = 1, data.unlocked do
+			local planter = ReefConfig.Planters[slot]
+			local distance = (planter.x - x) ^ 2 + (planter.z - z) ^ 2
+			if not taken[slot] and distance < bestDistance then
+				best, bestDistance = slot, distance
+			end
+		end
+		return best
+	end
 	local function addPlant(key: any, saved: any, x: any, z: any)
 		if
-			count >= data.unlocked
-			or type(saved) ~= "table"
+			type(saved) ~= "table"
 			or type(saved.seed) ~= "string"
 			or not ReefConfig.Seeds[saved.seed]
 			or type(saved.mutation) ~= "string"
 			or not ReefConfig.isMutationKey(saved.mutation)
-			or type(x) ~= "number"
-			or type(z) ~= "number"
-			or not (x * x + z * z <= bedRadius * bedRadius) -- also false for NaN
 		then
 			return
 		end
+		local slot = saved.slot
+		if type(slot) ~= "number" or slot ~= math.floor(slot) or slot < 1 or slot > data.unlocked or taken[slot] then
+			local fromX = if type(x) == "number" and x == x then x else 0
+			local fromZ = if type(z) == "number" and z == z then z else 0
+			slot = freePlanterNear(fromX, fromZ)
+		end
+		if not slot then
+			data.seeds[saved.seed] = math.min(ReefConfig.MAX_SEEDS_PER_TYPE, (data.seeds[saved.seed] or 0) + 1)
+			return
+		end
+		taken[slot] = true
 		local plantedAt = EconomyMath.sanitizeAmount(saved.plantedAt)
 		-- A planted time in the future (clock skew, edited data) counts as now.
 		if plantedAt == 0 or plantedAt > now then
@@ -218,9 +255,9 @@ local function sanitize(raw: any): Data
 			id = data.plantSeq + 1
 		end
 		data.plantSeq = math.max(data.plantSeq, id)
+		local planter = ReefConfig.Planters[slot]
 		data.plants[tostring(id)] =
-			{ seed = saved.seed, plantedAt = plantedAt, mutation = saved.mutation, x = x, z = z }
-		count += 1
+			{ seed = saved.seed, plantedAt = plantedAt, mutation = saved.mutation, slot = slot, x = planter.x, z = planter.z }
 	end
 
 	if type(raw.plants) == "table" then
@@ -344,19 +381,7 @@ local function sanitize(raw: any): Data
 			end
 		end
 	end
-	-- A decoration with coral on top of it (edited data) goes back to storage, so no coral is
-	-- ever lost.
-	for decorId, placed in data.decor do
-		local item = ReefConfig.DecorById[placed.item]
-		for _, plant in data.plants do
-			local dx, dz = plant.x - placed.x, plant.z - placed.z
-			local gap = item.footprint + ReefConfig.PLANT_SPACING / 2
-			if data.decor[decorId] and dx * dx + dz * dz < gap * gap then
-				data.decor[decorId] = nil
-				data.decorStorage[placed.item] = (data.decorStorage[placed.item] or 0) + 1
-			end
-		end
-	end
+	-- (decorProblem above keeps every decoration off the planters, so none sits on coral.)
 
 	if type(raw.gear) == "table" then
 		for _, gearId in ReefConfig.GEAR_ORDER do
@@ -404,6 +429,30 @@ local function sanitize(raw: any): Data
 		data.tutorial = math.clamp(math.floor(raw.tutorial), 1, finished)
 	elseif data.totalEarned > 0 or data.harvested > 0 or next(data.plants) ~= nil then
 		data.tutorial = finished
+	end
+	data.ruins = RuinsConfig.sanitize(raw.ruins)
+	data.abyss = AbyssConfig.sanitize(raw.abyss)
+	data.kelp = KelpConfig.sanitize(raw.kelp)
+	-- Researched species. Saves from before research keep every species the player has already
+	-- grown (Reef Index), planted, or has seeds of, so nobody loses anything they could buy.
+	data.research = cleanKeySet(raw.research, function(id)
+		return ReefConfig.Research.costs[id] ~= nil
+	end)
+	if type(raw.research) ~= "table" then
+		for _, seedId in ReefConfig.Research.order do
+			if ReefConfig.Research.costs[seedId] then
+				local known = (data.seeds[seedId] or 0) > 0
+				for key in data.index.coral do
+					known = known or ReefConfig.splitInventoryKey(key) == seedId
+				end
+				for _, plant in data.plants do
+					known = known or plant.seed == seedId
+				end
+				if known then
+					data.research[seedId] = true
+				end
+			end
+		end
 	end
 
 	return data
@@ -647,12 +696,14 @@ function PlayerData.sync(player: Player)
 	local quests = PlayerData.freshQuests(data)
 	Remotes.DataSync:FireClient(player, {
 		shells = data.shells,
+		pearls = data.pearls,
 		seeds = data.seeds,
 		inventory = data.inventory,
 		inventoryValue = inventoryValue(data),
 		unlocked = data.unlocked,
 		planted = planted,
 		expandCost = if data.unlocked < ReefConfig.MAX_SLOTS then ReefConfig.expandCost(data.unlocked) else nil,
+		expandPearls = if data.unlocked < ReefConfig.MAX_SLOTS then ReefConfig.expandPearls(data.unlocked) else nil,
 		selected = profile.selected,
 		fishCaught = data.fishCaught,
 		index = data.index,
@@ -672,6 +723,11 @@ function PlayerData.sync(player: Player)
 		title = data.title,
 		likes = data.likes,
 		tutorial = data.tutorial,
+		ruins = data.ruins,
+		abyss = data.abyss,
+		kelp = data.kelp,
+		research = data.research,
+		harvested = data.harvested, -- Reef Health, for the Abyss's unlock
 	})
 end
 

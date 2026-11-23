@@ -1,7 +1,7 @@
 --!nonstrict
--- The Coral Shop (seed counter with a server-wide stock that restocks on a timer, and the
--- sell counter), hotbar seed selection, and reef expansion, which is bought at the Upgrade
--- Station. Remotes carry ids only; prices come from ReefConfig.
+-- The Coral Market (seed counter with a server-wide stock that restocks on a timer, and the
+-- sell counter) and hotbar seed selection. Remotes carry ids only; prices come from
+-- ReefConfig. (Planters and species research are at the Research Laboratory.)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,7 +24,6 @@ local restockAt = 0
 local rng = Random.new()
 local shopStand: BasePart
 local sellStand: BasePart
-local upgradeStand: BasePart
 
 local function isNear(player: Player, target: BasePart): boolean
 	local character = player.Character
@@ -74,7 +73,13 @@ local function onBuySeed(player: Player, seedId: unknown)
 		return
 	end
 	if not isNear(player, shopStand) then
-		Plots.notify(player, "Walk over to the Coral Shop to buy seeds.")
+		Plots.notify(player, "Walk over to the Coral Market to buy seeds.")
+		return
+	end
+	-- Species research (the Research Laboratory) comes first, so a locked seed never says
+	-- "sold out" or "not enough shells".
+	if not ReefConfig.speciesUnlocked(profile.data, seedId) then
+		Plots.notify(player, `Research {seed.name} at the Research Laboratory before you can buy it.`)
 		return
 	end
 	if (stock[seedId] or 0) <= 0 then
@@ -99,35 +104,6 @@ local function onBuySeed(player: Player, seedId: unknown)
 	end
 	PlayerData.sync(player)
 	broadcastStock()
-end
-
-local function onExpand(player: Player)
-	if not RateLimit.consume(player, 2) then
-		return
-	end
-	local profile = PlayerData.get(player)
-	if not profile then
-		return
-	end
-	if profile.data.unlocked >= ReefConfig.MAX_SLOTS then
-		Plots.notify(player, "Your reef is already full size.")
-		return
-	end
-	if not isNear(player, upgradeStand) then
-		Plots.notify(player, "Walk over to the Upgrade Station to grow your reef.")
-		return
-	end
-	local price = ReefConfig.expandCost(profile.data.unlocked)
-	local wallet = { shells = profile.data.shells }
-	if not EconomyMath.trySpend(wallet, { shells = price }) then
-		Plots.notify(player, `Expanding costs {EconomyMath.formatNumber(price)} shells.`)
-		return
-	end
-	profile.data.shells = wallet.shells
-	profile.data.unlocked += 1
-	Plots.refresh(player)
-	Plots.notify(player, "Your reef grew! One more coral slot.", "good")
-	PlayerData.sync(player)
 end
 
 local function onSelectSeed(player: Player, seedId: unknown)
@@ -186,7 +162,6 @@ end
 function Shop.start(worldParts: World.WorldParts)
 	shopStand = worldParts.shopStand
 	sellStand = worldParts.sellStand
-	upgradeStand = worldParts.suppliesStand
 
 	local sellPrompt = sellStand:FindFirstChildOfClass("ProximityPrompt")
 	if sellPrompt then
@@ -194,7 +169,6 @@ function Shop.start(worldParts: World.WorldParts)
 	end
 
 	Remotes.BuySeed.OnServerEvent:Connect(onBuySeed)
-	Remotes.ExpandReef.OnServerEvent:Connect(onExpand)
 	Remotes.SelectSeed.OnServerEvent:Connect(onSelectSeed)
 	Remotes.RequestSync.OnServerEvent:Connect(function(player)
 		if RateLimit.consume(player) then

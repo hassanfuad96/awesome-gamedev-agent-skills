@@ -179,7 +179,7 @@ function AdminPanel.new(playerGui: PlayerGui): AdminPanel
 			send("giveShells", amount)
 		end })
 	end
-	table.insert(gifts, { "Restock Coral Shop", Color3.fromRGB(60, 120, 200), function()
+	table.insert(gifts, { "Restock Coral Market", Color3.fromRGB(60, 120, 200), function()
 		send("restock")
 	end })
 	buttonGrid(gifts)

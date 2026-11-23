@@ -27,6 +27,15 @@ local Shopkeepers = require(script.Parent.Shopkeepers)
 local SuppliesPanel = require(script.Parent.SuppliesPanel)
 local Swimming = require(script.Parent.Swimming)
 local TutorialPanel = require(script.Parent.TutorialPanel)
+local RuinsPanel = require(script.Parent.RuinsPanel)
+local RuinsLife = require(script.Parent.RuinsLife)
+local AbyssPanel = require(script.Parent.AbyssPanel)
+local AbyssLife = require(script.Parent.AbyssLife)
+local KelpPanel = require(script.Parent.KelpPanel)
+local LabPanel = require(script.Parent.LabPanel)
+local OxygenBar = require(script.Parent.OxygenBar)
+local AquariumDisplay = require(script.Parent.AquariumDisplay)
+local KelpLife = require(script.Parent.KelpLife)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local player = Players.LocalPlayer
@@ -36,7 +45,11 @@ local index = IndexPanel.new(playerGui)
 local pets = PetPanel.new(playerGui)
 local admin = AdminPanel.new(playerGui)
 local quests = QuestsPanel.new(playerGui)
-local sidePanels = { index = index, pets = pets, quests = quests, admin = admin }
+local journal = RuinsPanel.new(playerGui) -- the Sunken Ruins' Explorer's Journal
+local abyssShop = AbyssPanel.new(playerGui) -- Lumi's Deep Seeds, in the Abyss
+local kelpJournal = KelpPanel.new(playerGui) -- Otto's Ranger Journal, in the Kelp Forest
+local lab = LabPanel.new(playerGui) -- the Research Laboratory: species, planters, reef health
+local sidePanels = { index = index, pets = pets, quests = quests, journal = journal, admin = admin }
 local function closeSidePanels()
 	for _, window in sidePanels do
 		window:setOpen(false)
@@ -83,6 +96,13 @@ Remotes.DataSync.OnClientEvent:Connect(function(data)
 	Audio.onData(data)
 	hud:setQuestReady(QuestsPanel.readyToClaim(data))
 	TutorialPanel.setData(data)
+	kelpJournal:setData(data)
+	lab:setData(data)
+	AquariumDisplay.setData(data)
+	Swimming.setFinsLevel(type(data.gear) == "table" and data.gear.fins or 0)
+	KelpLife.setData(data)
+	journal:setData(data)
+	abyssShop:setData(data)
 	refreshPlacing()
 end)
 
@@ -138,15 +158,31 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, triggeredBy)
 		closeSidePanels()
 		pets:setOpen(true, prompt.Parent :: BasePart)
 	elseif kind == "Supplies" then
+		-- The Coral Market's Decor & Fences counter, or the Equipment Station.
 		closeSidePanels()
-		supplies:setOpen(true, prompt.Parent :: BasePart)
+		supplies:setOpen(true, prompt.Parent :: BasePart, prompt:GetAttribute("Mode"))
+	elseif kind == "Lab" then
+		closeSidePanels()
+		lab:setOpen(true, prompt.Parent :: BasePart)
 	elseif kind == "Merchant" then
 		closeSidePanels()
 		merchant:setOpen(true, prompt.Parent :: BasePart)
+	elseif kind == "AbyssShop" then
+		closeSidePanels()
+		abyssShop:setOpen(true, prompt.Parent :: BasePart)
+	elseif kind == "Explorer" then
+		-- Marlo at the Sunken Ruins entrance: his line for your mission, and the journal.
+		closeSidePanels()
+		journal:setOpen(true)
+		Shopkeepers.say("Explorer", journal:marloLine())
 	elseif kind == "Index" then
 		-- The Reef Index hologram in the Research Station; the side button opens it anywhere.
 		closeSidePanels()
 		index:setOpen(true)
+	elseif kind == "Otto" then
+		-- Otto at the Kelp Forest entrance: his journal of challenges.
+		closeSidePanels()
+		kelpJournal:setOpen(true, prompt.Parent :: BasePart)
 	end
 end)
 
@@ -192,6 +228,11 @@ RunService.Heartbeat:Connect(function(dt)
 	supplies:update()
 	merchant:update()
 	quests:update()
+	journal:update()
+	journal:track()
+	abyssShop:update()
+	kelpJournal:update()
+	lab:update()
 end)
 
 CoralLabels.start(playerGui)
@@ -204,6 +245,11 @@ Swimming.start()
 NameTags.start()
 Audio.start(playerGui)
 TutorialPanel.start(playerGui)
+RuinsLife.start()
+AbyssLife.start()
+task.spawn(KelpLife.start) -- its own thread: a problem in the forest's animation stops only it
+OxygenBar.start(playerGui)
+AquariumDisplay.start()
 
 -- Ask for a snapshot in case DataSync fired before these handlers connected.
 Remotes.RequestSync:FireServer()

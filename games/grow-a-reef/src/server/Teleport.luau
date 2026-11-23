@@ -1,7 +1,9 @@
 --!nonstrict
--- Teleporting between the shops and your reef: the HUD's Shop and Home buttons (the Teleport
--- remote, which carries only "shops" or "home") and the whirlpool pads' prompts. The server
--- picks where you land. Both ends get a burst of bubbles everyone can see.
+-- Teleporting between the shops, your reef and the Sunken Ruins: the HUD's Shop, Home and
+-- Ruins buttons (the Teleport remote, which carries only "shops", "home", "ruins" or "abyss";
+-- the Journal's Go to Abyss button sends "abyss", allowed once the Abyss is unlocked) and the
+-- whirlpool pads' prompts. The server picks where you land. Both ends get a burst of bubbles
+-- everyone can see.
 
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -11,6 +13,10 @@ local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
+local RuinsConfig = require(ReplicatedStorage.Shared.RuinsConfig)
+local AbyssConfig = require(ReplicatedStorage.Shared.AbyssConfig)
+local KelpConfig = require(ReplicatedStorage.Shared.KelpConfig)
+local Abyss = require(script.Parent.Abyss)
 local World = require(script.Parent.World)
 local Plots = require(script.Parent.Plots)
 local RateLimit = require(script.Parent.RateLimit)
@@ -25,6 +31,12 @@ local RING_TWEEN = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirectio
 
 local lastTeleport: { [Player]: number } = {}
 local shopsArrival: CFrame
+-- The whirlpool at the Sunken Ruins entrance, facing into the ruins.
+local ruinsArrival = CFrame.lookAt(RuinsConfig.Places.pad + Vector3.new(0, 3, 0), RuinsConfig.at(0, 3, 14))
+-- Just inside the Kelp Forest's entrance, facing up the trail.
+local kelpArrival = CFrame.lookAt(KelpConfig.entrance + Vector3.new(0, 3, -10), KelpConfig.Trail[2] + Vector3.new(0, 3, 0))
+-- The whirlpool on the Abyss floor, facing the Crystal Spire. Only for players who unlocked it.
+local abyssArrival = CFrame.lookAt(AbyssConfig.Places.pad + Vector3.new(0, 3, 0), AbyssConfig.Places.spire + Vector3.new(0, 3, 0))
 
 -- A whirlpool where someone leaves or lands: a glowing ring spreading out over the seabed
 -- and a burst of swirling bubbles.
@@ -70,7 +82,11 @@ local function teleport(player: Player, destination: string)
 	if not root or not humanoid or humanoid.Health <= 0 then
 		return
 	end
-	local target = if destination == "home" then Plots.homeFor(player) elseif destination == "shops" then shopsArrival else nil
+	if destination == "abyss" and not Abyss.isUnlocked(player) then
+		Plots.notify(player, Abyss.lockedText(player), "bad")
+		return
+	end
+	local target = if destination == "home" then Plots.homeFor(player) elseif destination == "shops" then shopsArrival elseif destination == "ruins" then ruinsArrival elseif destination == "abyss" then abyssArrival elseif destination == "kelp" then kelpArrival else nil
 	if not target then
 		return
 	end
@@ -88,12 +104,12 @@ end
 
 function Teleport.start(worldParts: World.WorldParts)
 	local pad = worldParts.shopsPad.Position
-	-- Land on the pad in front of the Coral Shop, facing its two counters.
+	-- Land on the pad beside the Coral Market, facing its counters.
 	local shop = (worldParts.shopStand.Position + worldParts.sellStand.Position) / 2
 	shopsArrival = CFrame.lookAt(pad + Vector3.new(0, 3, 0), Vector3.new(shop.X, pad.Y + 3, shop.Z))
 
 	Remotes.Teleport.OnServerEvent:Connect(function(player, destination)
-		if RateLimit.consume(player) and (destination == "home" or destination == "shops") then
+		if RateLimit.consume(player) and (destination == "home" or destination == "shops" or destination == "ruins" or destination == "abyss") then
 			teleport(player, destination)
 		end
 	end)
@@ -101,8 +117,12 @@ function Teleport.start(worldParts: World.WorldParts)
 		local kind = prompt:GetAttribute("Kind")
 		if kind == "TeleportHome" then
 			teleport(player, "home")
+		elseif kind == "TeleportRuins" then
+			teleport(player, "ruins")
 		elseif kind == "TeleportShops" then
 			teleport(player, "shops")
+		elseif kind == "TeleportKelp" then
+			teleport(player, "kelp") -- the whirlpool at the north edge of the plaza
 		end
 	end)
 	Players.PlayerRemoving:Connect(function(player)

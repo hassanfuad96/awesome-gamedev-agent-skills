@@ -25,9 +25,10 @@ export type MutationDef = {
 
 export type FishDef = {
 	id: string,
-	weight: number,
+	weight: number, -- how often it comes to reef coral (0: never)
 	multiplier: number,
 	color: Color3,
+	kelpWeight: number?, -- set for Kelp Forest fish: how often each turns up there
 }
 
 export type ShopkeeperDef = {
@@ -47,40 +48,126 @@ ReefConfig.STARTING_SHELLS = 40
 ReefConfig.STARTING_SEEDS = {} :: { [string]: number }
 ReefConfig.MAX_SEEDS_PER_TYPE = 999
 
--- Plot layout. Coral is planted anywhere inside the plot's round reef bed; each coral
--- uses one slot, and every slot bought also widens the bed.
-ReefConfig.STARTING_SLOTS = 10
-ReefConfig.MAX_SLOTS = 50
-ReefConfig.BED_RADIUS = 37 -- studs, with the starting slots
-ReefConfig.BED_RADIUS_PER_SLOT = 0.425 -- extra radius for each slot bought (54 at 50 slots)
-ReefConfig.PLANT_SPACING = 5 -- minimum studs between two corals
-ReefConfig.PLANT_EDGE = 1.5 -- keep coral this far inside the bed's edge
+-- Plot layout. Each reef is a round bed of sand planters, one coral per planter, laid out
+-- on a hex grid. You start with STARTING_SLOTS planters and unlock the rest, one at a time,
+-- at the Research Laboratory (EXPAND). Saved coral remembers its planter (Plant.slot).
+ReefConfig.STARTING_SLOTS = 20
+ReefConfig.MAX_SLOTS = 30
+ReefConfig.PLANTER_SPACING = 10 -- studs between neighbouring planter centres
+ReefConfig.PLANTER_RADIUS = 3.2
+ReefConfig.PLANTER_HEIGHT = 1.4 -- how far a planter's sand top stands above the bed
+ReefConfig.BED_RADIUS = 34 -- the round bed the planters stand on
+ReefConfig.MOUND_RADIUS = 44 -- the whole reef out to the fence; decorations go round the bed
 ReefConfig.PLANT_REACH = 60 -- how far from your character you can plant
 ReefConfig.PLOT_COUNT = 6 -- one plot per player; set the place's max players to 6
 
--- The Starter Lagoon: a round plaza in the middle with the spawn, the buildings on its
--- sides, and the six reefs in a ring around it, each with its gate facing the plaza.
+-- Planter centres as (x, z) offsets in the reef's frame, in the order they unlock: the middle,
+-- then each hex ring outwards. The outer ring fills from the back, so the way in from the
+-- gate (local -Z) stays open longest.
+ReefConfig.Planters = {} :: { { x: number, z: number } }
+do
+	local cells = {}
+	for q = -3, 3 do
+		for r = -3, 3 do
+			local ring = math.max(math.abs(q), math.abs(r), math.abs(q + r))
+			if ring <= 3 then
+				local x = ReefConfig.PLANTER_SPACING * (q + r / 2)
+				local z = ReefConfig.PLANTER_SPACING * (r * math.sqrt(3) / 2)
+				table.insert(cells, { x = x, z = z, ring = ring })
+			end
+		end
+	end
+	table.sort(cells, function(a, b)
+		if a.ring ~= b.ring then
+			return a.ring < b.ring
+		elseif math.abs(a.z - b.z) > 0.01 then
+			return a.z > b.z
+		end
+		return a.x < b.x
+	end)
+	for i = 1, ReefConfig.MAX_SLOTS do
+		ReefConfig.Planters[i] = { x = cells[i].x, z = cells[i].z }
+	end
+end
+
+-- The planter at (x, z) in a reef's frame, if the point is on one.
+function ReefConfig.planterAt(x: number, z: number): number?
+	local reach = ReefConfig.PLANTER_RADIUS + 0.8
+	for slot, planter in ReefConfig.Planters do
+		local dx, dz = planter.x - x, planter.z - z
+		if dx * dx + dz * dz <= reach * reach then -- false for NaN
+			return slot
+		end
+	end
+	return nil
+end
+
+-- The Starter Lagoon, the central hub: a round plaza in the middle with the spawn, and four
+-- buildings in the four quadrants round it, each joined to the plaza by a glass tube corridor.
+-- The roads leave along the axes: north to the Kelp Forest, west through the Ocean Gate to the
+-- Main Reef, east to the Sunken Ruins, south to the Abyss.
 -- North is -Z, east is +X. Every position is on the seabed (Y = 0).
 ReefConfig.Lagoon = {
 	center = Vector3.zero, -- the plaza's middle, where new players spawn
 	plazaRadius = 44,
-	plotRing = 200, -- studs from the lagoon centre to each reef's centre
-	firstPlotBearing = 0, -- degrees clockwise from north; the other reefs follow round
+	rimRadius = 180, -- the lagoon's rocky edge, open where the roads leave
 	guide = Vector3.new(12, 0, -10), -- Inky, the tutorial octopus, beside the spawn
-	research = Vector3.new(-42, 0, -80), -- north side: the glass dome (Reef Index, Pet Hatchery)
-	upgrade = Vector3.new(42, 0, -78), -- north side, near the Research Station
-	coralShop = Vector3.new(98, 0, 0), -- east side: buy seeds, sell coral
-	oceanGate = Vector3.new(-122, 0, 0), -- west side: the stone arch out to the open ocean
-	boards = Vector3.new(0, 0, 76), -- south side: the two leaderboards, either side of the path
+	-- North-west, the biggest: the Research Laboratory, a geodesic glass dome with a glowing
+	-- coral on top. Research species, unlock planters, coral growth, reef health.
+	research = Vector3.new(-84, 0, -84),
+	labRadius = 36,
+	-- North-east: the Aquarium (Collection Center). The Reef Index, the Pet Hatchery and tanks
+	-- showing everything you've discovered.
+	aquarium = Vector3.new(84, 0, -84),
+	-- South-east: the Coral Market. Seeds, selling, decorations, fences and rare species.
+	coralShop = Vector3.new(84, 0, 84),
+	-- South-west: the Equipment Station. Diving gear, oxygen tank, swim fins.
+	upgrade = Vector3.new(-84, 0, 84),
+	oceanGate = Vector3.new(-122, 0, 0), -- west: the stone arch out to the Main Reef
+	boards = Vector3.new(0, 0, 76), -- south: the two leaderboards, either side of the path
+}
+
+-- The Main Reef: the big coral garden through the Ocean Gate, where the reefs are. A stone
+-- road runs west along Z = 0 with three reefs on each side, their gates facing it. Coral
+-- bridges arch over the road between the reefs, fish nurseries sit in the gaps between
+-- reefs, rocky ridges with caves wall it in north and south, and the Grand Reef Rock (with a
+-- grotto in its foot) closes the far west end.
+ReefConfig.MainReef = {
+	roadFrom = -150, -- X where the road leaves the Ocean Gate
+	roadTo = -790, -- X where it ends, at the Grand Reef Rock
+	roadWidth = 14,
+	entrance = Vector3.new(-205, 0, 0), -- the Main Reef sign over the road
+	-- Reef centres, in plot order: west along the north side, then back east along the
+	-- south, so a current flowing 1 > 2 > ... > 6 > 1 goes round the road.
+	reefs = {
+		Vector3.new(-330, 0, -100),
+		Vector3.new(-480, 0, -100),
+		Vector3.new(-630, 0, -100),
+		Vector3.new(-630, 0, 100),
+		Vector3.new(-480, 0, 100),
+		Vector3.new(-330, 0, 100),
+	},
+	bridges = { -405, -555 }, -- X of the coral bridges over the road
+	fishSpots = { -- wild fish nurseries in the gaps between reefs
+		Vector3.new(-405, 0, -104),
+		Vector3.new(-555, 0, -104),
+		Vector3.new(-555, 0, 104),
+		Vector3.new(-405, 0, 104),
+	},
+	ridgeZ = 190, -- the rocky ridges along the north and south edges
+	caves = { -- small caves in the ridges: { mouth, direction into the rock }
+		{ mouth = Vector3.new(-720, 0, -168), into = Vector3.new(0, 0, -1) },
+		{ mouth = Vector3.new(-720, 0, 168), into = Vector3.new(0, 0, 1) },
+		{ mouth = Vector3.new(-255, 0, -170), into = Vector3.new(0, 0, -1) },
+	},
+	grandRock = Vector3.new(-805, 0, 0),
 }
 
 -- Where reef `index` sits: its centre on the seabed, turned so its gate (local -Z) faces the
--- plaza. Saved coral and decoration positions are in this frame, so they stay put on any reef.
+-- road. Saved coral and decoration positions are in this frame, so they stay put on any reef.
 function ReefConfig.plotFrame(index: number): CFrame
-	local lagoon = ReefConfig.Lagoon
-	local bearing = math.rad(lagoon.firstPlotBearing + (index - 1) * 360 / ReefConfig.PLOT_COUNT)
-	local center = lagoon.center + Vector3.new(math.sin(bearing), 0, -math.cos(bearing)) * lagoon.plotRing
-	return CFrame.lookAt(center, lagoon.center)
+	local center = ReefConfig.MainReef.reefs[index]
+	return CFrame.lookAt(center, Vector3.new(center.X, center.Y, 0))
 end
 
 -- A world point as an offset (x, z) in a reef's frame (ReefConfig.plotFrame), and back.
@@ -97,7 +184,7 @@ end
 
 -- Whether (x, z) lies within `margin` studs of any reef's mound.
 function ReefConfig.nearPlot(x: number, z: number, margin: number): boolean
-	local reach = ReefConfig.bedRadius(ReefConfig.MAX_SLOTS) + 3 + margin
+	local reach = ReefConfig.MOUND_RADIUS + margin
 	for index = 1, ReefConfig.PLOT_COUNT do
 		local center = ReefConfig.plotFrame(index).Position
 		local dx, dz = x - center.X, z - center.Z
@@ -108,8 +195,17 @@ function ReefConfig.nearPlot(x: number, z: number, margin: number): boolean
 	return false
 end
 
--- Growing the reef: price of the n-th extra slot = floor(baseCost * costGrowth ^ n)
-ReefConfig.EXPAND = { baseCost = 200, costGrowth = 1.2 }
+-- Unlocking a planter: the n-th extra one costs floor(baseCost * costGrowth ^ n) shells and
+-- 1 + floor(n / 2) pearls, so the last ones need exploring the Main Reef for pearls.
+ReefConfig.EXPAND = { baseCost = 1000, costGrowth = 1.55 }
+
+-- Shells and pearls lying around the Main Reef. Anyone can swim into one to pick it up; it
+-- comes back somewhere else in a while. Pearls hide in caves, the grotto and up high.
+ReefConfig.Collectibles = {
+	shells = { count = 18, min = 5, max = 25, respawn = { 40, 80 } }, -- shells each, seconds
+	pearls = { count = 4, respawn = { 120, 240 } },
+	reach = 7, -- studs: how close you must be (the server checks)
+}
 
 export type FenceDef = {
 	id: string,
@@ -155,16 +251,16 @@ function ReefConfig.adminRole(userId: number): string?
 end
 
 -- Teleporting between the shops and your reef, from the HUD's Shop and Home buttons or the
--- whirlpool pads (one in front of the Coral Shop, one in front of every reef's gate).
+-- whirlpool pads (one beside the Coral Market, one in front of every reef's gate).
 ReefConfig.Teleport = {
 	cooldown = 3, -- seconds between teleports
-	shopsPad = Vector3.new(66, 0, 0), -- on the east path, in front of the Coral Shop
+	shopsPad = Vector3.new(68, 0, 50), -- beside the Coral Market's corridor
 }
 
 -- The Starter Lagoon tutorial. Inky (by the spawn) walks every new player through these
 -- steps in order; the HUD shows the current one and points the way. Each step finishes when
 -- the player does `action` (the same names Quests.progress reports), except "guide" (talk
--- to Inky) and "upgrade" (open the Upgrade Station).
+-- to Inky) and "upgrade" (talk at the Research Laboratory's counter).
 export type TutorialStep = {
 	id: string,
 	action: string,
@@ -187,15 +283,15 @@ ReefConfig.Tutorial = {
 			id = "plant",
 			action = "plant",
 			title = "Plant your first coral",
-			hint = "Press Home to go to your reef. Pick a seed in your hotbar, then tap the brown reef bed.",
-			inky = "Now press Home, pick a seed in your hotbar and tap the brown bed on your reef.",
+			hint = "Press Home to go to your reef in the Main Reef, through the Ocean Gate. Pick a seed, then tap a sand planter.",
+			inky = "Now press Home to visit your reef in the Main Reef. Pick a seed and tap a sand planter!",
 		},
 		{
 			id = "sell",
 			action = "sell",
 			title = "Earn your first shells",
-			hint = "When a coral says Ready!, click it to harvest. Then sell your bag at the Coral Shop (east).",
-			inky = "Harvest coral when it's Ready!, then sell your bag to Pinch at the Coral Shop.",
+			hint = "When a coral says Ready!, click it to harvest. Then sell your bag at the Coral Market (south-east).",
+			inky = "Harvest coral when it's Ready!, then sell your bag to Pinch at the Coral Market.",
 		},
 		{
 			id = "fish",
@@ -208,15 +304,16 @@ ReefConfig.Tutorial = {
 			id = "expand",
 			action = "upgrade",
 			title = "Learn how to expand your reef",
-			hint = "Visit the Upgrade Station on the north side, next to the glass dome.",
-			inky = "Last one! The Upgrade Station, north by the dome, grows your reef and your gear.",
+			hint = "Visit the Research Laboratory, the big glass dome north-west of the plaza.",
+			inky = "Last one! The Research Laboratory, the big dome, unlocks planters and new species.",
 		},
 	} :: { TutorialStep },
 	doneLines = {
-		"Your reef is looking great! Rare seeds show up in the Coral Shop at every restock.",
+		"Your reef is looking great! Rare seeds show up in the Coral Market at every restock.",
 		"Try the Research Station: the Reef Index pays out when you finish a set.",
 		"Sea events start every few minutes. Watch the timer under your shells!",
-		"The Ocean Gate leads to the open ocean. Shipwrecks sink out there sometimes...",
+		"Follow the sand road east from the plaza to the Sunken Ruins. Shipwrecks sink there!",
+		"Take the road north from the plaza to the Kelp Forest. Otto the otter has challenges for you!",
 	},
 }
 
@@ -389,8 +486,44 @@ ReefConfig.Gear = {
 		base = 30, -- coral your bag holds with no upgrades
 		perLevel = 30,
 	},
+	oxygen = {
+		id = "oxygen",
+		name = "Oxygen Tank",
+		costs = { 800, 4000, 15000, 60000, 200000 },
+		perLevel = 45, -- extra seconds of air in deep water (ReefConfig.Oxygen)
+	},
+	fins = {
+		id = "fins",
+		name = "Swim Fins",
+		costs = { 1200, 6000, 24000, 90000, 300000 },
+		perLevel = 0.08, -- 8% faster swimming per level
+	},
 }
-ReefConfig.GEAR_ORDER = { "fertilizer", "wand", "bag" }
+ReefConfig.GEAR_ORDER = { "fertilizer", "wand", "bag", "oxygen", "fins" }
+-- Where each piece of gear is sold: coral growth is research, the rest is diving equipment.
+ReefConfig.GearStation = {
+	fertilizer = "lab",
+	wand = "equipment",
+	bag = "equipment",
+	oxygen = "equipment",
+	fins = "equipment",
+} :: { [string]: string }
+
+-- Air. You breathe freely almost everywhere; only deep water (the Main Reef's caves, the
+-- Ruins' cave, the bottom of the Abyss: see the shared DeepWater module) uses it up, and it
+-- refills as soon as you're out. Run out and you're whisked back to the plaza.
+ReefConfig.Oxygen = {
+	base = 60, -- seconds of air with no Oxygen Tank upgrades
+	refillPerSecond = 30,
+}
+
+function ReefConfig.oxygenCapacity(level: number): number
+	return ReefConfig.Oxygen.base + ReefConfig.Gear.oxygen.perLevel * level
+end
+
+function ReefConfig.swimSpeedMultiplier(finsLevel: number): number
+	return 1 + ReefConfig.Gear.fins.perLevel * finsLevel
+end
 
 function ReefConfig.bagCapacity(level: number): number
 	local bag = ReefConfig.Gear.bag
@@ -446,8 +579,10 @@ function ReefConfig.dailyQuests(day: number): { string }
 	return picked
 end
 
+-- Quest rewards grow with the reef: x1 with the starting planters, x3 with all of them.
 function ReefConfig.questShells(quest: QuestDef, unlocked: number): number
-	return math.floor(quest.shells * math.max(1, unlocked / 10))
+	local extra = math.max(0, unlocked - ReefConfig.STARTING_SLOTS)
+	return math.floor(quest.shells * (1 + extra * 2 / (ReefConfig.MAX_SLOTS - ReefConfig.STARTING_SLOTS)))
 end
 
 -- Rebirth: start your reef over for a permanent shell bonus. You keep your pets, Reef Index,
@@ -483,6 +618,16 @@ ReefConfig.Titles = {
 	{ id = "starlight", text = "Starlight Legend", color = Color3.fromRGB(255, 225, 90) },
 	{ id = "transcendent", text = "Transcendent", color = Color3.fromRGB(130, 255, 225) },
 	{ id = "angler", text = "Master Angler", color = Color3.fromRGB(110, 190, 255) },
+	-- Sunken Ruins: the explorer missions and the two hidden coral sets.
+	{ id = "ruinexplorer", text = "Ruin Explorer", color = Color3.fromRGB(240, 200, 130) },
+	{ id = "ghostdiver", text = "Ghost Diver", color = Color3.fromRGB(190, 235, 255) },
+	{ id = "relickeeper", text = "Relic Keeper", color = Color3.fromRGB(255, 180, 110) },
+	-- Kelp Forest: all three hidden glades (KelpConfig.Challenges).
+	{ id = "kelpranger", text = "Kelp Ranger", color = Color3.fromRGB(150, 225, 90) },
+	-- The Abyss: every deep-sea creature spotted, and two abyssal coral sets.
+	{ id = "abyssdiver", text = "Abyss Diver", color = Color3.fromRGB(150, 140, 255) },
+	{ id = "deepglow", text = "Deep Glow", color = Color3.fromRGB(110, 210, 255) },
+	{ id = "voidwalker", text = "Void Walker", color = Color3.fromRGB(130, 255, 215) },
 } :: { TitleDef }
 ReefConfig.TitleById = {} :: { [string]: TitleDef }
 for _, title in ReefConfig.Titles do
@@ -494,7 +639,45 @@ ReefConfig.Likes = {
 	maxRemembered = 200, -- reefs a player's "liked today" list keeps
 }
 
-ReefConfig.SEED_ORDER = { "kelp", "brain", "fan", "anemone", "clam", "star", "seagrass" }
+-- Species research (the Research Laboratory): a coral sold in the Coral Market can only be
+-- bought once you've researched it. Bubble Kelp is known from the start; each species after it
+-- needs the one before it researched and grown at least once (it's in your Reef Index), plus
+-- shells. Seeds you get any other way can always be planted.
+ReefConfig.Research = {
+	free = "kelp",
+	costs = { brain = 150, fan = 600, anemone = 2500, clam = 10000, star = 50000 },
+	order = { "kelp", "brain", "fan", "anemone", "clam", "star" },
+}
+
+-- Whether this player can buy seedId in the Coral Market.
+function ReefConfig.speciesUnlocked(data: any, seedId: string): boolean
+	return seedId == ReefConfig.Research.free or (data.research ~= nil and data.research[seedId] == true)
+end
+
+-- Why seedId can't be researched yet, or nil if it can (it still costs its shells).
+function ReefConfig.researchProblem(data: any, seedId: string): string?
+	local order = ReefConfig.Research.order
+	local index = table.find(order, seedId)
+	if not index or seedId == ReefConfig.Research.free then
+		return "That species can't be researched."
+	end
+	if ReefConfig.speciesUnlocked(data, seedId) then
+		return "You've already researched that species."
+	end
+	local previous = order[index - 1]
+	local previousName = ReefConfig.Seeds[previous].name
+	if not ReefConfig.speciesUnlocked(data, previous) then
+		return `Research {previousName} first.`
+	end
+	for key in data.index and data.index.coral or {} do
+		if ReefConfig.splitInventoryKey(key) == previous then
+			return nil
+		end
+	end
+	return `Grow and harvest some {previousName} first: research needs a sample.`
+end
+
+ReefConfig.SEED_ORDER = { "kelp", "brain", "fan", "anemone", "clam", "star", "seagrass", "ghost", "relic", "glowcap", "lumen", "voidbloom" }
 
 ReefConfig.Seeds = {
 	kelp = {
@@ -526,6 +709,37 @@ ReefConfig.Seeds = {
 		id = "seagrass", name = "Seagrass", price = 0, growSeconds = 1800, sellValue = 150000,
 		color = Color3.fromRGB(110, 240, 210), stockChance = 0, stockMin = 0, stockMax = 0,
 		shop = false, rarity = "Transcendent",
+	},
+	-- Hidden coral from the Sunken Ruins (RuinsConfig): never in the shop. Ghost Coral grows in
+	-- the cave (a cutting a day), and turns up in ruins chests.
+	ghost = {
+		id = "ghost", name = "Ghost Coral", price = 0, growSeconds = 900, sellValue = 9000,
+		color = Color3.fromRGB(180, 230, 255), stockChance = 0, stockMin = 0, stockMax = 0,
+		shop = false, rarity = "Mythic",
+	},
+	-- Relic Coral grows in the temple sanctum, for divers who found every relic, and comes
+	-- from the last exploration missions.
+	relic = {
+		id = "relic", name = "Relic Coral", price = 0, growSeconds = 1800, sellValue = 45000,
+		color = Color3.fromRGB(255, 160, 110), stockChance = 0, stockMin = 0, stockMax = 0,
+		shop = false, rarity = "Ancient",
+	},
+	-- Abyssal coral: sold only at Lumi's stall in the Abyss (AbyssConfig.SHOP_SEEDS), at these
+	-- prices, never in the Coral Market. The high-value end of the game.
+	glowcap = {
+		id = "glowcap", name = "Glowcap", price = 45000, growSeconds = 1500, sellValue = 120000,
+		color = Color3.fromRGB(180, 110, 255), stockChance = 0, stockMin = 0, stockMax = 0,
+		shop = false, rarity = "Abyssal",
+	},
+	lumen = {
+		id = "lumen", name = "Lumen Brain", price = 180000, growSeconds = 2400, sellValue = 480000,
+		color = Color3.fromRGB(90, 200, 255), stockChance = 0, stockMin = 0, stockMax = 0,
+		shop = false, rarity = "Abyssal",
+	},
+	voidbloom = {
+		id = "voidbloom", name = "Void Bloom", price = 750000, growSeconds = 3600, sellValue = 2000000,
+		color = Color3.fromRGB(110, 255, 210), stockChance = 0, stockMin = 0, stockMax = 0,
+		shop = false, rarity = "Abyssal",
 	},
 } :: { [string]: SeedDef }
 
@@ -636,7 +850,7 @@ ReefConfig.Events = {
 			-- 20 s to hide, a 30 s hunt, 5 s for the orcas to leave (see Shipwreck below).
 			id = "Shipwreck", name = "Shipwreck", weight = 5, duration = 55,
 			color = Color3.fromRGB(255, 110, 100),
-			message = "A giant ship is sinking, and orcas are following it! Swim inside the wreck and hide before they arrive!",
+			message = "A giant ship is sinking into the Sunken Ruins, and orcas are following it! Press Ruins, swim inside the wreck and hide before they arrive!",
 		},
 	} :: { EventDef },
 	glowingMultiplier = 3, -- Bioluminescent Night: Glowing mutation weight x this
@@ -739,11 +953,11 @@ function ReefConfig.huntHeat(distance: number): string
 	return if distance < heat.burning then "Burning hot!" elseif distance < heat.hot then "Hot" elseif distance < heat.warm then "Warm" else "Cold"
 end
 
--- The Shipwreck event: a liner sinks onto the seabed past the Ocean Gate, then a pod of
+-- The Shipwreck event: a liner sinks into the Wreck Basin in the Sunken Ruins, then a pod of
 -- orcas hunts everyone who isn't hiding inside it. Everyone who was there when the hunt
 -- began and didn't get eaten wins the reward seed.
 ReefConfig.Shipwreck = {
-	landing = Vector3.new(-320, 0, 0), -- out past the Ocean Gate, on open seabed
+	landing = Vector3.new(420, 0, -85), -- the Sunken Ruins' Wreck Basin (RuinsConfig.Places.basin)
 	length = 120, -- the hull, which you can swim into through its holes and hatches
 	width = 22,
 	height = 18,
@@ -771,11 +985,19 @@ ReefConfig.Fish = {
 	maxPerPlot = 4,
 	lifetime = 45,
 	valueFraction = 0.2, -- fish value = coral sellValue * valueFraction * fish multiplier
+	-- Wild fish at the Main Reef's fish nurseries: anyone can catch them.
+	wild = { perSpot = 2, interval = 15, value = 12, roam = 9 }, -- value x fish multiplier
 	kinds = {
 		{ id = "Minnow", weight = 60, multiplier = 1, color = Color3.fromRGB(180, 200, 220) },
 		{ id = "Striped Tang", weight = 28, multiplier = 2, color = Color3.fromRGB(60, 120, 255) },
 		{ id = "Pufferfish", weight = 10, multiplier = 4, color = Color3.fromRGB(240, 200, 90) },
 		{ id = "Moonfish", weight = 2, multiplier = 10, color = Color3.fromRGB(230, 230, 255) },
+		-- Kelp Forest fish (KelpConfig.FISH_IDS): never on the reefs, only in the forest.
+		{ id = "Garibaldi", weight = 0, kelpWeight = 40, multiplier = 2, color = Color3.fromRGB(255, 130, 40) },
+		{ id = "Kelp Bass", weight = 0, kelpWeight = 30, multiplier = 2, color = Color3.fromRGB(120, 110, 70) },
+		{ id = "Opaleye", weight = 0, kelpWeight = 18, multiplier = 3, color = Color3.fromRGB(80, 140, 120) },
+		{ id = "Sheephead", weight = 0, kelpWeight = 9, multiplier = 6, color = Color3.fromRGB(230, 110, 130) },
+		{ id = "Giant Sea Bass", weight = 0, kelpWeight = 3, multiplier = 15, color = Color3.fromRGB(70, 80, 100) },
 	} :: { FishDef },
 }
 
@@ -796,7 +1018,7 @@ ReefConfig.Shopkeepers = {
 			"Welcome, diver! Fresh seeds, straight from the deep.",
 			"New here? Bubble Kelp grows in 20 seconds.",
 			"Rare seeds sell out fast. Come back after a restock!",
-			"Short on space? Old Shellby at the Upgrade Station can grow your reef.",
+			"Swim Fins make you faster, and a bigger Oxygen Tank lets you dive longer.",
 		},
 	},
 	Sell = {
@@ -831,13 +1053,48 @@ ReefConfig.Shopkeepers = {
 			"Psst! Talk to me for the next step.",
 		},
 	},
+	-- Marlo, the seal explorer at the Sunken Ruins entrance (built by RuinsWorld). Talking to
+	-- him opens the Explorer's Journal; these are for walking past.
+	-- Otto the sea otter, the Kelp Forest's ranger (KelpWorld). Talking opens his journal of
+	-- challenges (KelpPanel); these are for walking past.
+	Otto = {
+		name = "Otto",
+		bob = 0.2,
+		greetings = {
+			"Welcome to the Kelp Forest! It's a whole different world from the reefs.",
+			"The seagrass meadows need help. Replant a patch or two?",
+			"Shh... the turtles are nesting. Guide a hatchling to the sea!",
+			"Some paths here are hidden. Look for glowing pebbles.",
+		},
+	},
+	Explorer = {
+		name = "Marlo",
+		bob = 0.18,
+		greetings = {
+			"Ahoy, diver! Welcome to the Sunken Ruins. Talk to me for a mission!",
+			"Chests down here refill every 20 minutes. Go and look!",
+			"Six relics, four rare creatures... can you find them all?",
+			"Ghost Coral grows in the cave. It grows nowhere else in the sea!",
+		},
+	},
+	-- Lumi the lanternfish, who sells abyssal coral at the bottom of the Abyss (AbyssWorld).
+	Abyss = {
+		name = "Lumi",
+		bob = 0.3,
+		greetings = {
+			"Ooh, a visitor! Abyssal coral, the brightest seeds in the sea!",
+			"Void Bloom sells for two million shells. Worth every one!",
+			"Have you seen the Ghost Shark? It glides right over the pit.",
+			"Mind the dark, diver. Follow the glow!",
+		},
+	},
 } :: { [string]: ShopkeeperDef }
 
 ReefConfig.CORAL_TAG = "Coral" -- every planted coral model, for the client's labels and preview
 
 -- Ambient sea life (client-side and cosmetic) and where it, and the seabed decoration, roam.
 ReefConfig.SeaLife = {
-	area = { minX = -430, maxX = 430, minZ = -430, maxZ = 430 }, -- the whole lagoon and its rim
+	area = { minX = -880, maxX = 620, minZ = -300, maxZ = 300 }, -- the Main Reef, the lagoon and the Ruins
 	fishSchools = 10, -- each school is one species
 	fishPerSchool = 9,
 	turtles = 3,
@@ -851,13 +1108,19 @@ function ReefConfig.expandCost(unlocked: number): number
 	return math.floor(ReefConfig.EXPAND.baseCost * ReefConfig.EXPAND.costGrowth ^ extra)
 end
 
-function ReefConfig.bedRadius(unlocked: number): number
-	return ReefConfig.BED_RADIUS + ReefConfig.BED_RADIUS_PER_SLOT * (unlocked - ReefConfig.STARTING_SLOTS)
+-- Pearls to unlock the next planter, after `unlocked` planters.
+function ReefConfig.expandPearls(unlocked: number): number
+	return 1 + (unlocked - ReefConfig.STARTING_SLOTS) // 2
+end
+
+-- The round bed the planters stand on. The same size for every reef.
+function ReefConfig.bedRadius(_unlocked: number?): number
+	return ReefConfig.BED_RADIUS
 end
 
 -- The reef's whole mound, out to the fence (the fence stands just past this).
 function ReefConfig.moundRadius(): number
-	return ReefConfig.bedRadius(ReefConfig.MAX_SLOTS) + 3
+	return ReefConfig.MOUND_RADIUS
 end
 
 export type PlacedDecor = { item: string, x: number, z: number }
@@ -880,16 +1143,17 @@ function ReefConfig.decorProblem(itemId: string, x: number, z: number, plants: {
 	if not (x * x + z * z <= reach * reach) then -- also refuses NaN
 		return "Place it inside your fence."
 	end
+	-- Planters (locked ones too) are for coral.
+	for _, planter in ReefConfig.Planters do
+		local dx, dz = planter.x - x, planter.z - z
+		local gap = item.footprint + ReefConfig.PLANTER_RADIUS + 0.5
+		if dx * dx + dz * dz < gap * gap then
+			return "Too close to a planter."
+		end
+	end
 	-- Keep the way in from the gate (at -Z) clear.
 	if math.abs(x) < ReefConfig.FENCE_GATE_WIDTH / 2 + item.footprint and z < -(reach - 10) then
 		return "Keep the gateway clear."
-	end
-	for _, plant in plants do
-		local dx, dz = plant.x - x, plant.z - z
-		local gap = item.footprint + ReefConfig.PLANT_SPACING / 2
-		if dx * dx + dz * dz < gap * gap then
-			return "Too close to your coral."
-		end
 	end
 	for _, other in decor do
 		local otherItem = ReefConfig.DecorById[other.item]
@@ -902,36 +1166,37 @@ function ReefConfig.decorProblem(itemId: string, x: number, z: number, plants: {
 	return nil
 end
 
--- Why a coral can't be planted at (x, z) from the plot centre, or nil if it can. Shared so
--- the client's placement preview agrees with the server, which makes the real decision.
--- `decor` is the reef's placed decorations, which coral can't grow on.
-function ReefConfig.plantProblem(x: number, z: number, unlocked: number, plants: { [any]: { x: number, z: number } }, decor: { [any]: PlacedDecor }?): string?
-	local count = 0
-	for _ in plants do
-		count += 1
+-- Why a coral can't be planted at (x, z) in the reef's frame, or nil if it can, plus the
+-- planter it would go in. Shared so the client's preview agrees with the server, which makes
+-- the real decision. `plants` is what's planted on the reef (each with its slot).
+function ReefConfig.plantProblem(x: number, z: number, unlocked: number, plants: { [any]: { slot: number? } }): (string?, number?)
+	local slot = ReefConfig.planterAt(x, z)
+	if not slot then
+		return "Tap one of the sand planters to plant.", nil
 	end
-	if count >= unlocked then
-		return "Your reef is full. Harvest coral, or grow your reef at the Seed Shop."
-	end
-	local reach = ReefConfig.bedRadius(unlocked) - ReefConfig.PLANT_EDGE
-	if x * x + z * z > reach * reach then
-		return "Plant inside your reef bed."
+	if slot > unlocked then
+		return "That planter is locked. Unlock more at the Research Laboratory.", slot
 	end
 	for _, plant in plants do
-		local dx, dz = plant.x - x, plant.z - z
-		if dx * dx + dz * dz < ReefConfig.PLANT_SPACING * ReefConfig.PLANT_SPACING then
-			return "Too close to another coral."
+		if plant.slot == slot then
+			return "That planter already has coral in it.", slot
 		end
 	end
-	for _, placed in decor or {} do
-		local item = ReefConfig.DecorById[placed.item]
-		local dx, dz = placed.x - x, placed.z - z
-		local gap = (if item then item.footprint else 2) + ReefConfig.PLANT_SPACING / 2
-		if dx * dx + dz * dz < gap * gap then
-			return "Too close to a decoration."
-		end
+	return nil, slot
+end
+
+-- Every coral grows through three stages, by how far along it is (0 to 1):
+--   1 Seedling       a few thin sprouts poking out of the planter's sand
+--   2 Growing        the coral itself, small, filling out as it grows
+--   3 Fully grown    full size, with polyps round its foot and bubbles rising: ready to harvest
+ReefConfig.SEEDLING_UNTIL = 0.35
+ReefConfig.STAGE_NAMES = { "Seedling", "Growing", "Fully grown" }
+
+function ReefConfig.growthStage(progress: number): number
+	if progress >= 1 then
+		return 3
 	end
-	return nil
+	return if progress < ReefConfig.SEEDLING_UNTIL then 1 else 2
 end
 
 -- A coral's mutations are one key: "None", one id ("Golden"), or ids joined with "+" in
@@ -1116,6 +1381,11 @@ ReefConfig.IndexRewards = {
 	star = { title = "starlight", pet = { species = "octopus", golden = true } },
 	seagrass = { title = "transcendent", decor = { id = "arch", count = 1 } },
 	fish = { title = "angler", pet = { species = "pufferfish", golden = true } },
+	ghost = { title = "ghostdiver", decor = { id = "vent", count = 1 } },
+	relic = { title = "relickeeper", decor = { id = "statue", count = 1 } },
+	glowcap = { decor = { id = "lantern", count = 3 } },
+	lumen = { title = "deepglow", decor = { id = "vent", count = 1 } },
+	voidbloom = { title = "voidwalker", pet = { species = "octopus", golden = true } },
 } :: { [string]: IndexReward }
 
 -- "Kelp Keeper title, Golden Seahorse" for the Reef Index window and the reward message.

@@ -1,7 +1,7 @@
 --!nonstrict
 -- The Starter Lagoon tutorial (ReefConfig.Tutorial). Every new player starts on step 1 and
 -- Inky, the octopus by the spawn, walks them through: collect a seed, plant it, earn shells,
--- catch a fish, and find the Upgrade Station. The step is saved in data.tutorial; one past
+-- catch a fish, and find the Research Laboratory. The step is saved in data.tutorial; one past
 -- the last step means done.
 --   Tutorial.progress(player, action)  other systems report what the player did (Quests
 --                                      forwards everything it is told)
@@ -40,7 +40,7 @@ function Tutorial.isOn(player: Player, action: string): boolean
 end
 
 -- Moves the player on when `action` is their current step. The caller syncs afterwards,
--- except for the guide and Upgrade Station, which sync here.
+-- except for the guide and the Lab, which sync here.
 function Tutorial.progress(player: Player, action: string)
 	local profile, step = currentStep(player)
 	if not profile or not step or step.action ~= action then
@@ -89,7 +89,7 @@ function Tutorial.start()
 			if RateLimit.consume(player) then
 				talkToGuide(player)
 			end
-		elseif kind == "Supplies" and Tutorial.isOn(player, "upgrade") then
+		elseif kind == "Lab" and Tutorial.isOn(player, "upgrade") then
 			Tutorial.progress(player, "upgrade")
 			PlayerData.sync(player)
 		end
