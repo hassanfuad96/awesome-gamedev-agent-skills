@@ -1,6 +1,7 @@
 --!nonstrict
 -- Always-on HUD: shells, bag value, sea-event timer, toasts and the seed hotbar.
 
+local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
@@ -40,21 +41,21 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 	local gui = Ui.new("ScreenGui", {
 		Name = "ReefHud",
 		ResetOnSpawn = false,
-		IgnoreGuiInset = false,
+		-- Draws over the Roblox top bar too, so the shells bar can sit in it (see placeStatus).
+		IgnoreGuiInset = true,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		Parent = playerGui,
 	})
 
-	-- Top: currency and status, centred so it clears the Roblox menu buttons on the left.
+	-- Top: currency and status. Placed in the top bar row by placeStatus below.
 	local top = Ui.new("Frame", {
 		Name = "Status",
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 8),
-		Size = UDim2.new(0.6, 0, 0, 84),
+		Size = UDim2.fromOffset(420, 84),
 		BackgroundTransparency = 1,
 		Parent = gui,
 	}, {
-		Ui.new("UISizeConstraint", { MaxSize = Vector2.new(420, 84), MinSize = Vector2.new(240, 0) }),
 		Ui.new("UIListLayout", {
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
@@ -180,11 +181,30 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 		}),
 	})
 
-	-- Smaller on phones. The hotbar keeps its share of the screen width so more seeds fit,
-	-- and toasts start just below the (scaled) status bar.
+	-- The shells bar sits in the Roblox top bar row, centred in the free space between the
+	-- Roblox buttons (GuiService.TopbarInset). Where there is no top bar, it sits 8 px down.
+	local currentScale = 1
+	local function placeStatus()
+		local scale = currentScale
+		local bar = GuiService.TopbarInset
+		local pillHeight = 40 * scale
+		local y = if bar.Height >= pillHeight then (bar.Height - pillHeight) / 2 else 8
+		local center = gui.AbsoluteSize.X / 2
+		local room = if bar.Width > 0
+			then 2 * math.min(center - bar.Min.X, bar.Max.X - center) - 16
+			else gui.AbsoluteSize.X - 16
+		top.Size = UDim2.fromOffset(math.clamp(room, 200, 420 * scale) / scale, 84)
+		top.Position = UDim2.new(0.5, 0, 0, y)
+		toasts.Position = UDim2.new(0.5, 0, 0, y + 92 * scale)
+	end
+	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(placeStatus)
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeStatus)
+
+	-- Smaller on phones. The hotbar keeps its share of the screen width so more seeds fit.
 	Ui.autoScale({ top, toasts, side, hotbarHolder }, function(scale)
+		currentScale = scale
 		hotbarHolder.Size = UDim2.new(0.55 / scale, 0, 0, 96)
-		toasts.Position = UDim2.new(0.5, 0, 0, 8 + 92 * scale)
+		placeStatus()
 	end)
 
 	local self = setmetatable({
