@@ -48,10 +48,12 @@ local Econ = load("src/shared/EconomyMath.luau")
 
 check(Config.harvestValue("brain", "Golden") == 375, "Golden Brain Coral sells for 375")
 check(Config.harvestValue("nope", "None") == 0, "unknown seed sells for 0")
-check(Config.expandCost(6) == 200 and Config.expandCost(7) == 500 and Config.expandCost(11) == 19531, "expand costs 200, 500 ... 19531")
-check(Config.bedRadius(6) == 11 and Config.bedRadius(12) == 15.5, "reef bed grows from 11 to 15.5 studs")
+check(Config.expandCost(6) == 200 and Config.expandCost(7) == 400 and Config.expandCost(19) == 1638400, "expand costs 200, 400 ... 1,638,400")
+check(Config.bedRadius(6) == 16.5 and math.abs(Config.bedRadius(20) - 24.2) < 1e-9, "reef bed grows from 16.5 to 24.2 studs")
+local maxReach = Config.bedRadius(Config.MAX_SLOTS) + 7
+check(Config.PLOT_SPACING >= maxReach * 2, "neighbouring reef mounds don't overlap")
 check(Config.plantProblem(0, 0, 6, {}) == nil, "coral fits in the middle of an empty bed")
-check(Config.plantProblem(10, 0, 6, {}) ~= nil and Config.plantProblem(9.4, 0, 6, {}) == nil, "coral must stay 1.5 studs inside the bed edge")
+check(Config.plantProblem(15.1, 0, 6, {}) ~= nil and Config.plantProblem(14.9, 0, 6, {}) == nil, "coral must stay 1.5 studs inside the bed edge")
 check(Config.plantProblem(4.9, 0, 6, { { x = 0, z = 0 } }) ~= nil and Config.plantProblem(5, 0, 6, { { x = 0, z = 0 } }) == nil, "coral needs 5 studs of spacing")
 local full = {}
 for i = 1, 6 do full[tostring(i)] = { x = (i - 3.5) * 100, z = 0 } end

@@ -43,8 +43,10 @@ local REEF_SAND = Color3.fromRGB(196, 172, 128)
 local BED_SOIL = Color3.fromRGB(140, 100, 66)
 local ROCK = Color3.fromRGB(96, 104, 112)
 local SEA_GRASS = Color3.fromRGB(70, 150, 90)
-local PLOT_SPACING = 50
-local PLOT_ROW_Z = 45
+local PLOT_SPACING = ReefConfig.PLOT_SPACING
+local PLOT_ROW_Z = ReefConfig.PLOT_ROW_Z
+-- How far the mound (with its lumpy rim) reaches from a plot's centre.
+local MOUND_REACH = ReefConfig.bedRadius(ReefConfig.MAX_SLOTS) + 7
 
 local function part(props: { [string]: any }): Part
 	local p = Instance.new("Part")
@@ -403,7 +405,7 @@ function World.build(): WorldParts
 	})
 	-- Keep the play area (stands and plots) clear of rocks and decoration.
 	local function clearOfPlayArea(x: number, z: number): boolean
-		return math.abs(z - PLOT_ROW_Z) > 30 and not (math.abs(x) < 60 and z > -60 and z < 10)
+		return math.abs(z - PLOT_ROW_Z) > MOUND_REACH + 3 and not (math.abs(x) < 60 and z > -60 and z < 10)
 	end
 	local rng = Random.new(42)
 	for i = 1, 40 do
@@ -462,7 +464,7 @@ function World.build(): WorldParts
 	local span = ReefConfig.PLOT_COUNT * PLOT_SPACING
 	local streamPart = part({
 		Name = "CurrentStream",
-		Size = Vector3.new(4, 10, 36),
+		Size = Vector3.new(4, 10, MOUND_REACH * 1.6),
 		Position = Vector3.new(-span / 2 - 10, 6, PLOT_ROW_Z),
 		Transparency = 1,
 		CanCollide = false,

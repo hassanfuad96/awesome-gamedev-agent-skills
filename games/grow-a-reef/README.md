@@ -17,7 +17,7 @@ repository (`skills/other-engines/roblox-*`).
 | Harvest | Click fully grown coral (its label says "Ready!"). It goes into your bag. |
 | Sell | Walk to **Sell Coral** (orange stand) and press the prompt. Everything in your bag sells. |
 | Catch fish | Fish swim around grown coral on your reef. Click them before they swim off. |
-| Grow your reef | You start with 6 coral slots. In the Seed Shop, "Grow your reef" adds a slot (up to 12) and widens your bed. |
+| Grow your reef | You start with 6 coral slots. In the Seed Shop, "Grow your reef" adds a slot (up to 20) and widens your bed, from 33 studs across to 48. |
 | Reef Index | Press **Index** on the left. Every coral in every mutation combo, and every fish. |
 | Pets | Hatch eggs at the **Pet Hatchery** (purple stand), then take pets out from **Pets** on the left. |
 
@@ -189,8 +189,9 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
 
 Change numbers in `src/shared/ReefConfig.luau`. Things you might want to change first:
 `STARTING_SHELLS`, seed prices and grow times, `Mutations` weights, `Events` (interval, event weights and lengths, chest rewards),
-`Fish.spawnChance`, `EXPAND` (slot prices are 200, 500, 1,250, 3,125, 7,812, 19,531), and the bed:
-`BED_RADIUS`, `BED_RADIUS_PER_SLOT` and `PLANT_SPACING`. `SeaLife` sets how many of each sea
+`Fish.spawnChance`, `EXPAND` (slot prices double each time: 200, 400, 800 ... 1,638,400 for the 20th), and the bed:
+`BED_RADIUS`, `BED_RADIUS_PER_SLOT` and `PLANT_SPACING` (keep `PLOT_SPACING` at least 2 x
+(biggest bed radius + 7), which a test checks). `SeaLife` sets how many of each sea
 creature swim around; the underwater look (Atmosphere, tint) is in `World.luau`'s `setupLighting`.
 
 To change the economy with the pacing calculator, see
@@ -203,7 +204,7 @@ To change the economy with the pacing calculator, see
 ```bash
 rojo build default.project.json -o GrowAReef.rbxlx   # builds
 lune run tests/compile_check.luau src                # all 32 scripts compile
-lune run tests/check_place.luau GrowAReef.rbxlx      # 182 checks pass
+lune run tests/check_place.luau GrowAReef.rbxlx      # 183 checks pass
 ```
 
 `check_place` confirms that the remotes exist, that each script has the right class and every

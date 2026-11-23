@@ -26,7 +26,9 @@ local landingParams = RaycastParams.new()
 local open = 0 -- chests on the seabed right now
 
 -- Where chests may land: the plaza and the row of reefs.
-local AREA = { minX = -150, maxX = 150, minZ = -55, maxZ = 75 }
+local BED_REACH = ReefConfig.bedRadius(ReefConfig.MAX_SLOTS)
+local ROW_HALF = (ReefConfig.PLOT_COUNT - 1) * ReefConfig.PLOT_SPACING / 2 + BED_REACH
+local AREA = { minX = -ROW_HALF, maxX = ROW_HALF, minZ = -55, maxZ = ReefConfig.PLOT_ROW_Z + BED_REACH }
 
 local function landingPoint(): Vector3?
 	local x = rng:NextNumber(AREA.minX, AREA.maxX)

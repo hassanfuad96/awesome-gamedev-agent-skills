@@ -262,11 +262,12 @@ end
 local CRAB_COLORS = { Color3.fromRGB(220, 80, 50), Color3.fromRGB(240, 130, 40), Color3.fromRGB(180, 60, 90) }
 
 local function addCrab()
-	-- Anywhere on open seabed, not buried in the row of reef mounds (World's PLOT_ROW_Z = 45).
+	-- Anywhere on open seabed, not buried in the row of reef mounds.
+	local clear = ReefConfig.bedRadius(ReefConfig.MAX_SLOTS) + 10
 	local home
 	repeat
 		home = Vector3.new(rng:NextNumber(AREA.minX, AREA.maxX), 0, rng:NextNumber(AREA.minZ, AREA.maxZ))
-	until math.abs(home.Z - 45) > 28
+	until math.abs(home.Z - ReefConfig.PLOT_ROW_Z) > clear
 	local facing = CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
 	local phase = rng:NextNumber(0, math.pi * 2)
 	-- Crabs scuttle sideways, back and forth along their own right-hand axis.

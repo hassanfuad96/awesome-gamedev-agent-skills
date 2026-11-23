@@ -44,16 +44,18 @@ ReefConfig.MAX_SEEDS_PER_TYPE = 999
 -- Plot layout. Coral is planted anywhere inside the plot's round reef bed; each coral
 -- uses one slot, and every slot bought also widens the bed.
 ReefConfig.STARTING_SLOTS = 6
-ReefConfig.MAX_SLOTS = 12
-ReefConfig.BED_RADIUS = 11 -- studs, with the starting slots
-ReefConfig.BED_RADIUS_PER_SLOT = 0.75 -- extra radius for each slot bought
+ReefConfig.MAX_SLOTS = 20
+ReefConfig.BED_RADIUS = 16.5 -- studs, with the starting slots
+ReefConfig.BED_RADIUS_PER_SLOT = 0.55 -- extra radius for each slot bought (24.2 at 20 slots)
 ReefConfig.PLANT_SPACING = 5 -- minimum studs between two corals
 ReefConfig.PLANT_EDGE = 1.5 -- keep coral this far inside the bed's edge
-ReefConfig.PLANT_REACH = 50 -- how far from your character you can plant
+ReefConfig.PLANT_REACH = 60 -- how far from your character you can plant
 ReefConfig.PLOT_COUNT = 6 -- one plot per player; set the place's max players to 6
+ReefConfig.PLOT_SPACING = 64 -- studs between plot centres, along X
+ReefConfig.PLOT_ROW_Z = 55 -- the plots' row, behind the stands
 
 -- Growing the reef: price of the n-th extra slot = floor(baseCost * costGrowth ^ n)
-ReefConfig.EXPAND = { baseCost = 200, costGrowth = 2.5 }
+ReefConfig.EXPAND = { baseCost = 200, costGrowth = 2 }
 
 ReefConfig.SEED_ORDER = { "kelp", "brain", "fan", "anemone", "clam", "star" }
 
