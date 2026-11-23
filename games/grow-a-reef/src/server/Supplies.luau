@@ -1,5 +1,6 @@
 --!nonstrict
--- Reef Supplies: fences, decorations and gear upgrades, bought at the Reef Supplies stand.
+-- The Upgrade Station: fences, decorations and gear upgrades (reef expansion is here too,
+-- handled by Shop). Bought at the Upgrade Station counter, worldParts.suppliesStand.
 -- Remotes carry ids only; prices and limits come from ReefConfig.
 --   BuyFence <id> / EquipFence <id>   buy a fence style (it goes up at once) or swap styles
 --   BuyDecor <id> / PlaceDecor <id> <point>   buy a decoration, then place it on your reef
@@ -55,7 +56,7 @@ local function onBuyFence(player: Player, fenceId: unknown)
 		return
 	end
 	if not isNear(player) then
-		Plots.notify(player, "Walk over to Reef Supplies to buy fences.")
+		Plots.notify(player, "Walk over to the Upgrade Station to buy fences.")
 		return
 	end
 	if not pay(player, profile, fence.price) then
@@ -91,7 +92,7 @@ local function onBuyDecor(player: Player, itemId: unknown)
 		return
 	end
 	if not isNear(player) then
-		Plots.notify(player, "Walk over to Reef Supplies to buy decorations.")
+		Plots.notify(player, "Walk over to the Upgrade Station to buy decorations.")
 		return
 	end
 	local owned = (profile.data.decorStorage[itemId] or 0) + (PlayerData.placedCounts(profile.data)[itemId] or 0)
@@ -133,7 +134,7 @@ local function onUpgradeGear(player: Player, gearId: unknown)
 		return
 	end
 	if not isNear(player) then
-		Plots.notify(player, "Walk over to Reef Supplies to upgrade your gear.")
+		Plots.notify(player, "Walk over to the Upgrade Station to upgrade your gear.")
 		return
 	end
 	if not pay(player, profile, gear.costs[level + 1]) then

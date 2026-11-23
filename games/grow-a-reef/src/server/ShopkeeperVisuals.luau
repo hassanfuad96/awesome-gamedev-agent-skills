@@ -102,6 +102,36 @@ local builders: { [string]: (Model, CFrame) -> () } = {
 		piece(model, "Bridge", Vector3.new(0.3, 0.08, 0.08), base * CFrame.new(0, 1.8, -3.05), BRASS, Enum.Material.Metal)
 		piece(model, "Smile", Vector3.new(0.5, 0.08, 0.05), base * CFrame.new(0, 1.35, -3), DARK, Enum.Material.SmoothPlastic)
 	end,
+
+	-- Inky, the tutorial guide: a purple octopus with big eyes and a teal scarf, sitting on
+	-- a rock with eight tentacles curling out over it.
+	Guide = function(model, base)
+		local skin = Color3.fromRGB(156, 96, 210)
+		local belly = Color3.fromRGB(205, 160, 240)
+		piece(model, "Head", Vector3.new(3.4, 3.4, 3.4), base * CFrame.new(0, 3.3, 0), skin, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+		piece(model, "Mantle", Vector3.new(2.6, 2.6, 2.6), base * CFrame.new(0, 4.6, 0.7), skin, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+		for _, side in { -1, 1 } do
+			piece(model, "Eye", Vector3.new(1.2, 1.2, 1.2), base * CFrame.new(side * 0.72, 3.6, -1.25), Color3.new(1, 1, 1), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+			piece(model, "Pupil", Vector3.new(0.55, 0.55, 0.55), base * CFrame.new(side * 0.7, 3.6, -1.8), DARK, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+			piece(model, "Shine", Vector3.new(0.2, 0.2, 0.2), base * CFrame.new(side * 0.6, 3.75, -2.05), Color3.new(1, 1, 1), Enum.Material.Neon, Enum.PartType.Ball)
+			piece(model, "Cheek", Vector3.new(0.5, 0.5, 0.5), base * CFrame.new(side * 1.25, 2.95, -1.25), Color3.fromRGB(255, 150, 190), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+		end
+		piece(model, "Smile", Vector3.new(0.7, 0.12, 0.1), base * CFrame.new(0, 2.75, -1.62), DARK, Enum.Material.SmoothPlastic)
+		piece(model, "Scarf", Vector3.new(0.7, 3.3, 3.3), base * CFrame.new(0, 1.85, 0) * UPRIGHT, Color3.fromRGB(60, 200, 190), Enum.Material.Fabric, Enum.PartType.Cylinder)
+		piece(model, "ScarfTail", Vector3.new(0.8, 1.4, 0.25), base * CFrame.new(0.9, 1.3, -1.5) * CFrame.Angles(0, 0, math.rad(-15)), Color3.fromRGB(60, 200, 190), Enum.Material.Fabric)
+		-- Eight tentacles: a chain of shrinking balls running out and curling up at the tip.
+		for arm = 0, 7 do
+			local angle = (arm + 0.5) / 8 * math.pi * 2
+			local out = Vector3.new(math.sin(angle), 0, -math.cos(angle))
+			for k = 0, 4 do
+				local reach = 1.1 + k * 0.55
+				local lift = 1.35 - k * 0.22 + (if k == 4 then 0.45 else 0)
+				local size = 0.95 - k * 0.13
+				local position = out * reach + Vector3.new(0, lift, 0)
+				piece(model, "Tentacle", Vector3.new(size, size, size), base * CFrame.new(position), if k == 4 then belly else skin, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+			end
+		end
+	end,
 }
 
 function ShopkeeperVisuals.build(kind: string, base: CFrame): Model

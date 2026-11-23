@@ -56,6 +56,7 @@ export type Data = {
 	likes: number, -- likes other players gave your reef
 	liked: { [string]: number }, -- reefs you liked (owner user id) and the day you did
 	indexRewarded: { [string]: true }, -- Reef Index sets whose IndexRewards were given
+	tutorial: number, -- the Starter Lagoon step you're on; past the last step = finished
 }
 
 export type Profile = {
@@ -115,6 +116,7 @@ local function defaultData(): Data
 		likes = 0,
 		liked = {},
 		indexRewarded = {},
+		tutorial = 1,
 	}
 end
 
@@ -395,6 +397,14 @@ local function sanitize(raw: any): Data
 	data.indexRewarded = cleanKeySet(raw.indexRewarded, function(id)
 		return ReefConfig.IndexRewards[id] ~= nil
 	end)
+	-- Saves from before the tutorial: anyone who has already grown or earned something has
+	-- played, so they skip it.
+	local finished = #ReefConfig.Tutorial.steps + 1
+	if type(raw.tutorial) == "number" and raw.tutorial == raw.tutorial then
+		data.tutorial = math.clamp(math.floor(raw.tutorial), 1, finished)
+	elseif data.totalEarned > 0 or data.harvested > 0 or next(data.plants) ~= nil then
+		data.tutorial = finished
+	end
 
 	return data
 end
@@ -661,6 +671,7 @@ function PlayerData.sync(player: Player)
 		titles = data.titles,
 		title = data.title,
 		likes = data.likes,
+		tutorial = data.tutorial,
 	})
 end
 

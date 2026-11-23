@@ -14,6 +14,7 @@ local EventState = require(script.Parent.EventState)
 local Pets = require(script.Parent.Pets)
 local ReefIndex = require(script.Parent.ReefIndex)
 local Quests = require(script.Parent.Quests)
+local Tutorial = require(script.Parent.Tutorial)
 local RateLimit = require(script.Parent.RateLimit)
 
 local Fish = {}
@@ -197,7 +198,9 @@ function Fish.start()
 					if countFish(player) >= ReefConfig.Fish.maxPerPlot then
 						break
 					end
-					if rng:NextNumber() < ReefConfig.Fish.spawnChance then
+					-- On the tutorial's fish step, every ready coral brings one, so nobody waits.
+					local chance = if Tutorial.isOn(player, "fish") then 1 else ReefConfig.Fish.spawnChance
+					if rng:NextNumber() < chance then
 						spawnFish(player, coral)
 					end
 				end

@@ -91,11 +91,14 @@ function SeabedDecor.build(root: Instance, rng: Random, isClear: (number, number
 	folder.Name = "SeabedDecor"
 	folder.Parent = root
 
-	-- Kelp forests stand towards the edges, where they frame the view without hiding reefs.
+	-- Kelp forests stand round the lagoon's rocky rim, where they frame the view without
+	-- hiding reefs.
+	local center = ReefConfig.Lagoon.center
 	local function nearEdge(x: number, z: number): boolean
-		return math.abs(x) > AREA.maxX - 60 or z < AREA.minZ + 35 or z > AREA.maxZ - 40
+		local dx, dz = x - center.X, z - center.Z
+		return dx * dx + dz * dz > 285 * 285
 	end
-	for _ = 1, 12 do
+	for _ = 1, 18 do
 		local center = spot(rng, isClear, nearEdge)
 		if center then
 			for _ = 1, rng:NextInteger(6, 9) do

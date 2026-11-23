@@ -42,7 +42,9 @@ local ReefConfig = {}
 -- Index, pets; 2: free planting; 1: tile grid
 ReefConfig.DATA_VERSION = 4
 ReefConfig.STARTING_SHELLS = 40
-ReefConfig.STARTING_SEEDS = { kelp = 3 } :: { [string]: number }
+-- New players start with no seeds: Inky, the tutorial guide by the spawn, hands out the
+-- first ones (ReefConfig.Tutorial.firstSeeds).
+ReefConfig.STARTING_SEEDS = {} :: { [string]: number }
 ReefConfig.MAX_SEEDS_PER_TYPE = 999
 
 -- Plot layout. Coral is planted anywhere inside the plot's round reef bed; each coral
@@ -55,8 +57,56 @@ ReefConfig.PLANT_SPACING = 5 -- minimum studs between two corals
 ReefConfig.PLANT_EDGE = 1.5 -- keep coral this far inside the bed's edge
 ReefConfig.PLANT_REACH = 60 -- how far from your character you can plant
 ReefConfig.PLOT_COUNT = 6 -- one plot per player; set the place's max players to 6
-ReefConfig.PLOT_SPACING = 126 -- studs between plot centres, along X
-ReefConfig.PLOT_ROW_Z = 85 -- the plots' row, behind the stands
+
+-- The Starter Lagoon: a round plaza in the middle with the spawn, the buildings on its
+-- sides, and the six reefs in a ring around it, each with its gate facing the plaza.
+-- North is -Z, east is +X. Every position is on the seabed (Y = 0).
+ReefConfig.Lagoon = {
+	center = Vector3.zero, -- the plaza's middle, where new players spawn
+	plazaRadius = 44,
+	plotRing = 200, -- studs from the lagoon centre to each reef's centre
+	firstPlotBearing = 0, -- degrees clockwise from north; the other reefs follow round
+	guide = Vector3.new(12, 0, -10), -- Inky, the tutorial octopus, beside the spawn
+	research = Vector3.new(-42, 0, -80), -- north side: the glass dome (Reef Index, Pet Hatchery)
+	upgrade = Vector3.new(42, 0, -78), -- north side, near the Research Station
+	coralShop = Vector3.new(98, 0, 0), -- east side: buy seeds, sell coral
+	oceanGate = Vector3.new(-122, 0, 0), -- west side: the stone arch out to the open ocean
+	boards = Vector3.new(0, 0, 76), -- south side: the two leaderboards, either side of the path
+}
+
+-- Where reef `index` sits: its centre on the seabed, turned so its gate (local -Z) faces the
+-- plaza. Saved coral and decoration positions are in this frame, so they stay put on any reef.
+function ReefConfig.plotFrame(index: number): CFrame
+	local lagoon = ReefConfig.Lagoon
+	local bearing = math.rad(lagoon.firstPlotBearing + (index - 1) * 360 / ReefConfig.PLOT_COUNT)
+	local center = lagoon.center + Vector3.new(math.sin(bearing), 0, -math.cos(bearing)) * lagoon.plotRing
+	return CFrame.lookAt(center, lagoon.center)
+end
+
+-- A world point as an offset (x, z) in a reef's frame (ReefConfig.plotFrame), and back.
+-- Coral and decorations are saved as these offsets.
+function ReefConfig.plotOffset(frame: CFrame, point: Vector3): (number, number)
+	local offset = frame:PointToObjectSpace(point)
+	return offset.X, offset.Z
+end
+
+function ReefConfig.plotPoint(frame: CFrame, x: number, z: number, y: number): Vector3
+	local point = frame:PointToWorldSpace(Vector3.new(x, 0, z))
+	return Vector3.new(point.X, y, point.Z)
+end
+
+-- Whether (x, z) lies within `margin` studs of any reef's mound.
+function ReefConfig.nearPlot(x: number, z: number, margin: number): boolean
+	local reach = ReefConfig.bedRadius(ReefConfig.MAX_SLOTS) + 3 + margin
+	for index = 1, ReefConfig.PLOT_COUNT do
+		local center = ReefConfig.plotFrame(index).Position
+		local dx, dz = x - center.X, z - center.Z
+		if dx * dx + dz * dz < reach * reach then
+			return true
+		end
+	end
+	return false
+end
 
 -- Growing the reef: price of the n-th extra slot = floor(baseCost * costGrowth ^ n)
 ReefConfig.EXPAND = { baseCost = 200, costGrowth = 1.2 }
@@ -105,11 +155,75 @@ function ReefConfig.adminRole(userId: number): string?
 end
 
 -- Teleporting between the shops and your reef, from the HUD's Shop and Home buttons or the
--- whirlpool pads (one by the stands, one in front of every reef's gate).
+-- whirlpool pads (one in front of the Coral Shop, one in front of every reef's gate).
 ReefConfig.Teleport = {
 	cooldown = 3, -- seconds between teleports
-	shopsPad = Vector3.new(0, 0, 4), -- the plaza pad in front of the stands
+	shopsPad = Vector3.new(66, 0, 0), -- on the east path, in front of the Coral Shop
 }
+
+-- The Starter Lagoon tutorial. Inky (by the spawn) walks every new player through these
+-- steps in order; the HUD shows the current one and points the way. Each step finishes when
+-- the player does `action` (the same names Quests.progress reports), except "guide" (talk
+-- to Inky) and "upgrade" (open the Upgrade Station).
+export type TutorialStep = {
+	id: string,
+	action: string,
+	title: string,
+	hint: string,
+	inky: string, -- what Inky says while this is the current step
+}
+ReefConfig.Tutorial = {
+	firstSeeds = { kelp = 3 } :: { [string]: number }, -- Inky's gift, the first step
+	reward = 150, -- shells for finishing every step
+	steps = {
+		{
+			id = "seed",
+			action = "guide",
+			title = "Collect your first coral seed",
+			hint = "Talk to Inky the octopus, right beside the spawn.",
+			inky = "Welcome to the Starter Lagoon! Here are 3 Bubble Kelp seeds to get you going.",
+		},
+		{
+			id = "plant",
+			action = "plant",
+			title = "Plant your first coral",
+			hint = "Press Home to go to your reef. Pick a seed in your hotbar, then tap the brown reef bed.",
+			inky = "Now press Home, pick a seed in your hotbar and tap the brown bed on your reef.",
+		},
+		{
+			id = "sell",
+			action = "sell",
+			title = "Earn your first shells",
+			hint = "When a coral says Ready!, click it to harvest. Then sell your bag at the Coral Shop (east).",
+			inky = "Harvest coral when it's Ready!, then sell your bag to Pinch at the Coral Shop.",
+		},
+		{
+			id = "fish",
+			action = "fish",
+			title = "Unlock your first fish",
+			hint = "Plant again and let it grow. Fish gather round fully grown coral: click one to catch it.",
+			inky = "Fish love grown coral. Let some grow on your reef, then click a fish to catch it!",
+		},
+		{
+			id = "expand",
+			action = "upgrade",
+			title = "Learn how to expand your reef",
+			hint = "Visit the Upgrade Station on the north side, next to the glass dome.",
+			inky = "Last one! The Upgrade Station, north by the dome, grows your reef and your gear.",
+		},
+	} :: { TutorialStep },
+	doneLines = {
+		"Your reef is looking great! Rare seeds show up in the Coral Shop at every restock.",
+		"Try the Research Station: the Reef Index pays out when you finish a set.",
+		"Sea events start every few minutes. Watch the timer under your shells!",
+		"The Ocean Gate leads to the open ocean. Shipwrecks sink out there sometimes...",
+	},
+}
+
+-- The step a player is on, or nil once they've finished the tutorial.
+function ReefConfig.tutorialStep(step: number): TutorialStep?
+	return ReefConfig.Tutorial.steps[step]
+end
 
 -- Swimming: jumping pushes off into a swim, which is faster than walking (16 studs/s).
 ReefConfig.Swim = {
@@ -529,11 +643,11 @@ for _, event in ReefConfig.Events.list do
 	ReefConfig.EventById[event.id] = event
 end
 
--- The Shipwreck event: a liner sinks onto the seabed in front of the stands, then a pod of
+-- The Shipwreck event: a liner sinks onto the seabed past the Ocean Gate, then a pod of
 -- orcas hunts everyone who isn't hiding inside it. Everyone who was there when the hunt
 -- began and didn't get eaten wins the reward seed.
 ReefConfig.Shipwreck = {
-	landing = Vector3.new(0, 0, -88), -- where the wreck comes to rest, on open seabed
+	landing = Vector3.new(-320, 0, 0), -- out past the Ocean Gate, on open seabed
 	length = 120, -- the hull, which you can swim into through its holes and hatches
 	width = 22,
 	height = 18,
@@ -586,7 +700,7 @@ ReefConfig.Shopkeepers = {
 			"Welcome, diver! Fresh seeds, straight from the deep.",
 			"New here? Bubble Kelp grows in 20 seconds.",
 			"Rare seeds sell out fast. Come back after a restock!",
-			"Short on space? I can grow your reef bigger.",
+			"Short on space? Old Shellby at the Upgrade Station can grow your reef.",
 		},
 	},
 	Sell = {
@@ -607,6 +721,18 @@ ReefConfig.Shopkeepers = {
 			"A Bigger Bag holds more coral between trips to Pinch.",
 			"Fertilizer makes every coral on your reef grow faster.",
 			"Try the Bubble Wand: tap a growing coral to hurry it along.",
+			"Want more room? I can grow your reef, one coral slot at a time.",
+		},
+	},
+	-- The tutorial octopus by the spawn. Talking to Inky (the Guide prompt) gives the tutorial
+	-- lines in ReefConfig.Tutorial instead; these are for walking past.
+	Guide = {
+		name = "Inky",
+		bob = 0.2,
+		greetings = {
+			"Hi there! I'm Inky. Press E to talk to me!",
+			"Welcome to the Starter Lagoon! Talk to me if you're lost.",
+			"Psst! Talk to me for the next step.",
 		},
 	},
 } :: { [string]: ShopkeeperDef }
@@ -615,7 +741,7 @@ ReefConfig.CORAL_TAG = "Coral" -- every planted coral model, for the client's la
 
 -- Ambient sea life (client-side and cosmetic) and where it, and the seabed decoration, roam.
 ReefConfig.SeaLife = {
-	area = { minX = -440, maxX = 440, minZ = -110, maxZ = 230 },
+	area = { minX = -430, maxX = 430, minZ = -430, maxZ = 430 }, -- the whole lagoon and its rim
 	fishSchools = 10, -- each school is one species
 	fishPerSchool = 9,
 	turtles = 3,

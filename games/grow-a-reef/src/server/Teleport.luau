@@ -88,8 +88,9 @@ end
 
 function Teleport.start(worldParts: World.WorldParts)
 	local pad = worldParts.shopsPad.Position
-	-- Land on the plaza pad, facing the stands.
-	shopsArrival = CFrame.lookAt(pad + Vector3.new(0, 3, 0), worldParts.hatcheryStand.Position * Vector3.new(1, 0, 1) + Vector3.new(0, pad.Y + 3, 0))
+	-- Land on the pad in front of the Coral Shop, facing its two counters.
+	local shop = (worldParts.shopStand.Position + worldParts.sellStand.Position) / 2
+	shopsArrival = CFrame.lookAt(pad + Vector3.new(0, 3, 0), Vector3.new(shop.X, pad.Y + 3, shop.Z))
 
 	Remotes.Teleport.OnServerEvent:Connect(function(player, destination)
 		if RateLimit.consume(player) and (destination == "home" or destination == "shops") then

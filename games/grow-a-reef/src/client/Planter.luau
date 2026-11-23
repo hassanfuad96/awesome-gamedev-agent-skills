@@ -3,7 +3,7 @@
 -- green where the coral fits, red where it doesn't (same rules as the server, from
 -- ReefConfig.plantProblem). Clicking or tapping a bed sends only the point (PlantAt); the
 -- server checks everything again and says why when it refuses.
--- Placing a decoration (startPlacing, from the Reef Supplies window) works the same way over
+-- Placing a decoration (startPlacing, from the Upgrade Station window) works the same way over
 -- your whole reef inside the fence, with ReefConfig.decorProblem and PlaceDecor.
 
 local CollectionService = game:GetService("CollectionService")
@@ -69,33 +69,34 @@ local function bedUnder(origin: Vector3, direction: Vector3): (BasePart?, Vector
 	return groundUnder(origin, direction, false)
 end
 
-local function plantsOn(plot: Instance, center: Vector3): { { x: number, z: number } }
+-- Positions on a reef are offsets in its frame (ReefConfig.plotFrame), as the server saves.
+local function plantsOn(plot: Instance, frame: CFrame): { { x: number, z: number } }
 	local result = {}
 	for _, coral in CollectionService:GetTagged(ReefConfig.CORAL_TAG) do
 		if coral.Parent == plot then
-			local position = coral:GetPivot().Position
-			table.insert(result, { x = position.X - center.X, z = position.Z - center.Z })
+			local x, z = ReefConfig.plotOffset(frame, coral:GetPivot().Position)
+			table.insert(result, { x = x, z = z })
 		end
 	end
 	return result
 end
 
-local function decorOn(plot: Instance, center: Vector3): { ReefConfig.PlacedDecor }
+local function decorOn(plot: Instance, frame: CFrame): { ReefConfig.PlacedDecor }
 	local result = {}
 	for _, decor in CollectionService:GetTagged(ReefConfig.DECOR_TAG) do
 		local item = decor:GetAttribute("DecorItem")
 		if decor.Parent == plot and type(item) == "string" then
-			local position = decor:GetPivot().Position
-			table.insert(result, { item = item, x = position.X - center.X, z = position.Z - center.Z })
+			local x, z = ReefConfig.plotOffset(frame, decor:GetPivot().Position)
+			table.insert(result, { item = item, x = x, z = z })
 		end
 	end
 	return result
 end
 
--- The plot's centre on the ground: the bed's middle.
-local function plotCenter(plot: Instance): Vector3?
-	local bed = plot:FindFirstChild("Bed") :: BasePart?
-	return bed and bed.Position
+-- The plot's frame: its centre on the seabed, turned so the gate is at local -Z.
+local function plotFrame(plot: Instance): CFrame?
+	local frame = plot:GetAttribute("PlotFrame")
+	return if typeof(frame) == "CFrame" then frame else nil
 end
 
 local function showGhost(visible: boolean)
@@ -114,20 +115,20 @@ local function updateGhost()
 	local ray = Workspace.CurrentCamera:ViewportPointToRay(mouse.X, mouse.Y)
 	local ground, point = groundUnder(ray.Origin, ray.Direction, placing ~= nil)
 	local plot = ground and ground.Parent
-	local center = plot and plotCenter(plot)
-	if not ground or not center or plot:GetAttribute("OwnerUserId") ~= player.UserId then
+	local frame = plot and plotFrame(plot)
+	if not ground or not frame or plot:GetAttribute("OwnerUserId") ~= player.UserId then
 		showGhost(false)
 		return
 	end
-	local x, z = point.X - center.X, point.Z - center.Z
+	local x, z = ReefConfig.plotOffset(frame, point)
 	local fits, size, tint
 	if placing then
 		local item = ReefConfig.DecorById[placing]
-		fits = ReefConfig.decorProblem(placing, x, z, plantsOn(plot, center), decorOn(plot, center)) == nil
+		fits = ReefConfig.decorProblem(placing, x, z, plantsOn(plot, frame), decorOn(plot, frame)) == nil
 		size = item.footprint * 2
 		tint = Ui.Colors.accent
 	else
-		fits = ReefConfig.plantProblem(x, z, unlocked, plantsOn(plot, center), decorOn(plot, center)) == nil
+		fits = ReefConfig.plantProblem(x, z, unlocked, plantsOn(plot, frame), decorOn(plot, frame)) == nil
 		size = ReefConfig.PLANT_SPACING
 		local seed = ReefConfig.Seeds[selected]
 		tint = seed and seed.color

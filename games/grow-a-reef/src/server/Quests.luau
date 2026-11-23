@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
 local EconomyMath = require(ReplicatedStorage.Shared.EconomyMath)
 local PlayerData = require(script.Parent.PlayerData)
+local Tutorial = require(script.Parent.Tutorial)
 local RateLimit = require(script.Parent.RateLimit)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -30,6 +31,8 @@ function Quests.progress(player: Player, questId: string, amount: number)
 	if not profile or amount <= 0 then
 		return
 	end
+	-- The Starter Lagoon tutorial listens to the same actions.
+	Tutorial.progress(player, questId)
 	local book = PlayerData.freshQuests(profile.data)
 	for i, id in ReefConfig.dailyQuests(book.day) do
 		local quest = ReefConfig.QuestById[id]

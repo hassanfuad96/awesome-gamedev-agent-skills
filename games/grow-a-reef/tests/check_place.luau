@@ -12,18 +12,18 @@ local function check(cond, msg) if cond then print("ok   " .. msg) else failures
 -- 1. Place structure
 local game = roblox.deserializePlace(fs.readFile(process.args[1]))
 local rs = game:GetService("ReplicatedStorage")
-for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify", "Teleport", "Teleported", "AdminAction", "Announcement", "BuyFence", "EquipFence", "BuyDecor", "PlaceDecor", "UpgradeGear", "ClaimQuest", "Rebirth", "EquipTitle" } do
+for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify", "Teleport", "Teleported", "AdminAction", "Announcement", "BuyFence", "EquipFence", "BuyDecor", "PlaceDecor", "UpgradeGear", "ClaimQuest", "Rebirth", "EquipTitle", "GuideLine" } do
 	local r = rs.Remotes:FindFirstChild(name)
 	check(r and r.ClassName == "RemoteEvent", "remote " .. name)
 end
 local server = game:GetService("ServerScriptService").Server
 check(server.Main.ClassName == "Script", "server Main is a Script")
-for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport", "Shipwreck", "ShipwreckVisuals", "Admin", "Quests", "Supplies", "Likes", "Rebirth" } do
+for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport", "Shipwreck", "ShipwreckVisuals", "Admin", "Quests", "Supplies", "Likes", "Rebirth", "Tutorial" } do
 	check(server:FindFirstChild(m) and server[m].ClassName == "ModuleScript", "server module " .. m)
 end
 local client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 check(client.Main.ClassName == "LocalScript", "client Main is a LocalScript")
-for _, m in { "Swimming", "AdminPanel", "SuppliesPanel", "QuestsPanel", "NameTags" } do
+for _, m in { "Swimming", "AdminPanel", "SuppliesPanel", "QuestsPanel", "NameTags", "TutorialPanel" } do
 	check(client:FindFirstChild(m) and client[m].ClassName == "ModuleScript", "client module " .. m)
 end
 check(rs.Shared.ReefConfig.ClassName == "ModuleScript", "shared ReefConfig")
@@ -56,13 +56,44 @@ check(Config.harvestValue("nope", "None") == 0, "unknown seed sells for 0")
 check(Config.expandCost(10) == 200 and Config.expandCost(11) == 240 and Config.expandCost(49) == 244961, "expand costs 200, 240 ... 244,961")
 check(Config.bedRadius(10) == 37 and math.abs(Config.bedRadius(50) - 54) < 1e-9, "reef bed grows from 37 to 54 studs")
 local maxReach = Config.bedRadius(Config.MAX_SLOTS) + 7
-check(Config.PLOT_SPACING >= maxReach * 2, "neighbouring reef mounds don't overlap")
-local rowHalf = (Config.PLOT_COUNT - 1) * Config.PLOT_SPACING / 2 + maxReach
-check(rowHalf < Config.SeaLife.area.maxX and rowHalf < 600, "the row of reefs fits inside the sea area and the seabed")
+-- The Starter Lagoon: reefs in a ring round the plaza, buildings in between.
+local Lagoon = Config.Lagoon
+local V3 = roblox.Vector3
+local function flat(v) return V3.new(v.X, 0, v.Z) end
+local ringOk, gatesOk, insideOk = true, true, true
+for i = 1, Config.PLOT_COUNT do
+	local frame = Config.plotFrame(i)
+	local nextFrame = Config.plotFrame(i % Config.PLOT_COUNT + 1)
+	ringOk = ringOk and (frame.Position - nextFrame.Position).Magnitude >= maxReach * 2 + 4
+	local toPlaza = flat(Lagoon.center - frame.Position).Unit
+	gatesOk = gatesOk and frame.LookVector:Dot(toPlaza) > 0.999
+	local far = (frame.Position - Lagoon.center).Magnitude + maxReach
+	insideOk = insideOk and far < Config.SeaLife.area.maxX and far < 600
+end
+check(ringOk, "neighbouring reef mounds don't overlap")
+check(gatesOk, "every reef's gate (local -Z) faces the plaza")
+check(insideOk, "the ring of reefs fits inside the sea area and the seabed")
+local buildings = { guide = 4, research = 26, upgrade = 16, coralShop = 30, oceanGate = 30, boards = 34 }
+for name, radius in buildings do
+	local at = Lagoon[name]
+	check(not Config.nearPlot(at.X, at.Z, radius), "the " .. name .. " stands clear of every reef")
+end
+check((Lagoon.guide - Lagoon.center).Magnitude < Config.SHOPKEEPER_GREET_DISTANCE, "Inky is close enough to the spawn to greet new players")
+check(Lagoon.research.Z < -40 and Lagoon.upgrade.Z < -40 and (Lagoon.upgrade - Lagoon.research).Magnitude < 100, "the Research and Upgrade Stations are on the north side, near each other")
+check(Lagoon.coralShop.X > 60 and math.abs(Lagoon.coralShop.Z) < 10, "the Coral Shop is on the east side")
+check(Lagoon.oceanGate.X < -60 and math.abs(Lagoon.oceanGate.Z) < 10, "the Ocean Gate is on the west side")
+local frame3 = Config.plotFrame(3)
+local x3, z3 = Config.plotOffset(frame3, Config.plotPoint(frame3, 12.5, -7.25, 1.4))
+check(math.abs(x3 - 12.5) < 1e-6 and math.abs(z3 + 7.25) < 1e-6, "plot offsets round-trip through world space on a turned reef")
+check(Config.STARTING_SEEDS.kelp == nil and Config.Tutorial.firstSeeds.kelp == 3, "new players get their first seeds from Inky")
+local actions = {}
+for _, step in Config.Tutorial.steps do table.insert(actions, step.action) end
+check(table.concat(actions, ",") == "guide,plant,sell,fish,upgrade", "tutorial: seed, plant, sell, fish, expand")
 check(Config.plantProblem(0, 0, 10, {}) == nil, "coral fits in the middle of an empty bed")
 check(Config.plantProblem(35.6, 0, 10, {}) ~= nil and Config.plantProblem(35.4, 0, 10, {}) == nil, "coral must stay 1.5 studs inside the bed edge")
 check(Config.Swim.speed > 16 and Config.Swim.rise > 0 and Config.Swim.sink > 0, "swimming is faster than walking (16)")
-check(Config.Teleport.cooldown > 0 and Config.Teleport.shopsPad.Z > -15, "teleport has a cooldown and the shops pad clears the stands")
+local pad = Config.Teleport.shopsPad
+check(Config.Teleport.cooldown > 0 and (pad - Lagoon.coralShop).Magnitude < 40 and (pad - Lagoon.coralShop).Magnitude > 20, "teleport has a cooldown and the shops pad sits in front of the Coral Shop")
 check(Config.adminRole(5067168140) == "Owner" and Config.adminRole(1) == nil, "far_rel2017 (5067168140) is the owner; others are not admins")
 local giftsOk = #Config.Admin.giftShells > 0
 for _, amount in Config.Admin.giftShells do giftsOk = giftsOk and amount > 0 and amount % 1 == 0 end
@@ -106,7 +137,11 @@ local reward = Config.Seeds[ship.reward.seed]
 check(reward ~= nil and reward.shop == false and reward.rarity == "Transcendent" and reward.stockChance == 0, "the reward seed is Transcendent and never in the shop")
 local rest = roblox.CFrame.new(ship.landing)
 check(Config.insideShipwreck(rest, ship.landing + roblox.Vector3.new(10, 5, 3)) and not Config.insideShipwreck(rest, ship.landing + roblox.Vector3.new(0, 5, 20)) and not Config.insideShipwreck(rest, ship.landing + roblox.Vector3.new(0, 30, 0)), "inside the hull is hidden; beside or above it is not")
-check(ship.landing.Z + ship.width / 2 < -30 and ship.landing.Z - ship.width / 2 > Config.SeaLife.area.minZ, "the wreck lands on open seabed in front of the stands")
+local landingClear = true
+for dx = -ship.length / 2, ship.length / 2, 10 do
+	landingClear = landingClear and not Config.nearPlot(ship.landing.X + dx, ship.landing.Z, ship.width / 2)
+end
+check(landingClear and ship.landing.X < Lagoon.oceanGate.X and ship.landing.X - ship.length / 2 > Config.SeaLife.area.minX, "the wreck lands on open seabed out past the Ocean Gate")
 
 -- Stacked mutations
 check(Config.harvestValue("kelp", "Glowing+Golden") == 180, "Glowing + Golden Bubble Kelp sells at x10 (180)")

@@ -1,5 +1,6 @@
 --!nonstrict
--- The Reef Supplies window, opened at the Reef Supplies stand. Three tabs:
+-- The Upgrade Station window, opened at the Upgrade Station counter. Four tabs:
+--   Reef    grow your reef: one more coral slot and a wider bed (ExpandReef, in Shop)
 --   Fences  buy a fence style, or switch to one you own
 --   Decor   buy decorations, then Place them on your reef (Planter does the placing)
 --   Gear    upgrade Fertilizer, the Bubble Wand and your bag
@@ -32,13 +33,14 @@ export type SuppliesPanel = typeof(setmetatable(
 		fenceRows: { [string]: FenceRow },
 		decorRows: { [string]: DecorRow },
 		gearRows: { [string]: GearRow },
+		reefRow: { detail: TextLabel, button: TextButton },
 		data: any,
 		stand: BasePart?,
 	},
 	SuppliesPanel
 ))
 
-local TABS = { { id = "fences", text = "Fences" }, { id = "decor", text = "Decor" }, { id = "gear", text = "Gear" } }
+local TABS = { { id = "reef", text = "Reef" }, { id = "gear", text = "Gear" }, { id = "fences", text = "Fences" }, { id = "decor", text = "Decor" } }
 local BLUE = Color3.fromRGB(60, 120, 200)
 
 -- The Reef Index set whose reward is this fence, for fences you can't buy.
@@ -126,7 +128,7 @@ function SuppliesPanel.new(playerGui: PlayerGui, onPlace: (string) -> ()): Suppl
 	Ui.scaleWindow(root, Vector2.new(0.92, 0.94), Vector2.new(600, 580))
 	Ui.label({
 		Name = "Title",
-		Text = "Reef Supplies",
+		Text = "Upgrade Station",
 		Font = Ui.TitleFont,
 		MaxTextSize = 30,
 		Size = UDim2.new(0.5, 0, 0, 34),
@@ -168,7 +170,7 @@ function SuppliesPanel.new(playerGui: PlayerGui, onPlace: (string) -> ()): Suppl
 		status = status,
 		tabs = {},
 		lists = {},
-		tab = "fences",
+		tab = "reef",
 		fenceRows = {},
 		decorRows = {},
 		gearRows = {},
@@ -205,6 +207,27 @@ function SuppliesPanel.new(playerGui: PlayerGui, onPlace: (string) -> ()): Suppl
 		}, {
 			Ui.new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) }),
 		})
+	end
+
+	-- Reef: how big your reef is, and the button to grow it by one slot.
+	do
+		local frame = row(self.lists.reef, "GrowReef", 1, 96)
+		title(frame, "Grow your reef", 12, UDim.new(1, -170))
+		local info = detail(frame, 12, 34, UDim.new(1, -170), 54)
+		local button = Ui.button({
+			Name = "Expand",
+			Text = "",
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -10, 0.5, 0),
+			Size = UDim2.fromOffset(150, 56),
+			BackgroundColor3 = BLUE,
+			MaxTextSize = 16,
+			Parent = frame,
+		})
+		button.Activated:Connect(function()
+			Remotes.ExpandReef:FireServer()
+		end)
+		self.reefRow = { detail = info, button = button }
 	end
 
 	-- Fences: a strip of the style's colours, its name and price, and Buy / Use.
@@ -365,6 +388,18 @@ function SuppliesPanel.render(self: SuppliesPanel)
 	end
 	local shells = data.shells
 	self.status.Text = `{EconomyMath.formatNumber(shells)} shells`
+
+	local cost = data.expandCost
+	local reef = self.reefRow
+	if cost then
+		reef.detail.Text = `{data.unlocked} of {ReefConfig.MAX_SLOTS} coral slots. Each new slot lets you plant one more coral and widens your reef bed.`
+		reef.button.Text = `+1 slot · {EconomyMath.formatNumber(cost)}`
+		reef.button.BackgroundColor3 = if shells >= cost then BLUE else Ui.Colors.buttonDisabled
+	else
+		reef.detail.Text = `Your reef is fully grown: {ReefConfig.MAX_SLOTS} coral slots.`
+		reef.button.Text = "Fully grown"
+		reef.button.BackgroundColor3 = Ui.Colors.buttonDisabled
+	end
 
 	for _, fence in ReefConfig.Fences do
 		local r = self.fenceRows[fence.id]

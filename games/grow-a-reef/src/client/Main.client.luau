@@ -24,6 +24,7 @@ local ShopPanel = require(script.Parent.ShopPanel)
 local Shopkeepers = require(script.Parent.Shopkeepers)
 local SuppliesPanel = require(script.Parent.SuppliesPanel)
 local Swimming = require(script.Parent.Swimming)
+local TutorialPanel = require(script.Parent.TutorialPanel)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local player = Players.LocalPlayer
@@ -76,6 +77,7 @@ Remotes.DataSync.OnClientEvent:Connect(function(data)
 	quests:setData(data)
 	supplies:setData(data)
 	hud:setQuestReady(QuestsPanel.readyToClaim(data))
+	TutorialPanel.setData(data)
 	refreshPlacing()
 end)
 
@@ -108,6 +110,13 @@ Remotes.Announcement.OnClientEvent:Connect(function(from, text, global)
 	end
 end)
 
+-- Inky's tutorial lines, already chosen by the server.
+Remotes.GuideLine.OnClientEvent:Connect(function(text)
+	if type(text) == "string" then
+		Shopkeepers.say("Guide", text)
+	end
+end)
+
 Remotes.Teleported.OnClientEvent:Connect(function()
 	Swimming.stop()
 	hud:flash()
@@ -126,6 +135,10 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, triggeredBy)
 	elseif kind == "Supplies" then
 		closeSidePanels()
 		supplies:setOpen(true, prompt.Parent :: BasePart)
+	elseif kind == "Index" then
+		-- The Reef Index hologram in the Research Station; the side button opens it anywhere.
+		closeSidePanels()
+		index:setOpen(true)
 	end
 end)
 
@@ -180,7 +193,8 @@ OceanEffects.start()
 PetFollowers.start()
 Swimming.start()
 NameTags.start()
+TutorialPanel.start(playerGui)
 
 -- Ask for a snapshot in case DataSync fired before these handlers connected.
 Remotes.RequestSync:FireServer()
-hud:toast("Welcome to Grow a Reef! Buy seeds at the Seed Shop, plant them on your reef.", "good")
+hud:toast("Welcome to the Starter Lagoon! Talk to Inky the octopus to get started.", "good")

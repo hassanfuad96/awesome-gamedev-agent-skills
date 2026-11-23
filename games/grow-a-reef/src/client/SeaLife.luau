@@ -223,8 +223,9 @@ end
 
 -- The Whale Pass whale crosses the whole map overhead during the event. Its path runs on
 -- server time, so every player sees it in the same place.
-local WHALE_FROM = Vector3.new(AREA.minX - 40, 55, ReefConfig.PLOT_ROW_Z)
-local WHALE_TO = Vector3.new(AREA.maxX + 40, 55, ReefConfig.PLOT_ROW_Z)
+-- It swims west to east straight over the plaza, between the north and south reefs.
+local WHALE_FROM = Vector3.new(AREA.minX - 40, 55, ReefConfig.Lagoon.center.Z)
+local WHALE_TO = Vector3.new(AREA.maxX + 40, 55, ReefConfig.Lagoon.center.Z)
 
 local function addWhale(startedAt: number, endsAt: number): Creature
 	local serverOffset = Workspace:GetServerTimeNow() - os.clock()
@@ -264,12 +265,12 @@ end
 local CRAB_COLORS = { Color3.fromRGB(220, 80, 50), Color3.fromRGB(240, 130, 40), Color3.fromRGB(180, 60, 90) }
 
 local function addCrab()
-	-- Anywhere on open seabed, not buried in the row of reef mounds.
-	local clear = ReefConfig.bedRadius(ReefConfig.MAX_SLOTS) + 10
+	-- Anywhere on open seabed: not buried in a reef mound or scuttling across the plaza.
+	local plaza = ReefConfig.Lagoon.plazaRadius + 10
 	local home
 	repeat
 		home = Vector3.new(rng:NextNumber(AREA.minX, AREA.maxX), 0, rng:NextNumber(AREA.minZ, AREA.maxZ))
-	until math.abs(home.Z - ReefConfig.PLOT_ROW_Z) > clear
+	until not ReefConfig.nearPlot(home.X, home.Z, 7) and (home - ReefConfig.Lagoon.center).Magnitude > plaza
 	local facing = CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
 	local phase = rng:NextNumber(0, math.pi * 2)
 	-- Crabs scuttle sideways, back and forth along their own right-hand axis.

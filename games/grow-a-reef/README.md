@@ -8,25 +8,56 @@ tracks every coral and fish you find, and pets hatched from eggs follow you and 
 Written in Luau as a [Rojo](https://rojo.space) project, following the Roblox skills in this
 repository (`skills/other-engines/roblox-*`).
 
+## The Starter Lagoon
+
+Every new player starts in the middle of the lagoon, on the glowing dais in the plaza.
+
+| Place | Where | What it's for |
+|---|---|---|
+| Spawn | Centre of the plaza | Where new players appear. |
+| Inky, the tutorial guide | Beside the spawn | A purple octopus. Talk to him (E) for your first seeds and the next tutorial step. |
+| Research Station | North | The glass dome from the concept art: the **Reef Index** hologram in the middle, the **Pet Hatchery** counter at the back, a submarine parked outside. |
+| Upgrade Station | North, next to the dome | Old Shellby the turtle: **grow your reef**, gear, fences and decorations. |
+| Coral Shop | East | Two counters: **Seeds** (Captain Coralie) and **Sell Coral** (Pinch). The Shop teleport lands in front of it. |
+| Ocean Gate | West | A huge stone arch out to the open ocean. Shipwrecks sink out past it. |
+| Reefs | All around | The six player reefs in a ring round the plaza, each gate facing the middle, with sand paths and jellyfish lamps leading to them. |
+| Leaderboards | South | Top Reefs and Best Reefs, either side of the south path. |
+
+The layout lives in `ReefConfig.Lagoon` (north is -Z). Each reef is turned to face the plaza
+(`ReefConfig.plotFrame`), and coral and decoration positions are saved in the reef's own frame,
+so they stay put whichever reef a player gets.
+
+**Tutorial.** Inky walks every new player through five steps; a card at the top right shows the
+current one, and a glowing beam and marker point the way:
+
+1. Collect your first coral seed: talk to Inky (he gives 3 Bubble Kelp seeds).
+2. Plant your first coral.
+3. Earn your first shells: harvest it and sell at the Coral Shop.
+4. Unlock your first fish: catch one at your reef (fish come to every grown coral on this step).
+5. Learn how to expand your reef: visit the Upgrade Station.
+
+Finishing pays 150 shells. Players who already had progress before the tutorial existed skip it.
+Players still in the tutorial start at the plaza; everyone else starts at home.
+
 ## How to play
 
 | Do this | How |
 |---|---|
-| Buy seeds | Walk to the **Seed Shop** (green stand) and press the prompt (E / tap). |
+| Buy seeds | Walk to the **Coral Shop** (east), press the prompt at the green **Seeds** counter (E / tap). |
 | Plant | Pick a seed in the hotbar at the bottom, then click or tap anywhere on your reef bed (the round brown patch). With a mouse, a ring shows where it goes: green fits, red is too close to other coral or the edge. |
 | Harvest | Click fully grown coral (its label says "Ready!"). It goes into your bag. |
-| Sell | Walk to **Sell Coral** (orange stand) and press the prompt. Everything in your bag sells. |
+| Sell | Press the prompt at the orange **Sell Coral** counter in the Coral Shop. Everything in your bag sells. |
 | Catch fish | Fish swim around grown coral on your reef. Click them before they swim off. |
-| Grow your reef | You start with 10 coral slots. In the Seed Shop, "Grow your reef" adds a slot (up to 50) and widens your bed, from 74 studs across to 108. |
-| Fences and decorations | At **Reef Supplies** (blue stand, kept by Old Shellby the turtle) buy fence styles and decorations. Press **Place** on a decoration, go home, and tap anywhere inside your fence (not on coral or the gateway). Hold the prompt on a placed one to pick it up. |
-| Gear | Also at Reef Supplies: **Fertilizer** (coral grows faster), **Bubble Wand** (click a growing coral to speed it up) and **Bigger Bag** (your bag holds 30 coral, +30 a level). |
+| Grow your reef | You start with 10 coral slots. At the **Upgrade Station**, the Reef tab adds a slot (up to 50) and widens your bed, from 74 studs across to 108. |
+| Fences and decorations | At the **Upgrade Station** (north, kept by Old Shellby the turtle) buy fence styles and decorations. Press **Place** on a decoration, go home, and tap anywhere inside your fence (not on coral or the gateway). Hold the prompt on a placed one to pick it up. |
+| Gear | Also at the Upgrade Station: **Fertilizer** (coral grows faster), **Bubble Wand** (click a growing coral to speed it up) and **Bigger Bag** (your bag holds 30 coral, +30 a level). |
 | Quests | **Quests** on the left: three daily quests, the same for everyone, new each day (UTC). Claim the reward when one is done; a red "!" shows when one is waiting. |
 | Rebirth | In the Quests window. Pay the rebirth cost to start over for +25% shells from coral and fish, forever. You keep pets, the Index, fences, decorations, gear and titles. |
 | Titles | Pick one in the Quests window; it shows over your head. Earned from Reef Index sets and from rebirthing. |
 | Like a reef | Visit someone's reef and press **F** at the sign over its gate (once a day per reef). The sign shows its likes, and the **Best Reefs** board ranks them. |
-| Reef Index | Press **Index** on the left. Every coral in every mutation combo, and every fish. |
-| Pets | Hatch eggs at the **Pet Hatchery** (purple stand), then take pets out from **Pets** on the left. |
-| Teleport | **Shop** and **Home** on the right take you to the stands or your reef (3 s cooldown). The glowing whirlpool pads by the stands and in front of each reef gate do the same. |
+| Reef Index | Press **Index** on the left, or use the hologram in the Research Station. Every coral in every mutation combo, and every fish. |
+| Pets | Hatch eggs at the **Pet Hatchery** counter inside the Research Station, then take pets out from **Pets** on the left. |
+| Teleport | **Shop** and **Home** on the right take you to the Coral Shop or your reef (3 s cooldown). The glowing whirlpool pads in front of the Coral Shop and each reef gate do the same. |
 | Swim | Jump to start swimming: about twice walking speed, in the direction the camera points (tilt it well down or up to dive or rise). Hold jump to swim up; let go of everything to drift down and land. |
 
 The whole map is underwater: deep-blue haze instead of sky, a glowing surface with light shafts
@@ -35,8 +66,9 @@ specks and diver bubbles near you. Schools of reef fish, sea turtles, jellyfish,
 and crabs swim around. They are decoration and can't be caught; the fish to catch are the
 ones that gather around your own grown coral.
 
-Each stand has a shopkeeper: Captain Coralie, a diver behind the Seed Shop counter, and Pinch,
-a crab on the Sell Coral counter. They turn to face you and greet you when you walk up. Their
+Each counter has a shopkeeper: Captain Coralie, a diver behind the Seeds counter, Pinch, a crab
+on the Sell Coral counter, and Old Shellby, a turtle at the Upgrade Station; Inky the octopus waits
+by the spawn. They turn to face you and greet you when you walk up. Their
 names and lines are in `ReefConfig.Shopkeepers`.
 
 ### Mutations and sea events
@@ -67,7 +99,7 @@ shows the event running.
 | Feeding Frenzy | 60 s | Fish come to grown coral twice as fast. |
 | Treasure Storm | 40 s | Chests sink onto the plaza and reefs. Anyone can hold E (or tap) to open one for 30-200 shells, or sometimes rare seeds. Unopened chests wash away after 45 s. |
 | Whale Pass | 50 s | A giant whale crosses overhead, and all coral grows twice as fast while it's there. |
-| Shipwreck (5%) | 55 s | A liner sinks onto the seabed in front of the stands. 20 s after it starts, six orcas arrive and hunt for 30 s. They are faster than swimming, so swim inside the wreck (through the holes in its sides or the deck hatches) and stay there. Anyone caught is eaten and respawns at home. Everyone who was there when the orcas came and wasn't eaten gets a **Seagrass** seed. The HUD says whether you are hidden. |
+| Shipwreck (5%) | 55 s | A liner sinks onto the seabed out past the Ocean Gate. 20 s after it starts, six orcas arrive and hunt for 30 s. They are faster than swimming, so swim inside the wreck (through the holes in its sides or the deck hatches) and stay there. Anyone caught is eaten and respawns at home. Everyone who was there when the orcas came and wasn't eaten gets a **Seagrass** seed. The HUD says whether you are hidden. |
 
 ### Reef Index
 
@@ -80,7 +112,7 @@ To also award a badge, create it on the Creator Dashboard and put its id in
 
 ### Pets
 
-Eggs are sold at the **Pet Hatchery** for shells, and every outcome's odds are shown before
+Eggs are sold at the **Pet Hatchery** (inside the Research Station) for shells, and every outcome's odds are shown before
 you buy:
 
 | Egg | Price | Seahorse | Pufferfish | Octopus |
@@ -116,7 +148,7 @@ section of `skills/other-engines/roblox-simulator-economy/SKILL.md` first.
 The shop stock is shared by everyone on the server and restocks every 5 minutes. Growth is
 stored as a timestamp, so coral keeps growing while you're offline.
 
-### Reef Supplies, quests and rebirth
+### Upgrade Station, quests and rebirth
 
 | Fence | Cost | Look |
 |---|---|---|
@@ -148,7 +180,7 @@ Owners and admins get a red **Admin** button on the left. Its window can:
 - **Announcement:** type a message and send it to this server or to every server. It shows
   as a gold banner and in chat, after Roblox's text filter has checked it.
 - **Gifts for everyone in this server:** 1 seed of any kind (Seagrass included), 1K, 10K or
-  100K shells, or an instant Seed Shop restock.
+  100K shells, or an instant Coral Shop restock.
 
 Admins are listed by **user id** in `ReefConfig.Admin` (usernames can change; ids can't).
 The id is the number in a player's profile link, `roblox.com/users/<id>/profile`.
@@ -192,13 +224,15 @@ src/shared/                 -> ReplicatedStorage.Shared
   EconomyMath.luau          copied unchanged from skills/other-engines/roblox-simulator-economy
 src/server/                 -> ServerScriptService.Server
   Main.server.luau          starts everything in order
-  World.luau                builds the seabed, underwater lighting, surface, stands, shopkeepers,
-                            leaderboard board and 6 plots
+  World.luau                builds the Starter Lagoon: seabed, lighting, surface, plaza and
+                            spawn, Inky, Research Station, Upgrade Station, Coral Shop, Ocean
+                            Gate, paths, leaderboards and the ring of 6 reefs
+  Tutorial.luau             the Starter Lagoon tutorial steps, Inky's lines and the reward
   SeabedDecor.luau          kelp forests, coral clusters, starfish and urchins
   PlayerData.luau           DataStore load/save with a session lock, data repair, leaderstats
   Plots.luau                plot assignment, free planting (PlantAt), growth, harvesting
   ReefIndex.luau            Reef Index finds, set rewards and IndexRewards (titles, fences, pets)
-  Supplies.luau             Reef Supplies: fences, decorations, gear upgrades, Fertilizer
+  Supplies.luau             Upgrade Station: fences, decorations, gear upgrades, Fertilizer
   Quests.luau               daily quests: progress and claiming
   Likes.luau                reef likes at each gate sign
   Rebirth.luau              rebirths and picking a title
@@ -221,7 +255,8 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   OceanEffects.luau         marine snow around the camera, bubbles from divers
   CoralLabels.luau          name and growth countdown over each coral
   Hud.luau                  shells, bag, sea-event timer, toasts, seed hotbar, side and Shop/Home buttons
-  SuppliesPanel.luau        the Reef Supplies window (Fences, Decor, Gear)
+  SuppliesPanel.luau        the Upgrade Station window (Reef, Gear, Fences, Decor)
+  TutorialPanel.luau        the Starter Lagoon tutorial card, beam and marker
   QuestsPanel.luau          the Quests window: daily quests, rebirth, titles
   NameTags.luau             titles and rebirths over players' heads
   Swimming.luau             jump-to-swim movement and animation (client only)
@@ -245,7 +280,8 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   reach, spaced from other coral and inside a free slot, using the same `plantProblem` rules the
   client preview uses. Harvesting and fish catching use `ClickDetector.MouseClick`, which fires
   on the server with the real player.
-- Buying and expanding check that the player is standing at the Seed Shop; eggs, at the Pet
+- Buying checks that the player is standing at the Coral Shop, and expanding at the Upgrade
+  Station; eggs, at the Pet
   Hatchery. The server rolls every egg from the same odds list the window shows.
 - Every request goes through a per-player rate limit.
 - Saves use `UpdateAsync` with a session lease, so two servers can't overwrite each other's

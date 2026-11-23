@@ -25,14 +25,40 @@ local folder: Folder
 local landingParams = RaycastParams.new()
 local open = 0 -- chests on the seabed right now
 
--- Where chests may land: the plaza and the row of reefs.
-local BED_REACH = ReefConfig.bedRadius(ReefConfig.MAX_SLOTS)
-local ROW_HALF = (ReefConfig.PLOT_COUNT - 1) * ReefConfig.PLOT_SPACING / 2 + BED_REACH
-local AREA = { minX = -ROW_HALF, maxX = ROW_HALF, minZ = -55, maxZ = ReefConfig.PLOT_ROW_Z + BED_REACH }
+-- Where chests may land: anywhere in the lagoon, from the plaza out to the far edge of the
+-- ring of reefs.
+local REACH = ReefConfig.Lagoon.plotRing + ReefConfig.bedRadius(ReefConfig.MAX_SLOTS)
+
+-- Buildings a chest must not land inside, as (centre, radius).
+local LAGOON = ReefConfig.Lagoon
+local BUILDINGS = {
+	{ LAGOON.research, 26 },
+	{ LAGOON.upgrade, 16 },
+	{ LAGOON.coralShop, 30 },
+	{ LAGOON.oceanGate, 28 },
+}
+
+local function clearOfBuildings(x: number, z: number): boolean
+	for _, building in BUILDINGS do
+		local center, radius = building[1], building[2]
+		if (x - center.X) ^ 2 + (z - center.Z) ^ 2 < radius * radius then
+			return false
+		end
+	end
+	return true
+end
 
 local function landingPoint(): Vector3?
-	local x = rng:NextNumber(AREA.minX, AREA.maxX)
-	local z = rng:NextNumber(AREA.minZ, AREA.maxZ)
+	-- Uniform over the disc: the square root spreads points evenly out to the rim.
+	local x, z
+	for _ = 1, 10 do
+		local angle = rng:NextNumber(0, math.pi * 2)
+		local distance = math.sqrt(rng:NextNumber()) * REACH
+		x, z = LAGOON.center.X + math.cos(angle) * distance, LAGOON.center.Z + math.sin(angle) * distance
+		if clearOfBuildings(x, z) then
+			break
+		end
+	end
 	local hit = Workspace:Raycast(Vector3.new(x, 80, z), Vector3.new(0, -100, 0), landingParams)
 	return hit and hit.Position
 end

@@ -1,6 +1,6 @@
 --!nonstrict
--- Builds a reef's fence out of plain Parts round a circle, with a gap at the front (-Z) to
--- walk in. Each style (ReefConfig.Fences) has a kind that decides its shape:
+-- Builds a reef's fence out of plain Parts round a circle, with a gap at the front (the
+-- reef frame's -Z, which faces the plaza) to walk in. Each style (ReefConfig.Fences) has a kind that decides its shape:
 --   planks   posts with rails of salvaged planks (Shipwreck Wood)
 --   hedge    kelp stalks topped with leafy bushes, joined by a low hedge (Kelp Hedge)
 --   wall     round stone pillars with rows of stacked stones between them (Coral Stone Wall)
@@ -226,9 +226,11 @@ rails.crystal = function(model, style, material, a, b, outward, rng)
 	bar.Transparency = 0.35
 end
 
--- A fence of style fenceId round `center` (a point on the ground) at `radius`. rng makes each
--- reef's fence a little different, and the same every time it is built.
-function FenceVisuals.build(fenceId: string, center: Vector3, radius: number, rng: Random): Model
+-- A fence of style fenceId at `radius` round `frame` (a point on the ground, turned so its
+-- -Z is the gate). rng makes each reef's fence a little different, and the same every time
+-- it is built.
+function FenceVisuals.build(fenceId: string, frame: CFrame, radius: number, rng: Random): Model
+	local center = frame.Position
 	local style = ReefConfig.FenceById[fenceId] or ReefConfig.FenceById[ReefConfig.DEFAULT_FENCE]
 	local material = Enum.Material[style.material]
 	local buildPost = posts[style.kind] or posts.planks
@@ -245,7 +247,7 @@ function FenceVisuals.build(fenceId: string, center: Vector3, radius: number, rn
 	local points = {}
 	for i = 0, sections do
 		local angle = start + sweep * i / sections
-		points[i] = center + Vector3.new(math.cos(angle), 0, math.sin(angle)) * radius
+		points[i] = frame:PointToWorldSpace(Vector3.new(math.cos(angle), 0, math.sin(angle)) * radius)
 	end
 
 	for i = 0, sections do

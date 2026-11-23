@@ -48,6 +48,9 @@
         "Teleported": {
           "$className": "RemoteEvent"
         },
+        "GuideLine": {
+          "$className": "RemoteEvent"
+        },
         "AdminAction": {
           "$className": "RemoteEvent"
         },

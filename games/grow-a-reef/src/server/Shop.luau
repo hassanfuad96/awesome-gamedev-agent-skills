@@ -1,6 +1,7 @@
 --!nonstrict
--- Seed shop with a server-wide stock that restocks on a timer, reef expansion,
--- hotbar seed selection and selling. Remotes carry ids only; prices come from ReefConfig.
+-- The Coral Shop (seed counter with a server-wide stock that restocks on a timer, and the
+-- sell counter), hotbar seed selection, and reef expansion, which is bought at the Upgrade
+-- Station. Remotes carry ids only; prices come from ReefConfig.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,6 +24,7 @@ local restockAt = 0
 local rng = Random.new()
 local shopStand: BasePart
 local sellStand: BasePart
+local upgradeStand: BasePart
 
 local function isNear(player: Player, target: BasePart): boolean
 	local character = player.Character
@@ -72,7 +74,7 @@ local function onBuySeed(player: Player, seedId: unknown)
 		return
 	end
 	if not isNear(player, shopStand) then
-		Plots.notify(player, "Walk over to the Seed Shop to buy seeds.")
+		Plots.notify(player, "Walk over to the Coral Shop to buy seeds.")
 		return
 	end
 	if (stock[seedId] or 0) <= 0 then
@@ -111,8 +113,8 @@ local function onExpand(player: Player)
 		Plots.notify(player, "Your reef is already full size.")
 		return
 	end
-	if not isNear(player, shopStand) then
-		Plots.notify(player, "Walk over to the Seed Shop to expand your reef.")
+	if not isNear(player, upgradeStand) then
+		Plots.notify(player, "Walk over to the Upgrade Station to grow your reef.")
 		return
 	end
 	local price = ReefConfig.expandCost(profile.data.unlocked)
@@ -184,6 +186,7 @@ end
 function Shop.start(worldParts: World.WorldParts)
 	shopStand = worldParts.shopStand
 	sellStand = worldParts.sellStand
+	upgradeStand = worldParts.suppliesStand
 
 	local sellPrompt = sellStand:FindFirstChildOfClass("ProximityPrompt")
 	if sellPrompt then

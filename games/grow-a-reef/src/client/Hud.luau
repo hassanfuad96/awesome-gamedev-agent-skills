@@ -267,7 +267,7 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 	}, { Ui.new("UISizeConstraint", { MaxSize = Vector2.new(620, 96) }) })
 	local hint = Ui.label({
 		Name = "Hint",
-		Text = "Buy seeds at the Seed Shop",
+		Text = "Buy seeds at the Coral Shop",
 		MaxTextSize = 16,
 		Size = UDim2.new(1, 0, 0, 20),
 		TextStrokeTransparency = 0.5,
@@ -472,9 +472,9 @@ function Hud.setData(self: Hud, data: any)
 
 	local slots = `{data.planted or 0}/{data.unlocked} coral planted`
 	if not any then
-		self.hint.Text = `No seeds. Buy some at the Seed Shop! ({slots})`
+		self.hint.Text = `No seeds. Buy some at the Coral Shop! ({slots})`
 	elseif (data.planted or 0) >= data.unlocked then
-		self.hint.Text = `Reef full ({slots}). Harvest, or grow your reef at the Seed Shop`
+		self.hint.Text = `Reef full ({slots}). Harvest, or grow your reef at the Upgrade Station`
 	elseif data.selected then
 		self.hint.Text = `Click your reef bed to plant {ReefConfig.Seeds[data.selected].name} ({slots})`
 	else

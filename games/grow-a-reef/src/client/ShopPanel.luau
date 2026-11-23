@@ -1,6 +1,7 @@
 --!nonstrict
--- Seed shop window. Opens from the Seed Shop's ProximityPrompt and closes when the player
--- walks away. Buttons send seed ids only; the server checks price, stock and distance.
+-- The Coral Shop's seed window. Opens from the seed counter's ProximityPrompt and closes
+-- when the player walks away. Buttons send seed ids only; the server checks price, stock and
+-- distance. Growing the reef is at the Upgrade Station (SuppliesPanel).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,7 +25,6 @@ export type ShopPanel = typeof(setmetatable(
 		gui: ScreenGui,
 		root: Frame,
 		restock: TextLabel,
-		expand: TextButton,
 		close: TextButton,
 		rows: { [string]: Row },
 		stock: { [string]: number },
@@ -59,7 +59,7 @@ function ShopPanel.new(playerGui: PlayerGui): ShopPanel
 
 	Ui.label({
 		Name = "Title",
-		Text = "Seed Shop",
+		Text = "Coral Shop · Seeds",
 		Font = Ui.TitleFont,
 		MaxTextSize = 30,
 		Size = UDim2.new(1, -50, 0, 34),
@@ -89,7 +89,7 @@ function ShopPanel.new(playerGui: PlayerGui): ShopPanel
 	local list = Ui.new("ScrollingFrame", {
 		Name = "Seeds",
 		Position = UDim2.new(0, 0, 0, 64),
-		Size = UDim2.new(1, 0, 1, -124),
+		Size = UDim2.new(1, 0, 1, -64),
 		BackgroundTransparency = 1,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
@@ -176,24 +176,10 @@ function ShopPanel.new(playerGui: PlayerGui): ShopPanel
 		rows[seedId] = { button = button, stock = stock, price = price }
 	end
 
-	local expand = Ui.button({
-		Name = "Expand",
-		Text = "Grow your reef",
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, 0),
-		Size = UDim2.new(1, 0, 0, 48),
-		BackgroundColor3 = Color3.fromRGB(60, 120, 200),
-		Parent = root,
-	})
-	expand.Activated:Connect(function()
-		Remotes.ExpandReef:FireServer()
-	end)
-
 	local self = setmetatable({
 		gui = gui,
 		root = root,
 		restock = restock,
-		expand = expand,
 		close = close,
 		rows = rows,
 		stock = {},
@@ -248,15 +234,6 @@ function ShopPanel.render(self: ShopPanel)
 		row.button.BackgroundColor3 = if canBuy then Ui.Colors.button else Ui.Colors.buttonDisabled
 		row.button.Text = if left > 0 then "Buy" else "Sold out"
 		row.price.TextColor3 = if shells >= seed.price then Ui.Colors.rare else Ui.Colors.bad
-	end
-
-	local cost = self.data and self.data.expandCost
-	if cost then
-		self.expand.Text = `Grow your reef to {self.data.unlocked + 1} coral slots - {EconomyMath.formatNumber(cost)} shells`
-		self.expand.BackgroundColor3 = if shells >= cost then Color3.fromRGB(60, 120, 200) else Ui.Colors.buttonDisabled
-	else
-		self.expand.Text = "Reef fully grown"
-		self.expand.BackgroundColor3 = Ui.Colors.buttonDisabled
 	end
 end
 

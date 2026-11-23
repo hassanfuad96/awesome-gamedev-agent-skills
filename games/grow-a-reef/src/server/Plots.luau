@@ -60,7 +60,7 @@ local function growthOf(plant: Plant): number
 end
 
 local function worldPosition(plot: PlotParts, plant: Plant): Vector3
-	return Vector3.new(plot.center.X + plant.x, plot.bedTop, plot.center.Z + plant.z)
+	return ReefConfig.plotPoint(plot.frame, plant.x, plant.z, plot.bedTop)
 end
 
 -- The point's plot, if it lies on one of the reef mounds.
@@ -140,7 +140,7 @@ local function setDecor(player: Player, plot: PlotParts, decorId: string, placed
 	if not item then
 		return
 	end
-	local at = Vector3.new(plot.center.X + placed.x, groundAt(plot, placed.x, placed.z), plot.center.Z + placed.z)
+	local at = ReefConfig.plotPoint(plot.frame, placed.x, placed.z, groundAt(plot, placed.x, placed.z))
 	local model = DecorVisuals.build(placed.item, CFrame.new(at))
 	model:SetAttribute("DecorItem", placed.item)
 	model:SetAttribute("OwnerUserId", player.UserId)
@@ -173,7 +173,7 @@ local function buildFence(plot: PlotParts, fenceId: string)
 	if plot.fence then
 		plot.fence:Destroy()
 	end
-	plot.fence = FenceVisuals.build(fenceId, plot.fenceCenter, plot.fenceRadius, Random.new(plot.index))
+	plot.fence = FenceVisuals.build(fenceId, plot.fenceFrame, plot.fenceRadius, Random.new(plot.index))
 	plot.fence.Parent = plot.model
 end
 
@@ -213,7 +213,7 @@ local function plant(player: Player, profile: Profile, plot: PlotParts, x: numbe
 	end
 	local owned = profile.data.seeds[seedId] or 0
 	if owned <= 0 then
-		notify(player, `You're out of {ReefConfig.Seeds[seedId].name} seeds. Buy more at the Seed Shop.`)
+		notify(player, `You're out of {ReefConfig.Seeds[seedId].name} seeds. Buy more at the Coral Shop.`)
 		return
 	end
 	profile.data.seeds[seedId] = if owned > 1 then owned - 1 else nil
@@ -334,7 +334,7 @@ handleCoralClick = function(player: Player, plot: PlotParts, plantId: string)
 	if growthOf(clicked) >= 1 then
 		if bagFull(profile) then
 			local capacity = PlayerData.bagCapacity(profile.data)
-			notify(player, `Your bag is full ({capacity}/{capacity})! Sell your coral at Sell Coral, or get a Bigger Bag at Reef Supplies.`, "bad")
+			notify(player, `Your bag is full ({capacity}/{capacity})! Sell your coral at Sell Coral, or get a Bigger Bag at the Upgrade Station.`, "bad")
 			return
 		end
 		harvest(player, profile, plot, plantId, clicked)
@@ -365,8 +365,9 @@ local function onPlantAt(player: Player, point: unknown)
 		notify(player, "Swim closer to your reef to plant.")
 		return
 	end
-	local x = math.round((position.X - plot.center.X) * 10) / 10
-	local z = math.round((position.Z - plot.center.Z) * 10) / 10
+	local offsetX, offsetZ = ReefConfig.plotOffset(plot.frame, position)
+	local x = math.round(offsetX * 10) / 10
+	local z = math.round(offsetZ * 10) / 10
 	local problem = ReefConfig.plantProblem(x, z, profile.data.unlocked, profile.data.plants, profile.data.decor)
 	if problem then
 		notify(player, problem)
@@ -396,7 +397,14 @@ function Plots.assign(player: Player, profile: Profile)
 	player:SetAttribute("PlotIndex", plot.index)
 	renderPlot(player, profile)
 
+	-- Players still in the tutorial start in the middle of the lagoon, by Inky; everyone else
+	-- (and every respawn, like after an orca) starts at home.
+	local startAtPlaza = ReefConfig.tutorialStep(profile.data.tutorial) ~= nil
 	local function moveToPlot(character: Model)
+		if startAtPlaza then
+			startAtPlaza = false
+			return
+		end
 		task.defer(function()
 			if character.Parent and plotByPlayer[player] == plot then
 				character:PivotTo(plot.spawn)
@@ -466,11 +474,12 @@ function Plots.placeDecor(player: Player, itemId: string, point: Vector3): boole
 	end
 	local stored = profile.data.decorStorage[itemId] or 0
 	if stored <= 0 then
-		notify(player, `You have no {item.name} to place. Buy one at Reef Supplies.`)
+		notify(player, `You have no {item.name} to place. Buy one at the Upgrade Station.`)
 		return false
 	end
-	local x = math.round((point.X - plot.center.X) * 10) / 10
-	local z = math.round((point.Z - plot.center.Z) * 10) / 10
+	local offsetX, offsetZ = ReefConfig.plotOffset(plot.frame, point)
+	local x = math.round(offsetX * 10) / 10
+	local z = math.round(offsetZ * 10) / 10
 	local problem = ReefConfig.decorProblem(itemId, x, z, profile.data.plants, profile.data.decor)
 	if problem then
 		notify(player, problem)
@@ -500,7 +509,7 @@ pickUpDecor = function(player: Player, decorId: string)
 	profile.data.decor[decorId] = nil
 	profile.data.decorStorage[placed.item] = (profile.data.decorStorage[placed.item] or 0) + 1
 	setDecor(player, plot, decorId, nil)
-	notify(player, `Picked up your {ReefConfig.DecorById[placed.item].name}. Place it again from Reef Supplies.`)
+	notify(player, `Picked up your {ReefConfig.DecorById[placed.item].name}. Place it again from the Upgrade Station.`)
 	PlayerData.sync(player)
 end
 

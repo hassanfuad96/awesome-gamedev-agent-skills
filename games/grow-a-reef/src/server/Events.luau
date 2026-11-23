@@ -155,8 +155,15 @@ end
 
 function Events.start(worldParts: World.WorldParts)
 	TreasureStorm.start()
-	local stream = worldParts.currentStream
-	local streamColor = stream.Color
+	-- The current's particle streams, one from each reef to the next round the ring.
+	local streams = worldParts.currentStreams
+	local streamColor = streams[1].Color
+	local function setStreams(enabled: boolean, color: ColorSequence)
+		for _, stream in streams do
+			stream.Color = color
+			stream.Enabled = enabled
+		end
+	end
 	-- Night darkens the sea and, while it lasts, grown coral can turn Shadow.
 	local night = nightLighting(worldParts)
 	night.every = SETTINGS.mutationTick
@@ -166,22 +173,20 @@ function Events.start(worldParts: World.WorldParts)
 	local handlers: { [string]: Handler } = {
 		Current = {
 			start = function()
-				stream.Enabled = true
+				setStreams(true, streamColor)
 			end,
 			stop = function()
-				stream.Enabled = false
+				setStreams(false, streamColor)
 			end,
 			every = ReefConfig.Current.tick,
 			tick = Currents.spreadOnce,
 		},
 		Cold = {
 			start = function()
-				stream.Color = ColorSequence.new(Color3.fromRGB(235, 250, 255))
-				stream.Enabled = true
+				setStreams(true, ColorSequence.new(Color3.fromRGB(235, 250, 255)))
 			end,
 			stop = function()
-				stream.Enabled = false
-				stream.Color = streamColor
+				setStreams(false, streamColor)
 			end,
 			every = SETTINGS.mutationTick,
 			tick = function()

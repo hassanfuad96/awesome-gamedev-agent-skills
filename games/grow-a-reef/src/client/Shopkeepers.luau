@@ -34,6 +34,7 @@ type Keeper = {
 
 local keepers: { [Model]: Keeper } = {}
 local rng = Random.new()
+local gui: PlayerGui
 
 local function nextLine(keeper: Keeper): string
 	local lines = keeper.def.greetings
@@ -45,18 +46,21 @@ local function nextLine(keeper: Keeper): string
 	return lines[index]
 end
 
-local function showBubble(keeper: Keeper, playerGui: PlayerGui, text: string)
+-- `long` is for something the player asked for (talking to Inky): a bigger bubble that
+-- stays up longer.
+local function showBubble(keeper: Keeper, playerGui: PlayerGui, text: string, long: boolean?)
 	if keeper.bubble then
 		keeper.bubble:Destroy()
 	end
 	local bubble = Ui.new("BillboardGui", {
 		Name = "ShopkeeperBubble",
 		Adornee = keeper.head,
-		Size = UDim2.fromOffset(250, 66),
-		-- Beside the head, not above it, where it would cover the stand's sign. SizeOffset
-		-- keeps the bubble's left edge next to the head at any distance.
-		StudsOffset = Vector3.new(keeper.head.Size.X / 2 + 0.4, 0.3, 0),
-		SizeOffset = Vector2.new(0.5, 0),
+		Size = if long then UDim2.fromOffset(300, 92) else UDim2.fromOffset(250, 66),
+		-- Usually beside the head, not above it, where it would cover the stand's sign.
+		-- SizeOffset keeps the bubble's edge next to the head at any distance. Long lines
+		-- (Inky, who has no sign) go above the head, where they stay on screen up close.
+		StudsOffset = if long then Vector3.new(0, keeper.head.Size.Y / 2 + 0.6, 0) else Vector3.new(keeper.head.Size.X / 2 + 0.4, 0.3, 0),
+		SizeOffset = if long then Vector2.new(0, 0.5) else Vector2.new(0.5, 0),
 		-- The Seed Shop roof is in front of the diver's head from most camera angles.
 		AlwaysOnTop = true,
 		MaxDistance = 60,
@@ -93,7 +97,7 @@ local function showBubble(keeper: Keeper, playerGui: PlayerGui, text: string)
 	})
 	keeper.bubble = bubble
 
-	task.delay(BUBBLE_SECONDS, function()
+	task.delay(if long then BUBBLE_SECONDS * 2 else BUBBLE_SECONDS, function()
 		if keeper.bubble ~= bubble then
 			return -- replaced by a newer greeting, which owns its own fade
 		end
@@ -145,7 +149,19 @@ local function remove(instance: Instance)
 	end
 end
 
+-- Shows a line from the shopkeeper of `kind` (a ReefConfig.Shopkeepers key), such as Inky's
+-- tutorial lines from the server.
+function Shopkeepers.say(kind: string, text: string)
+	for model, keeper in keepers do
+		if model:GetAttribute("Shopkeeper") == kind then
+			keeper.lastGreet = os.clock()
+			showBubble(keeper, gui, text, true)
+		end
+	end
+end
+
 function Shopkeepers.start(playerGui: PlayerGui)
+	gui = playerGui
 	for _, instance in CollectionService:GetTagged(ReefConfig.SHOPKEEPER_TAG) do
 		add(instance)
 	end
