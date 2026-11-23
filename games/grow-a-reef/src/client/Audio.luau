@@ -156,6 +156,8 @@ function Audio.onData(data: any)
 	end
 end
 
+-- The Music button sits just under the HUD's teleport buttons (right edge), wherever that
+-- column ends up on this screen, so it never covers the tutorial card or the jump button.
 local function musicButton(playerGui: PlayerGui)
 	local gui = Ui.new("ScreenGui", {
 		Name = "AudioToggle",
@@ -167,8 +169,8 @@ local function musicButton(playerGui: PlayerGui)
 	local button = Ui.button({
 		Name = "Music",
 		Text = "Music",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -10, 0, 10),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(1, -46, 0.5, 100),
 		Size = UDim2.fromOffset(64, 30),
 		BackgroundColor3 = Ui.Colors.panel,
 		MaxTextSize = 15,
@@ -176,7 +178,29 @@ local function musicButton(playerGui: PlayerGui)
 	})
 	local stroke = Ui.stroke(Ui.Colors.accent, 1.5)
 	stroke.Parent = button
-	Ui.autoScale({ button })
+	local currentScale = 1
+	local hud = playerGui:FindFirstChild("ReefHud")
+	local column = hud and hud:FindFirstChild("TeleportButtons") :: GuiObject?
+	local layout = column and column:FindFirstChildOfClass("UIListLayout")
+	local function place()
+		if not column or not layout then
+			return
+		end
+		-- Both GUIs ignore the top bar inset, so their absolute positions line up.
+		local offset = column.AbsolutePosition - gui.AbsolutePosition
+		local bottom = offset.Y + layout.AbsoluteContentSize.Y + 8 * currentScale
+		button.Position = UDim2.fromOffset(offset.X + column.AbsoluteSize.X / 2, bottom)
+	end
+	Ui.autoScale({ button }, function(scale)
+		currentScale = scale
+		task.defer(place) -- after the HUD has applied the same scale
+	end)
+	if column and layout then
+		column:GetPropertyChangedSignal("AbsolutePosition"):Connect(place)
+		column:GetPropertyChangedSignal("AbsoluteSize"):Connect(place)
+		layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(place)
+		place()
+	end
 	button.Activated:Connect(function()
 		musicEnabled = not musicEnabled
 		button.TextTransparency = if musicEnabled then 0 else 0.55
