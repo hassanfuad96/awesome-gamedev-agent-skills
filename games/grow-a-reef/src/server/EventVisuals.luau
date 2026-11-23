@@ -12,7 +12,8 @@ local EventVisuals = {}
 
 local UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- turns a cylinder (along X) upright
 local LAVA = Color3.fromRGB(255, 110, 40)
-local BASALT = Color3.fromRGB(70, 62, 60)
+-- Warmer than real basalt: the sea's blue light turns dark grey rock navy.
+local BASALT = Color3.fromRGB(150, 112, 96)
 
 local function piece(model: Model, name: string, size: Vector3, cf: CFrame, color: Color3, material: Enum.Material, shape: Enum.PartType?): Part
 	local p = Instance.new("Part")
@@ -64,23 +65,28 @@ function EventVisuals.volcano(base: CFrame, height: number): (Model, BasePart)
 	local model = Instance.new("Model")
 	model.Name = "Volcano"
 	root(model, base)
-	local layers = 8
+	-- Many thin tiers, so the cone reads as a slope rather than a stack of cakes.
+	local layers = 14
+	local tier = height / layers
+	local radii = {}
 	for i = 0, layers - 1 do
 		local t = i / layers
-		local radius = height * (0.75 - 0.55 * t)
-		local h = height / layers
-		piece(model, "Slope", Vector3.new(h + 0.5, radius * 2, radius * 2), base * CFrame.new(0, h * (i + 0.5), 0) * UPRIGHT * CFrame.Angles(i * 0.7, 0, 0), BASALT:Lerp(Color3.fromRGB(110, 90, 80), t * 0.6), Enum.Material.Basalt, Enum.PartType.Cylinder)
+		radii[i] = height * (0.75 - 0.58 * t)
+		piece(model, "Slope", Vector3.new(tier + 0.4, radii[i] * 2, radii[i] * 2), base * CFrame.new(0, tier * (i + 0.5), 0) * UPRIGHT * CFrame.Angles(i * 0.7, 0, 0), BASALT:Lerp(Color3.fromRGB(190, 140, 115), t * 0.7), Enum.Material.Basalt, Enum.PartType.Cylinder)
 	end
+	-- Lava running down six sides: a glowing strip on the outer face of each tier, from the
+	-- crater down to near the foot.
 	for i = 1, 6 do
-		local angle = i / 6 * math.pi * 2
+		local angle = i / 6 * math.pi * 2 + (i % 2) * 0.2
 		local outward = Vector3.new(math.cos(angle), 0, math.sin(angle))
-		local top = base.Position + Vector3.new(0, height * 0.95, 0) + outward * height * 0.2
-		local bottom = base.Position + Vector3.new(0, height * 0.15, 0) + outward * height * 0.62
-		local cf = CFrame.lookAt((top + bottom) / 2, bottom)
-		local flow = piece(model, "LavaFlow", Vector3.new(1.6, 0.6, (top - bottom).Magnitude), cf, LAVA, Enum.Material.Neon)
-		flow.Transparency = 0.1
+		for layer = layers - 1, 2, -1 do
+			local reach = radii[layer] + 0.25
+			local at = base.Position + outward * reach + Vector3.new(0, tier * (layer + 0.5), 0)
+			local width = 2.2 + (layers - layer) * 0.12 -- streams widen as they run down
+			piece(model, "LavaFlow", Vector3.new(width, tier + 0.5, 0.6), CFrame.lookAt(at, at + outward), LAVA, Enum.Material.Neon)
+		end
 	end
-	local crater = piece(model, "Crater", Vector3.new(1, height * 0.36, height * 0.36), base * CFrame.new(0, height + 0.2, 0) * UPRIGHT, LAVA, Enum.Material.Neon, Enum.PartType.Cylinder)
+	local crater = piece(model, "Crater", Vector3.new(1, radii[layers - 1] * 1.6, radii[layers - 1] * 1.6), base * CFrame.new(0, height + 0.2, 0) * UPRIGHT, LAVA, Enum.Material.Neon, Enum.PartType.Cylinder)
 	light(crater, LAVA, 60, 4)
 	emitter(crater, {
 		Name = "Smoke",
@@ -236,7 +242,8 @@ function EventVisuals.mermaidStall(base: CFrame): (Model, BasePart)
 	piece(model, "ShellHinge", Vector3.new(3, 3, 1.5), base * CFrame.new(0, 3.8, 3), shell, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
 	-- Marina: a teal tail curling up from the sand, a body, a face and long hair.
 	local tail = Color3.fromRGB(60, 200, 180)
-	local skin = Color3.fromRGB(240, 196, 160)
+	local skin = Color3.fromRGB(255, 212, 180) -- warm: the sea's blue light greys out paler skin
+	local hair = Color3.fromRGB(255, 105, 85)
 	local from = base.Position + Vector3.new(1.5, 0.6, 1.5)
 	for segment, offset in { Vector3.new(-0.8, 1, -0.3), Vector3.new(-0.6, 1.2, -0.2), Vector3.new(-0.1, 1.3, 0) } do
 		local to = from + offset
@@ -248,13 +255,17 @@ function EventVisuals.mermaidStall(base: CFrame): (Model, BasePart)
 	piece(model, "Body", Vector3.new(1.8, 2.2, 1.2), base * CFrame.new(0, 5.3, 1.5), skin, Enum.Material.SmoothPlastic)
 	piece(model, "Top", Vector3.new(1.9, 0.7, 1.3), base * CFrame.new(0, 5.8, 1.5), Color3.fromRGB(255, 140, 170), Enum.Material.SmoothPlastic)
 	local head = piece(model, "Head", Vector3.new(1.7, 1.8, 1.7), base * CFrame.new(0, 7.3, 1.5), skin, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
-	piece(model, "Hair", Vector3.new(2, 2.6, 1.4), base * CFrame.new(0, 6.9, 2.1), Color3.fromRGB(240, 90, 80), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+	-- Long hair: a cap over the back of the head and a lock down each side, framing the face.
+	piece(model, "Hair", Vector3.new(2.1, 2, 1.6), base * CFrame.new(0, 7.6, 1.95), hair, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
 	for _, side in { -1, 1 } do
-		piece(model, "Eye", Vector3.new(0.3, 0.3, 0.3), base * CFrame.new(side * 0.35, 7.45, 0.68), Color3.fromRGB(30, 60, 90), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+		piece(model, "HairLock", Vector3.new(0.7, 2.8, 0.9), base * CFrame.new(side * 0.95, 6.5, 1.55) * CFrame.Angles(0, 0, side * math.rad(8)), hair, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+		piece(model, "Eye", Vector3.new(0.42, 0.42, 0.3), base * CFrame.new(side * 0.36, 7.45, 0.68), Color3.fromRGB(20, 80, 110), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+		piece(model, "Cheek", Vector3.new(0.3, 0.2, 0.1), base * CFrame.new(side * 0.55, 7.1, 0.7), Color3.fromRGB(255, 150, 150), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
 		piece(model, "Arm", Vector3.new(0.5, 2, 0.5), base * CFrame.new(side * 1.2, 5, 1) * CFrame.Angles(math.rad(-30), 0, side * math.rad(-15)), skin, Enum.Material.SmoothPlastic)
 	end
+	piece(model, "Smile", Vector3.new(0.55, 0.12, 0.08), base * CFrame.new(0, 6.95, 0.66), Color3.fromRGB(200, 60, 80), Enum.Material.SmoothPlastic)
 	piece(model, "Crown", Vector3.new(1.4, 0.4, 1.4), base * CFrame.new(0, 8.25, 1.5), Color3.fromRGB(255, 215, 90), Enum.Material.Foil)
-	light(head, Color3.fromRGB(180, 255, 240), 18, 1.4)
+	light(head, Color3.fromRGB(255, 225, 195), 14, 1.6) -- warm, so her face keeps its colour
 	-- Seed jars on the counter, glowing in the seed colours.
 	for i, color in { Color3.fromRGB(70, 230, 230), Color3.fromRGB(235, 235, 245), Color3.fromRGB(255, 220, 80) } do
 		local jar = piece(model, "Jar", Vector3.new(1.1, 1.4, 1.1), base * CFrame.new(-3 + (i - 1) * 3, 4.6, -1), color, Enum.Material.Glass)

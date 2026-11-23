@@ -23,7 +23,7 @@ for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leade
 end
 local client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 check(client.Main.ClassName == "LocalScript", "client Main is a LocalScript")
-for _, m in { "Swimming", "AdminPanel", "SuppliesPanel", "QuestsPanel", "NameTags", "TutorialPanel", "MerchantPanel", "RuinsPanel", "RuinsLife", "AbyssPanel", "AbyssLife", "Audio", "KelpPanel", "KelpLife", "LabPanel", "OxygenBar", "AquariumDisplay" } do
+for _, m in { "Swimming", "AdminPanel", "SuppliesPanel", "QuestsPanel", "NameTags", "TutorialPanel", "MerchantPanel", "EventBars", "RuinsPanel", "RuinsLife", "AbyssPanel", "AbyssLife", "Audio", "KelpPanel", "KelpLife", "LabPanel", "OxygenBar", "AquariumDisplay" } do
 	check(client:FindFirstChild(m) and client[m].ClassName == "ModuleScript", "client module " .. m)
 end
 check(rs.Shared.ReefConfig.ClassName == "ModuleScript", "shared ReefConfig")

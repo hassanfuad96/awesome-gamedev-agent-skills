@@ -3,7 +3,8 @@
 -- it (a ClickDetector, so mouse and touch both work; the server counts the hits and limits how
 -- fast each player can land them). Its health grows with the number of players. Beat it
 -- before the event ends and everyone who landed at least ReefConfig.Octopus.minHits hits wins
--- shells and seeds. The HUD reads the OctopusHealth / OctopusMaxHealth Workspace attributes.
+-- shells and seeds. The HUD line and the on-screen bar (EventBars) read the OctopusHealth /
+-- OctopusMaxHealth Workspace attributes.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -38,40 +39,6 @@ end
 local function setHealthAttributes(current: number?, maximum: number?)
 	Workspace:SetAttribute("OctopusHealth", current)
 	Workspace:SetAttribute("OctopusMaxHealth", maximum)
-end
-
-local function healthBar(body: BasePart, maximum: number): Frame
-	local gui = Instance.new("BillboardGui")
-	gui.Name = "HealthBar"
-	gui.Size = UDim2.fromOffset(240, 34)
-	gui.StudsOffset = Vector3.new(0, 13, 0)
-	gui.AlwaysOnTop = true
-	gui.MaxDistance = 250
-	gui.LightInfluence = 0
-	gui.Parent = body
-	local back = Instance.new("Frame")
-	back.Size = UDim2.fromScale(1, 0.55)
-	back.Position = UDim2.fromScale(0, 0.45)
-	back.BackgroundColor3 = Color3.fromRGB(30, 20, 40)
-	back.Parent = gui
-	Instance.new("UICorner").Parent = back
-	local fill = Instance.new("Frame")
-	fill.Name = "Fill"
-	fill.Size = UDim2.fromScale(1, 1)
-	fill.BackgroundColor3 = Color3.fromRGB(255, 90, 150)
-	fill.Parent = back
-	Instance.new("UICorner").Parent = fill
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 0.45)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.FredokaOne
-	label.TextScaled = true
-	label.TextColor3 = Color3.new(1, 1, 1)
-	label.TextStrokeTransparency = 0.3
-	label.Text = `Giant Octopus  {maximum}/{maximum}`
-	label.Name = "Label"
-	label.Parent = gui
-	return fill
 end
 
 local function reward(player: Player)
@@ -123,8 +90,6 @@ function GiantOctopus.start(onDefeated: (() -> ())?)
 	health = maximum
 	local home = CFrame.new(ReefConfig.Lagoon.center + SETTINGS.hover)
 	local octopus, body = EventVisuals.octopus(home * CFrame.new(0, 60, 0))
-	local fill = healthBar(body, maximum)
-	local label = (body:FindFirstChild("HealthBar") :: BillboardGui):FindFirstChild("Label") :: TextLabel
 	local click = Instance.new("ClickDetector")
 	click.MaxActivationDistance = SETTINGS.clickRange
 	click.Parent = octopus
@@ -148,8 +113,6 @@ function GiantOctopus.start(onDefeated: (() -> ())?)
 		lastHit[player] = now
 		hits[player] = (hits[player] or 0) + 1
 		health -= 1
-		fill.Size = UDim2.fromScale(math.max(0, health / maximum), 1)
-		label.Text = `Giant Octopus  {math.max(0, health)}/{maximum}`
 		setHealthAttributes(math.max(0, health), maximum)
 		if rng:NextNumber() < 0.3 then
 			EventVisuals.burst(body.Position + Vector3.new(rng:NextNumber(-6, 6), rng:NextNumber(-4, 4), -7), INK, 8)
