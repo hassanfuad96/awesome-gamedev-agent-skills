@@ -14,6 +14,7 @@ local EconomyMath = require(ReplicatedStorage.Shared.EconomyMath)
 local World = require(script.Parent.World)
 local PlayerData = require(script.Parent.PlayerData)
 local Plots = require(script.Parent.Plots)
+local Quests = require(script.Parent.Quests)
 local RateLimit = require(script.Parent.RateLimit)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -110,6 +111,7 @@ local function onBuyEgg(player: Player, eggId: unknown)
 	local name = petName(pet)
 	local article = if string.find(name, "^[AEIOU]") then "an" else "a"
 	Plots.notify(player, `You hatched {article} {name}!`, if pet.golden then "rare" else "good")
+	Quests.progress(player, "hatch", 1)
 	PlayerData.sync(player)
 end
 

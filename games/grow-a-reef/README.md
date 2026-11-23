@@ -18,7 +18,12 @@ repository (`skills/other-engines/roblox-*`).
 | Sell | Walk to **Sell Coral** (orange stand) and press the prompt. Everything in your bag sells. |
 | Catch fish | Fish swim around grown coral on your reef. Click them before they swim off. |
 | Grow your reef | You start with 10 coral slots. In the Seed Shop, "Grow your reef" adds a slot (up to 50) and widens your bed, from 74 studs across to 108. |
-| Fence | Every reef has a Shipwreck Wood fence with a gate at the front, under the name sign. More fence styles can be added to `ReefConfig.Fences`. |
+| Fences and decorations | At **Reef Supplies** (blue stand, kept by Old Shellby the turtle) buy fence styles and decorations. Press **Place** on a decoration, go home, and tap anywhere inside your fence (not on coral or the gateway). Hold the prompt on a placed one to pick it up. |
+| Gear | Also at Reef Supplies: **Fertilizer** (coral grows faster), **Bubble Wand** (click a growing coral to speed it up) and **Bigger Bag** (your bag holds 30 coral, +30 a level). |
+| Quests | **Quests** on the left: three daily quests, the same for everyone, new each day (UTC). Claim the reward when one is done; a red "!" shows when one is waiting. |
+| Rebirth | In the Quests window. Pay the rebirth cost to start over for +25% shells from coral and fish, forever. You keep pets, the Index, fences, decorations, gear and titles. |
+| Titles | Pick one in the Quests window; it shows over your head. Earned from Reef Index sets and from rebirthing. |
+| Like a reef | Visit someone's reef and press **F** at the sign over its gate (once a day per reef). The sign shows its likes, and the **Best Reefs** board ranks them. |
 | Reef Index | Press **Index** on the left. Every coral in every mutation combo, and every fish. |
 | Pets | Hatch eggs at the **Pet Hatchery** (purple stand), then take pets out from **Pets** on the left. |
 | Teleport | **Shop** and **Home** on the right take you to the stands or your reef (3 s cooldown). The glowing whirlpool pads by the stands and in front of each reef gate do the same. |
@@ -111,6 +116,30 @@ section of `skills/other-engines/roblox-simulator-economy/SKILL.md` first.
 The shop stock is shared by everyone on the server and restocks every 5 minutes. Growth is
 stored as a timestamp, so coral keeps growing while you're offline.
 
+### Reef Supplies, quests and rebirth
+
+| Fence | Cost | Look |
+|---|---|---|
+| Shipwreck Wood | free | salvaged planks and posts with rope and barnacles |
+| Kelp Hedge | 5K | kelp stalks topped with leafy bushes and a low hedge |
+| Coral Stone Wall | 25K | pink stone pillars and stacked stone rows |
+| Whale Bone | 120K | giant ribs arching over the reef, joined by rope |
+| Glow Crystal | Reef Index reward (Glow Anemone set) | glowing crystal shards and a light bar |
+
+Decorations: Lantern Post (800), Old Anchor (2.5K), Treasure Chest (6K), Bubble Vent (12K), Fish
+Statue (40K), Rock Arch (90K). Up to 24 on a reef, 99 of each kind owned.
+
+Gear has five levels each. Fertilizer: +10% growth speed a level. Bubble Wand: each click gives
+a growing coral 1 s plus 1% of its grow time per level, then refills for 10 s. Bigger Bag:
+30 coral, +30 a level; a full bag stops harvesting (and the octopus) until you sell.
+
+Daily quests pay their shells times your coral slots / 10, so they keep up with you. Rebirths
+cost 500K, then 1.5M, 4.5M and so on (x3 each). Optional rebirth badges go in
+`ReefConfig.Rebirth.badges` once you create them on the Creator Dashboard.
+
+Every Reef Index set now also gives a title, a fence, decorations or a Golden pet
+(`ReefConfig.IndexRewards`); players who finished a set earlier get it when they next join.
+
 ### Admins
 
 Owners and admins get a red **Admin** button on the left. Its window can:
@@ -158,7 +187,8 @@ default.project.json        Rojo mapping; also creates the RemoteEvents and sets
 src/shared/                 -> ReplicatedStorage.Shared
   ReefConfig.luau           every tunable number: seeds, mutations, fish, sea events, index, pets
   CoralVisuals.luau         coral models made from Parts, plus mutation effects (server and Index)
-  FenceVisuals.luau         reef fences made from Parts, one style per ReefConfig.Fences entry
+  FenceVisuals.luau         reef fences made from Parts: planks, hedge, wall, ribs or crystal
+  DecorVisuals.luau         the reef decorations made from Parts
   EconomyMath.luau          copied unchanged from skills/other-engines/roblox-simulator-economy
 src/server/                 -> ServerScriptService.Server
   Main.server.luau          starts everything in order
@@ -167,7 +197,11 @@ src/server/                 -> ServerScriptService.Server
   SeabedDecor.luau          kelp forests, coral clusters, starfish and urchins
   PlayerData.luau           DataStore load/save with a session lock, data repair, leaderstats
   Plots.luau                plot assignment, free planting (PlantAt), growth, harvesting
-  ReefIndex.luau            Reef Index finds and set rewards
+  ReefIndex.luau            Reef Index finds, set rewards and IndexRewards (titles, fences, pets)
+  Supplies.luau             Reef Supplies: fences, decorations, gear upgrades, Fertilizer
+  Quests.luau               daily quests: progress and claiming
+  Likes.luau                reef likes at each gate sign
+  Rebirth.luau              rebirths and picking a title
   Pets.luau                 eggs, taking pets out, releasing, and the pet perks
   Teleport.luau             Shop/Home teleports, the whirlpool pads and their bubble effect
   Admin.luau                admin checks, event control, announcements, gifts
@@ -180,20 +214,23 @@ src/server/                 -> ServerScriptService.Server
   TreasureStorm.luau        treasure chests: dropping, opening, rewards
   Shipwreck.luau            the Shipwreck event: sinking, the orca hunt, eating, rewards
   ShipwreckVisuals.luau     the wreck and orca models made from Parts
-  Leaderboard.luau          global "Top Reefs" board (OrderedDataStore of shells earned)
+  Leaderboard.luau          global "Top Reefs" (shells earned) and "Best Reefs" (likes) boards
   RateLimit.luau            per-player token bucket for every request
 src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   Main.client.luau          connects remotes and UI
   OceanEffects.luau         marine snow around the camera, bubbles from divers
   CoralLabels.luau          name and growth countdown over each coral
-  Hud.luau                  shells, bag, sea-event timer, toasts, seed hotbar, Index/Pets and Shop/Home buttons
+  Hud.luau                  shells, bag, sea-event timer, toasts, seed hotbar, side and Shop/Home buttons
+  SuppliesPanel.luau        the Reef Supplies window (Fences, Decor, Gear)
+  QuestsPanel.luau          the Quests window: daily quests, rebirth, titles
+  NameTags.luau             titles and rebirths over players' heads
   Swimming.luau             jump-to-swim movement and animation (client only)
   AdminPanel.luau           the Admin window (shown only to admins)
   IndexPanel.luau           the Reef Index window (3D entries, silhouettes, set progress)
   PetPanel.luau             the Pets window (eggs with odds, your pets)
   PetVisuals.luau           pet models made from Parts
   PetFollowers.luau         everyone's pets swimming beside them (client only)
-  Planter.luau              placement preview ring and click/tap to plant
+  Planter.luau              placement preview ring, click/tap to plant or place decorations
   SeaLife.luau              fish schools, turtles, jellyfish, manta ray, crabs (client only)
   ShopPanel.luau            seed shop window
   Shopkeepers.luau          shopkeeper idle animation, turning and greetings (client only)
@@ -234,8 +271,8 @@ To change the economy with the pacing calculator, see
 
 ```bash
 rojo build default.project.json -o GrowAReef.rbxlx   # builds
-lune run tests/compile_check.luau src                # all 39 scripts compile
-lune run tests/check_place.luau GrowAReef.rbxlx      # 236 checks pass
+lune run tests/compile_check.luau src                # all 47 scripts compile
+lune run tests/check_place.luau GrowAReef.rbxlx      # 362 checks pass
 ```
 
 `check_place` confirms that the remotes exist, that each script has the right class and every

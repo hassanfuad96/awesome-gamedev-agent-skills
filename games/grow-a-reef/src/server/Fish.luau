@@ -13,6 +13,7 @@ local Plots = require(script.Parent.Plots)
 local EventState = require(script.Parent.EventState)
 local Pets = require(script.Parent.Pets)
 local ReefIndex = require(script.Parent.ReefIndex)
+local Quests = require(script.Parent.Quests)
 local RateLimit = require(script.Parent.RateLimit)
 
 local Fish = {}
@@ -133,10 +134,11 @@ local function spawnFish(player: Player, coral: Plots.ReadyCoral)
 			return
 		end
 		caught = true
-		-- A pufferfish makes the catch worth more.
-		local earned = math.floor(value * Pets.fishMultiplier(clicker))
+		-- A pufferfish makes the catch worth more, and so do rebirths.
+		local earned = math.floor(value * Pets.fishMultiplier(clicker) * ReefConfig.shellMultiplier(profile.data.rebirths))
 		PlayerData.addShells(clicker, earned)
 		profile.data.fishCaught += 1
+		Quests.progress(clicker, "fish", 1)
 		Plots.notify(clicker, `Caught a {fishKind.id}! +{EconomyMath.formatNumber(earned)} shells`, if fishKind.multiplier >= 4 then "rare" else "good")
 		ReefIndex.discoverFish(clicker, profile, fishKind.id)
 		PlayerData.sync(clicker)

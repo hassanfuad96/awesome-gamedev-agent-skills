@@ -28,6 +28,8 @@ export type Hud = typeof(setmetatable(
 		flashFrame: Frame,
 		banner: Frame,
 		bannerShownAt: number,
+		placingBar: Frame,
+		questBadge: Frame,
 		onSelect: (string?) -> (),
 	},
 	Hud
@@ -40,9 +42,10 @@ local TONE_COLORS = {
 	bad = Ui.Colors.bad,
 }
 
--- onOpen is called with "index" or "pets" when a side button is pressed, and onTeleport with
--- "shops" or "home" for the teleport buttons on the right.
-function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (string) -> (), onTeleport: (string) -> ()): Hud
+-- onOpen is called with "index", "pets", "quests" or "admin" when a side button is pressed,
+-- onTeleport with "shops" or "home" for the teleport buttons on the right, and
+-- onStopPlacing when the player is done placing decorations.
+function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (string) -> (), onTeleport: (string) -> (), onStopPlacing: () -> ()): Hud
 	local gui = Ui.new("ScreenGui", {
 		Name = "ReefHud",
 		ResetOnSpawn = false,
@@ -123,33 +126,50 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 		}),
 	})
 
-	-- Left edge: the Reef Index and pets, above where the touch thumbstick sits.
+	-- Left edge: the Reef Index, pets and quests, above where the touch thumbstick sits.
 	local side = Ui.new("Frame", {
 		Name = "SideButtons",
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 10, 0.5, -30),
-		Size = UDim2.fromOffset(72, 232),
+		Size = UDim2.fromOffset(66, 288),
 		BackgroundTransparency = 1,
 		Parent = gui,
 	}, { Ui.new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) }) })
 	local sidePanels = {
 		{ id = "index", text = "Index", color = Ui.Colors.accent },
 		{ id = "pets", text = "Pets", color = Ui.Colors.accent },
+		{ id = "quests", text = "Quests", color = Ui.Colors.rare },
 		{ id = "admin", text = "Admin", color = Ui.Colors.bad }, -- only shown to admins
 	}
+	local questBadge
 	for order, panel in sidePanels do
 		local button = Ui.button({
 			Name = panel.text,
 			LayoutOrder = order,
 			Text = panel.text,
-			Size = UDim2.fromOffset(72, 72),
+			Size = UDim2.fromOffset(66, 66),
 			BackgroundColor3 = Ui.Colors.panel,
+			MaxTextSize = 18,
 			Parent = side,
 		})
 		Ui.stroke(panel.color, 2).Parent = button
 		button.Activated:Connect(function()
 			onOpen(panel.id)
 		end)
+		if panel.id == "quests" then
+			-- A "!" when a finished quest is waiting to be claimed.
+			questBadge = Ui.new("Frame", {
+				Name = "Ready",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(1, -6, 0, 6),
+				Size = UDim2.fromOffset(22, 22),
+				BackgroundColor3 = Ui.Colors.bad,
+				Visible = false,
+				ZIndex = 3,
+				Parent = button,
+			}, { Ui.new("UICorner", { CornerRadius = UDim.new(0.5, 0) }) })
+			Ui.label({ Text = "!", Font = Ui.TitleFont, MaxTextSize = 16, ZIndex = 3, Parent = questBadge })
+		end
 		if panel.id == "admin" then
 			-- The server sets IsAdmin; the server also checks every admin request itself.
 			local player = Players.LocalPlayer
@@ -275,6 +295,41 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 		}),
 	})
 
+	-- Above the hotbar while placing decorations: what you're placing, and Done.
+	local placingBar = Ui.new("Frame", {
+		Name = "Placing",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -112),
+		Size = UDim2.new(0.55, 0, 0, 44),
+		BackgroundColor3 = Ui.Colors.panel,
+		BackgroundTransparency = 0.1,
+		Visible = false,
+		Parent = gui,
+	}, {
+		Ui.corner(12),
+		Ui.stroke(Ui.Colors.accent, 2),
+		Ui.new("UISizeConstraint", { MaxSize = Vector2.new(620, 44) }),
+	})
+	Ui.label({
+		Name = "Text",
+		Text = "",
+		MaxTextSize = 16,
+		Position = UDim2.fromOffset(12, 4),
+		Size = UDim2.new(1, -110, 1, -8),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = placingBar,
+	})
+	local done = Ui.button({
+		Name = "Done",
+		Text = "Done",
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -6, 0.5, 0),
+		Size = UDim2.fromOffset(90, 34),
+		MaxTextSize = 16,
+		Parent = placingBar,
+	})
+	done.Activated:Connect(onStopPlacing)
+
 	-- The shells bar sits in the Roblox top bar row, centred in the free space between the
 	-- Roblox buttons (GuiService.TopbarInset). Where there is no top bar, it sits 8 px down.
 	local currentScale = 1
@@ -295,9 +350,11 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeStatus)
 
 	-- Smaller on phones. The hotbar keeps its share of the screen width so more seeds fit.
-	Ui.autoScale({ top, toasts, side, teleports, banner, hotbarHolder }, function(scale)
+	Ui.autoScale({ top, toasts, side, teleports, banner, hotbarHolder, placingBar }, function(scale)
 		currentScale = scale
 		hotbarHolder.Size = UDim2.new(0.55 / scale, 0, 0, 96)
+		placingBar.Size = UDim2.new(0.55 / scale, 0, 0, 44)
+		placingBar.Position = UDim2.new(0.5, 0, 1, -112 * scale)
 		placeStatus()
 	end)
 
@@ -312,20 +369,34 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 		flashFrame = flash,
 		banner = banner,
 		bannerShownAt = 0,
+		placingBar = placingBar,
+		questBadge = questBadge,
 		onSelect = onSelect,
 	}, Hud)
 	return self
 end
 
+-- Shows what is being placed ("Old Anchor", 2 left), or hides the bar with nil.
+function Hud.setPlacing(self: Hud, itemName: string?, left: number)
+	self.placingBar.Visible = itemName ~= nil
+	if itemName then
+		local label = self.placingBar:FindFirstChild("Text") :: TextLabel
+		label.Text = `Placing {itemName} ({left} left): tap inside your fence`
+	end
+end
+
+function Hud.setQuestReady(self: Hud, ready: boolean)
+	self.questBadge.Visible = ready
+end
+
 function Hud.setData(self: Hud, data: any)
 	self.shells.Text = `{EconomyMath.formatNumber(data.shells)} shells`
-	local count = 0
-	for _, amount in data.inventory do
-		count += amount
-	end
+	local count = data.bagCount or 0
+	local capacity = data.bagCapacity or 0
 	self.bag.Text = if count == 0
-		then "Bag empty"
-		else `Bag: {count} coral ({EconomyMath.formatNumber(data.inventoryValue)})`
+		then `Bag empty (0/{capacity})`
+		else `Bag {count}/{capacity} ({EconomyMath.formatNumber(data.inventoryValue)})`
+	self.bag.TextColor3 = if count >= capacity then Ui.Colors.bad else Ui.Colors.muted
 
 	for _, child in self.hotbar:GetChildren() do
 		if child:IsA("TextButton") then

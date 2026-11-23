@@ -8,17 +8,21 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 
+local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
 local AdminPanel = require(script.Parent.AdminPanel)
 local CoralLabels = require(script.Parent.CoralLabels)
 local Hud = require(script.Parent.Hud)
 local IndexPanel = require(script.Parent.IndexPanel)
+local NameTags = require(script.Parent.NameTags)
 local OceanEffects = require(script.Parent.OceanEffects)
 local PetFollowers = require(script.Parent.PetFollowers)
 local PetPanel = require(script.Parent.PetPanel)
 local Planter = require(script.Parent.Planter)
+local QuestsPanel = require(script.Parent.QuestsPanel)
 local SeaLife = require(script.Parent.SeaLife)
 local ShopPanel = require(script.Parent.ShopPanel)
 local Shopkeepers = require(script.Parent.Shopkeepers)
+local SuppliesPanel = require(script.Parent.SuppliesPanel)
 local Swimming = require(script.Parent.Swimming)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -28,7 +32,13 @@ local playerGui = player:WaitForChild("PlayerGui") :: PlayerGui
 local index = IndexPanel.new(playerGui)
 local pets = PetPanel.new(playerGui)
 local admin = AdminPanel.new(playerGui)
-local sidePanels = { index = index, pets = pets, admin = admin }
+local quests = QuestsPanel.new(playerGui)
+local sidePanels = { index = index, pets = pets, quests = quests, admin = admin }
+local function closeSidePanels()
+	for _, window in sidePanels do
+		window:setOpen(false)
+	end
+end
 local hud = Hud.new(playerGui, function(seedId: string?)
 	Remotes.SelectSeed:FireServer(seedId)
 end, function(panel: string)
@@ -39,8 +49,20 @@ end, function(panel: string)
 	end
 end, function(destination: string)
 	Remotes.Teleport:FireServer(destination)
+end, function()
+	Planter.stopPlacing()
 end)
 local shop = ShopPanel.new(playerGui)
+local supplies = SuppliesPanel.new(playerGui, function(itemId: string)
+	Planter.startPlacing(itemId)
+	hud:toast("Teleport Home, then tap inside your fence to place it.", "info")
+end)
+
+local function refreshPlacing()
+	local item = ReefConfig.DecorById[Planter.placingItem() or ""]
+	hud:setPlacing(item and item.name, Planter.placingLeft())
+end
+Planter.onPlacingChanged(refreshPlacing)
 
 Remotes.DataSync.OnClientEvent:Connect(function(data)
 	if type(data) ~= "table" then
@@ -51,6 +73,10 @@ Remotes.DataSync.OnClientEvent:Connect(function(data)
 	Planter.setData(data)
 	index:setData(data)
 	pets:setData(data)
+	quests:setData(data)
+	supplies:setData(data)
+	hud:setQuestReady(QuestsPanel.readyToClaim(data))
+	refreshPlacing()
 end)
 
 Remotes.ShopSync.OnClientEvent:Connect(function(payload)
@@ -95,9 +121,40 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, triggeredBy)
 	if kind == "SeedShop" then
 		shop:setOpen(true, prompt.Parent :: BasePart)
 	elseif kind == "Hatchery" then
-		index:setOpen(false)
-		admin:setOpen(false)
+		closeSidePanels()
 		pets:setOpen(true, prompt.Parent :: BasePart)
+	elseif kind == "Supplies" then
+		closeSidePanels()
+		supplies:setOpen(true, prompt.Parent :: BasePart)
+	end
+end)
+
+-- Some prompts are only for some players: "Pick up" only on your own decorations, and
+-- "Like this reef" only on other people's reefs. Prompts are made by the server, so each
+-- client hides the ones that aren't for it.
+-- Both prompts sit on a part whose parent (the decoration, or the plot) has OwnerUserId.
+local function ownerOf(prompt: ProximityPrompt): number?
+	local holder = prompt.Parent and prompt.Parent.Parent
+	return holder and holder:GetAttribute("OwnerUserId")
+end
+ProximityPromptService.PromptShown:Connect(function(prompt)
+	local kind = prompt:GetAttribute("Kind")
+	if kind ~= "Decor" and kind ~= "LikeReef" then
+		return
+	end
+	local owner = ownerOf(prompt)
+	local hide = if kind == "Decor" then owner ~= player.UserId else (owner == nil or owner == player.UserId)
+	if hide then
+		prompt.Enabled = false
+		-- A reef changes hands when players come and go: check again when it does.
+		local plot = prompt.Parent and prompt.Parent.Parent
+		if kind == "LikeReef" and plot then
+			local connection
+			connection = plot:GetAttributeChangedSignal("OwnerUserId"):Connect(function()
+				connection:Disconnect()
+				prompt.Enabled = true
+			end)
+		end
 	end
 end)
 
@@ -111,6 +168,8 @@ RunService.Heartbeat:Connect(function(dt)
 	hud:updateTimers()
 	shop:update()
 	pets:update()
+	supplies:update()
+	quests:update()
 end)
 
 CoralLabels.start(playerGui)
@@ -120,6 +179,7 @@ SeaLife.start()
 OceanEffects.start()
 PetFollowers.start()
 Swimming.start()
+NameTags.start()
 
 -- Ask for a snapshot in case DataSync fired before these handlers connected.
 Remotes.RequestSync:FireServer()

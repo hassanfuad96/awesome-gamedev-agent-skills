@@ -129,17 +129,19 @@ function IndexPanel.new(playerGui: PlayerGui): IndexPanel
 	local setLine = Ui.label({
 		Name = "SetLine",
 		Text = "",
-		MaxTextSize = 16,
-		Position = UDim2.fromOffset(0, 92),
-		Size = UDim2.new(1, 0, 0, 22),
+		MaxTextSize = 15,
+		TextWrapped = true,
+		Position = UDim2.fromOffset(0, 90),
+		Size = UDim2.new(1, 0, 0, 36),
 		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
 		TextColor3 = Ui.Colors.muted,
 		Parent = root,
 	})
 	local grid = Ui.new("ScrollingFrame", {
 		Name = "Entries",
-		Position = UDim2.fromOffset(0, 120),
-		Size = UDim2.new(1, 0, 1, -120),
+		Position = UDim2.fromOffset(0, 130),
+		Size = UDim2.new(1, 0, 1, -130),
 		BackgroundTransparency = 1,
 		ScrollingDirection = Enum.ScrollingDirection.Y,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
@@ -236,10 +238,14 @@ function IndexPanel.render(self: IndexPanel)
 			foundHere += 1
 		end
 	end
-	local reward = EconomyMath.formatNumber(set.reward)
+	local reward = `{EconomyMath.formatNumber(set.reward)} shells`
+	local extra = ReefConfig.indexRewardText(set.id)
+	if extra then
+		reward ..= ` + {extra}`
+	end
 	self.setLine.Text = if book.sets[set.id]
-		then `{set.name} set complete! ({foundHere}/{#set.entries}, paid {reward} shells)`
-		else `{set.name} set: {foundHere}/{#set.entries} found. Complete it for {reward} shells`
+		then `{set.name} set complete! ({foundHere}/{#set.entries}, won {reward})`
+		else `{set.name}: {foundHere}/{#set.entries} found. Complete it for {reward}`
 
 	-- Viewports are costly to rebuild, so only redraw the grid when what it shows changed.
 	local shown = `{set.id}:{foundHere}`

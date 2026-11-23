@@ -22,7 +22,12 @@ export type PlotParts = {
 	bed: BasePart, -- the round plantable bed (a cylinder lying flat)
 	bedTop: number, -- world Y of the bed's top surface
 	sign: TextLabel,
+	likes: TextLabel, -- under the name on the sign
+	signPart: BasePart, -- holds the "Like this reef" prompt
 	spawn: CFrame,
+	fence: Model, -- swapped when the owner picks another style
+	fenceCenter: Vector3,
+	fenceRadius: number,
 }
 
 export type WorldParts = {
@@ -30,8 +35,10 @@ export type WorldParts = {
 	shopStand: BasePart,
 	sellStand: BasePart,
 	hatcheryStand: BasePart,
+	suppliesStand: BasePart,
 	shopsPad: BasePart, -- the teleport pad's pool by the stands
-	boardList: Frame,
+	boardList: Frame, -- Top Reefs, by shells earned
+	likesBoardList: Frame, -- Best Reefs, by likes
 	currentStream: ParticleEmitter,
 	surface: BasePart,
 	lightShafts: { BasePart },
@@ -382,9 +389,11 @@ local function buildPlot(parent: Instance, index: number): PlotParts
 		end
 	end
 
-	-- The fence runs along the mound's edge, open at the front.
+	-- The fence runs along the mound's edge, open at the front. Plots swaps the style.
 	local fenceRadius = radius + 0.3
-	FenceVisuals.build(ReefConfig.DEFAULT_FENCE, center + Vector3.new(0, 1, 0), fenceRadius, rng).Parent = model
+	local fenceCenter = center + Vector3.new(0, 1, 0)
+	local fence = FenceVisuals.build(ReefConfig.DEFAULT_FENCE, fenceCenter, fenceRadius, Random.new(index))
+	fence.Parent = model
 
 	-- The name sign arches over the gate, high enough to walk under.
 	local front = center + Vector3.new(0, 0, -fenceRadius - 1)
@@ -406,6 +415,26 @@ local function buildPlot(parent: Instance, index: number): PlotParts
 		Parent = model,
 	})
 	local sign = surfaceLabel(signPart, Enum.NormalId.Front, "Empty reef", Color3.fromRGB(200, 240, 255))
+	sign.Size = UDim2.fromScale(1, 0.7)
+	local likes = surfaceLabel(signPart, Enum.NormalId.Front, "", Color3.fromRGB(255, 150, 190))
+	likes.Parent.Name = "LikesGui"
+	likes.Position = UDim2.fromScale(0, 0.68)
+	likes.Size = UDim2.fromScale(1, 0.3)
+	-- Visitors like the reef here; the server's Likes module answers.
+	local likePrompt = Instance.new("ProximityPrompt")
+	likePrompt.Name = "LikePrompt"
+	likePrompt.ActionText = "Like this reef"
+	likePrompt.ObjectText = "Reef rating"
+	likePrompt.HoldDuration = 0.3
+	likePrompt.MaxActivationDistance = 14
+	likePrompt.RequiresLineOfSight = false
+	likePrompt.UIOffset = Vector2.new(0, 40)
+	-- The teleport pad's prompt is close by on E; this one has its own key and shows too.
+	likePrompt.KeyboardKeyCode = Enum.KeyCode.F
+	likePrompt.GamepadKeyCode = Enum.KeyCode.ButtonY
+	likePrompt.Exclusivity = Enum.ProximityPromptExclusivity.AlwaysShow
+	likePrompt:SetAttribute("Kind", "LikeReef")
+	likePrompt.Parent = signPart
 
 	-- You arrive on this pad when teleporting home, and it takes you back to the shops.
 	local spawnPosition = center + Vector3.new(0, 3, -radius - 7)
@@ -418,23 +447,28 @@ local function buildPlot(parent: Instance, index: number): PlotParts
 		bed = bed,
 		bedTop = bed.Position.Y + 0.2,
 		sign = sign,
+		likes = likes,
+		signPart = signPart,
 		spawn = CFrame.lookAt(spawnPosition, center + Vector3.new(0, 3, 0)),
+		fence = fence,
+		fenceCenter = fenceCenter,
+		fenceRadius = fenceRadius,
 	}
 end
 
-local function buildBoard(parent: Instance): Frame
+local function buildBoard(parent: Instance, name: string, x: number, heading: string): Frame
 	local board = part({
-		Name = "TopReefsBoard",
+		Name = name,
 		Size = Vector3.new(20, 14, 1),
 		-- Behind the Pet Hatchery and raised, so its roof doesn't hide the board.
-		Position = Vector3.new(0, 12, -52),
+		Position = Vector3.new(x, 12, -52),
 		Color = Color3.fromRGB(30, 60, 90),
 		Parent = parent,
 	})
 	part({
 		Name = "BoardPost",
 		Size = Vector3.new(1.5, 5, 1.5),
-		Position = Vector3.new(0, 2.5, -52),
+		Position = Vector3.new(x, 2.5, -52),
 		Color = ROCK,
 		Parent = parent,
 	})
@@ -451,7 +485,7 @@ local function buildBoard(parent: Instance): Frame
 	title.Font = Enum.Font.FredokaOne
 	title.TextScaled = true
 	title.TextColor3 = Color3.fromRGB(255, 220, 120)
-	title.Text = "Top Reefs (shells earned)"
+	title.Text = heading
 	title.Parent = gui
 
 	local list = Instance.new("Frame")
@@ -530,7 +564,12 @@ function World.build(): WorldParts
 	local onCounter = CFrame.new(4.5, sellStand.Size.Y / 2, 0)
 	ShopkeeperVisuals.build("Sell", sellStand.CFrame * onCounter * facePlayers).Parent = sellStand.Parent
 	local hatcheryStand = stand(root, "PetHatchery", Vector3.new(0, 0, -26), Color3.fromRGB(150, 95, 220), "Pet Hatchery", "Hatchery", "Hatch eggs")
-	local boardList = buildBoard(root)
+	-- Reef Supplies: fences, decorations and gear, past the Seed Shop. A turtle keeps it.
+	local suppliesStand = stand(root, "ReefSupplies", Vector3.new(-54, 0, -20), Color3.fromRGB(60, 140, 200), "Reef Supplies", "Supplies", "Browse supplies")
+	local onSuppliesCounter = CFrame.new(-4, suppliesStand.Size.Y / 2, 0)
+	ShopkeeperVisuals.build("Supplies", suppliesStand.CFrame * onSuppliesCounter * facePlayers).Parent = suppliesStand.Parent
+	local boardList = buildBoard(root, "TopReefsBoard", -12, "Top Reefs (shells earned)")
+	local likesBoardList = buildBoard(root, "BestReefsBoard", 12, "Best Reefs (likes)")
 	local shopsPad = teleportPad(root, ReefConfig.Teleport.shopsPad, "TeleportHome", "Go to your reef")
 
 	local plotsFolder = Instance.new("Folder")
@@ -576,8 +615,10 @@ function World.build(): WorldParts
 		shopStand = shopStand,
 		sellStand = sellStand,
 		hatcheryStand = hatcheryStand,
+		suppliesStand = suppliesStand,
 		shopsPad = shopsPad,
 		boardList = boardList,
+		likesBoardList = likesBoardList,
 		currentStream = stream,
 		surface = surface,
 		lightShafts = lightShafts,

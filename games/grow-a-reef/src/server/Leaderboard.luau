@@ -1,5 +1,6 @@
 --!nonstrict
--- Global "Top Reefs" board ranked by lifetime shells earned (OrderedDataStore).
+-- Global boards (OrderedDataStore): "Top Reefs" ranked by lifetime shells earned and "Best
+-- Reefs" ranked by likes.
 
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
@@ -51,22 +52,23 @@ local function render(list: Frame, rows: { { name: string, value: number } })
 	end
 end
 
-function Leaderboard.start(worldParts: World.WorldParts)
+-- One board: an OrderedDataStore of `value(data)` for every player, drawn into `list`.
+local function runBoard(storeName: string, list: Frame, value: (PlayerData.Data) -> number)
 	local ok, board = pcall(function()
-		return DataStoreService:GetOrderedDataStore("GrowAReef_TotalEarned_v1")
+		return DataStoreService:GetOrderedDataStore(storeName)
 	end)
 	if not ok then
-		render(worldParts.boardList, {})
+		render(list, {})
 		return
 	end
 	local ordered = board :: OrderedDataStore
 
 	task.spawn(function()
 		while true do
-			-- Push the totals of everyone here, then read the top of the board.
+			-- Push the values of everyone here, then read the top of the board.
 			for player, profile in PlayerData.all() do
 				if profile.persist then
-					local total = math.floor(profile.data.totalEarned)
+					local total = math.floor(value(profile.data))
 					pcall(function()
 						ordered:SetAsync(tostring(player.UserId), total)
 					end)
@@ -80,14 +82,23 @@ function Leaderboard.start(worldParts: World.WorldParts)
 			if readOk then
 				for _, entry in (pages :: DataStorePages):GetCurrentPage() do
 					local userId = tonumber(entry.key)
-					if userId then
+					if userId and entry.value > 0 then
 						table.insert(rows, { name = nameFor(userId), value = entry.value })
 					end
 				end
 			end
-			render(worldParts.boardList, rows)
+			render(list, rows)
 			task.wait(ReefConfig.LEADERBOARD_REFRESH)
 		end
+	end)
+end
+
+function Leaderboard.start(worldParts: World.WorldParts)
+	runBoard("GrowAReef_TotalEarned_v1", worldParts.boardList, function(data)
+		return data.totalEarned
+	end)
+	runBoard("GrowAReef_Likes_v1", worldParts.likesBoardList, function(data)
+		return data.likes
 	end)
 end
 

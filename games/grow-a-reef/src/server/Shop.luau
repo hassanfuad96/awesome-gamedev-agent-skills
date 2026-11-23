@@ -11,6 +11,7 @@ local EconomyMath = require(ReplicatedStorage.Shared.EconomyMath)
 local World = require(script.Parent.World)
 local PlayerData = require(script.Parent.PlayerData)
 local Plots = require(script.Parent.Plots)
+local Quests = require(script.Parent.Quests)
 local RateLimit = require(script.Parent.RateLimit)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -165,9 +166,13 @@ local function sellAll(player: Player)
 		Plots.notify(player, "Nothing to sell. Harvest fully grown coral first.")
 		return
 	end
+	-- Rebirths add their bonus to every sale.
+	total = math.floor(total * ReefConfig.shellMultiplier(profile.data.rebirths))
 	profile.data.inventory = {}
 	PlayerData.addShells(player, total)
 	Plots.notify(player, `Sold {count} coral for {EconomyMath.formatNumber(total)} shells!`, "good")
+	Quests.progress(player, "sell", count)
+	Quests.progress(player, "earn", total)
 	PlayerData.sync(player)
 end
 

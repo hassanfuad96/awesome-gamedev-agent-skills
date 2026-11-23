@@ -53,6 +53,30 @@
         },
         "Announcement": {
           "$className": "RemoteEvent"
+        },
+        "BuyFence": {
+          "$className": "RemoteEvent"
+        },
+        "EquipFence": {
+          "$className": "RemoteEvent"
+        },
+        "BuyDecor": {
+          "$className": "RemoteEvent"
+        },
+        "PlaceDecor": {
+          "$className": "RemoteEvent"
+        },
+        "UpgradeGear": {
+          "$className": "RemoteEvent"
+        },
+        "ClaimQuest": {
+          "$className": "RemoteEvent"
+        },
+        "Rebirth": {
+          "$className": "RemoteEvent"
+        },
+        "EquipTitle": {
+          "$className": "RemoteEvent"
         }
       }
     },

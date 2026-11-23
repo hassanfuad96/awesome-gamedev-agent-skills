@@ -81,6 +81,27 @@ local builders: { [string]: (Model, CFrame) -> () } = {
 			end
 		end
 	end,
+
+	-- An old sea turtle with spectacles, resting on the counter.
+	Supplies = function(model, base)
+		local skin = Color3.fromRGB(120, 170, 110)
+		local shell = Color3.fromRGB(110, 86, 52)
+		piece(model, "Shell", Vector3.new(3.2, 1.7, 3.6), base * CFrame.new(0, 1, 0.3), shell, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+		for i, at in { Vector3.new(0, 1.75, 0.3), Vector3.new(-0.8, 1.55, -0.4), Vector3.new(0.8, 1.55, -0.4), Vector3.new(-0.8, 1.55, 1), Vector3.new(0.8, 1.55, 1) } do
+			piece(model, "Plate", Vector3.new(0.9, 0.3, 0.9), base * CFrame.new(at) * CFrame.Angles(0, math.rad(45), 0), shell:Lerp(Color3.fromRGB(200, 170, 110), 0.3 + i * 0.04), Enum.Material.SmoothPlastic)
+		end
+		piece(model, "Belly", Vector3.new(2.8, 0.5, 3.2), base * CFrame.new(0, 0.35, 0.3), Color3.fromRGB(226, 206, 150), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+		piece(model, "Neck", Vector3.new(0.8, 0.8, 1.2), base * CFrame.new(0, 1.2, -1.6), skin, Enum.Material.SmoothPlastic)
+		piece(model, "Head", Vector3.new(1.4, 1.2, 1.5), base * CFrame.new(0, 1.6, -2.3), skin, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+		for _, side in { -1, 1 } do
+			piece(model, "Eye", Vector3.new(0.3, 0.3, 0.3), base * CFrame.new(side * 0.35, 1.8, -2.95), DARK, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+			piece(model, "Lens", Vector3.new(0.06, 0.5, 0.5), base * CFrame.new(side * 0.35, 1.8, -3.05) * FORWARD, BRASS, Enum.Material.Metal, Enum.PartType.Cylinder)
+			piece(model, "Flipper", Vector3.new(1.6, 0.25, 0.8), base * CFrame.new(side * 1.8, 0.4, -0.7) * CFrame.Angles(0, side * math.rad(-30), 0), skin, Enum.Material.SmoothPlastic)
+			piece(model, "BackFlipper", Vector3.new(1, 0.25, 0.6), base * CFrame.new(side * 1.3, 0.35, 1.9) * CFrame.Angles(0, side * math.rad(35), 0), skin, Enum.Material.SmoothPlastic)
+		end
+		piece(model, "Bridge", Vector3.new(0.3, 0.08, 0.08), base * CFrame.new(0, 1.8, -3.05), BRASS, Enum.Material.Metal)
+		piece(model, "Smile", Vector3.new(0.5, 0.08, 0.05), base * CFrame.new(0, 1.35, -3), DARK, Enum.Material.SmoothPlastic)
+	end,
 }
 
 function ShopkeeperVisuals.build(kind: string, base: CFrame): Model

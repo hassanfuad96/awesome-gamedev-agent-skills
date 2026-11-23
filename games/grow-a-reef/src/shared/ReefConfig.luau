@@ -38,7 +38,9 @@ export type ShopkeeperDef = {
 
 local ReefConfig = {}
 
-ReefConfig.DATA_VERSION = 3 -- 3: stacked mutations, Reef Index, pets; 2: free planting; 1: tile grid
+-- 4: fences, decorations, gear, quests, rebirths, titles, likes; 3: stacked mutations, Reef
+-- Index, pets; 2: free planting; 1: tile grid
+ReefConfig.DATA_VERSION = 4
 ReefConfig.STARTING_SHELLS = 40
 ReefConfig.STARTING_SEEDS = { kelp = 3 } :: { [string]: number }
 ReefConfig.MAX_SEEDS_PER_TYPE = 999
@@ -62,6 +64,11 @@ ReefConfig.EXPAND = { baseCost = 200, costGrowth = 1.2 }
 export type FenceDef = {
 	id: string,
 	name: string,
+	-- How FenceVisuals builds it: "planks" (posts and rails), "hedge" (kelp bushes), "wall"
+	-- (stacked stone), "ribs" (arched bones) or "crystal" (glowing shards).
+	kind: string,
+	price: number, -- shells at Reef Supplies; 0 = free
+	shop: boolean?, -- false: never sold (a Reef Index reward)
 	postColor: Color3,
 	plankColors: { Color3 },
 	material: string,
@@ -71,6 +78,7 @@ export type FenceDef = {
 	brokenChance: number,
 	rope: boolean,
 	barnacles: boolean,
+	glow: Color3?, -- crystal fences light up in this colour
 }
 
 -- Admins get an Admin button: start or stop sea events, announce to this server or every
@@ -111,12 +119,15 @@ ReefConfig.Swim = {
 	maxHeight = 80, -- swim no higher than this, well below the water surface
 }
 
--- Fences around each reef, with a gap at the front to walk in. Only the first style exists
--- so far; more go in this list. Materials are Enum.Material names.
+-- Fences around each reef, with a gap at the front to walk in. Everyone owns the first one;
+-- the rest are bought at Reef Supplies (or won from the Reef Index) and swapped in from there.
+-- Materials are Enum.Material names.
 ReefConfig.Fences = {
 	{
 		id = "shipwood",
 		name = "Shipwreck Wood",
+		kind = "planks",
+		price = 0,
 		-- Salvaged hull planks, sun-bleached, tarred or green with weed. Brighter than they
 		-- look: the underwater tint darkens wood a lot.
 		postColor = Color3.fromRGB(110, 84, 62),
@@ -135,6 +146,73 @@ ReefConfig.Fences = {
 		rope = true, -- rope lashings on some posts
 		barnacles = true,
 	},
+	{
+		-- Thick kelp bushes on stalks, joined by a low leafy hedge.
+		id = "kelp",
+		name = "Kelp Hedge",
+		kind = "hedge",
+		price = 5000,
+		-- Brighter than real kelp: leafy materials render dark under the sea's light.
+		postColor = Color3.fromRGB(110, 190, 90),
+		plankColors = { Color3.fromRGB(130, 220, 110), Color3.fromRGB(100, 205, 120), Color3.fromRGB(170, 235, 120) },
+		material = "LeafyGrass",
+		height = 4,
+		postSpacing = 6,
+		rails = 2,
+		brokenChance = 0,
+		rope = false,
+		barnacles = false,
+	},
+	{
+		-- A low wall of pink coral stone with round pillars.
+		id = "coralstone",
+		name = "Coral Stone Wall",
+		kind = "wall",
+		price = 25000,
+		postColor = Color3.fromRGB(226, 160, 150),
+		plankColors = { Color3.fromRGB(236, 178, 160), Color3.fromRGB(214, 140, 132), Color3.fromRGB(244, 206, 186), Color3.fromRGB(196, 128, 126) },
+		material = "Cobblestone",
+		height = 3.5,
+		postSpacing = 9,
+		rails = 3, -- rows of stones
+		brokenChance = 0,
+		rope = false,
+		barnacles = true,
+	},
+	{
+		-- Giant whale ribs arching over the edge of the reef, with a rope between them.
+		id = "whalebone",
+		name = "Whale Bone",
+		kind = "ribs",
+		price = 120000,
+		postColor = Color3.fromRGB(240, 232, 210),
+		plankColors = { Color3.fromRGB(176, 150, 104) },
+		material = "Limestone",
+		height = 7,
+		postSpacing = 8,
+		rails = 1,
+		brokenChance = 0,
+		rope = true,
+		barnacles = true,
+	},
+	{
+		-- Glowing crystal shards. Only from completing the Glow Anemone set in the Reef Index.
+		id = "crystal",
+		name = "Glow Crystal",
+		kind = "crystal",
+		price = 0,
+		shop = false,
+		postColor = Color3.fromRGB(150, 230, 255),
+		plankColors = { Color3.fromRGB(120, 210, 255), Color3.fromRGB(200, 150, 255), Color3.fromRGB(140, 255, 220) },
+		material = "Glass",
+		height = 5,
+		postSpacing = 6,
+		rails = 1,
+		brokenChance = 0,
+		rope = false,
+		barnacles = false,
+		glow = Color3.fromRGB(130, 220, 255),
+	},
 }
 ReefConfig.DEFAULT_FENCE = "shipwood"
 ReefConfig.FENCE_GATE_WIDTH = 12 -- studs, the opening at the front
@@ -142,6 +220,165 @@ ReefConfig.FenceById = {} :: { [string]: FenceDef }
 for _, fence in ReefConfig.Fences do
 	ReefConfig.FenceById[fence.id] = fence
 end
+
+export type DecorDef = {
+	id: string,
+	name: string,
+	price: number,
+	footprint: number, -- studs of radius it takes up on the reef
+	description: string,
+}
+
+-- Decorations: bought at Reef Supplies, then placed anywhere inside your fence (not on coral,
+-- and not in the gateway). Picking one up puts it back in your storage.
+ReefConfig.Decor = {
+	maxPlaced = 24, -- per reef
+	maxOwned = 99, -- of each kind, placed or in storage
+	edge = 2, -- studs to keep clear inside the fence
+	items = {
+		{ id = "lantern", name = "Lantern Post", price = 800, footprint = 1.5, description = "A glowing lantern on a driftwood post." },
+		{ id = "anchor", name = "Old Anchor", price = 2500, footprint = 2.5, description = "A rusty ship's anchor, half sunk in the sand." },
+		{ id = "chest", name = "Treasure Chest", price = 6000, footprint = 2.5, description = "An open chest spilling gold coins." },
+		{ id = "vent", name = "Bubble Vent", price = 12000, footprint = 2, description = "A rocky vent that bubbles all day." },
+		{ id = "statue", name = "Fish Statue", price = 40000, footprint = 3, description = "A stone fish leaping from a carved plinth." },
+		{ id = "arch", name = "Rock Arch", price = 90000, footprint = 5, description = "A huge natural arch you can swim through." },
+	} :: { DecorDef },
+}
+ReefConfig.DecorById = {} :: { [string]: DecorDef }
+for _, item in ReefConfig.Decor.items do
+	ReefConfig.DecorById[item.id] = item
+end
+ReefConfig.DECOR_TAG = "ReefDecor" -- every placed decoration, for the client's placement preview
+
+-- Gear upgrades, bought one level at a time at Reef Supplies. costs[n] buys level n.
+ReefConfig.Gear = {
+	fertilizer = {
+		id = "fertilizer",
+		name = "Fertilizer",
+		costs = { 1500, 6000, 25000, 90000, 300000 },
+		perLevel = 0.1, -- coral grows 10% faster per level
+	},
+	wand = {
+		id = "wand",
+		name = "Bubble Wand",
+		costs = { 1000, 5000, 20000, 80000, 250000 },
+		-- Clicking a growing coral gives it a burst of growth: per level, 1 second plus 1% of
+		-- its full grow time. Then the wand needs `cooldown` seconds to refill.
+		boostSeconds = 1,
+		boostFraction = 0.01,
+		cooldown = 10,
+	},
+	bag = {
+		id = "bag",
+		name = "Bigger Bag",
+		costs = { 2000, 8000, 30000, 100000, 350000 },
+		base = 30, -- coral your bag holds with no upgrades
+		perLevel = 30,
+	},
+}
+ReefConfig.GEAR_ORDER = { "fertilizer", "wand", "bag" }
+
+function ReefConfig.bagCapacity(level: number): number
+	local bag = ReefConfig.Gear.bag
+	return bag.base + bag.perLevel * level
+end
+
+-- Seconds of growth one wand click gives a coral that takes growSeconds to grow.
+function ReefConfig.wandBoost(level: number, growSeconds: number): number
+	local wand = ReefConfig.Gear.wand
+	return level * (wand.boostSeconds + wand.boostFraction * growSeconds)
+end
+
+export type QuestDef = { id: string, text: string, goal: number, shells: number, seed: { id: string, count: number }? }
+
+-- Daily quests: everyone gets the same `perDay` quests each day (UTC), picked from this pool.
+-- Each quest pays its shells times (your coral slots / 10), so the reward keeps up with you.
+ReefConfig.Quests = {
+	perDay = 3,
+	pool = {
+		{ id = "plant", text = "Plant %d coral", goal = 10, shells = 150 },
+		{ id = "harvest", text = "Harvest %d coral", goal = 10, shells = 200 },
+		{ id = "mutated", text = "Harvest %d mutated coral", goal = 3, shells = 400, seed = { id = "fan", count = 1 } },
+		{ id = "sell", text = "Sell %d coral", goal = 20, shells = 250 },
+		{ id = "fish", text = "Catch %d fish", goal = 5, shells = 250 },
+		{ id = "hatch", text = "Hatch %d pet egg", goal = 1, shells = 300, seed = { id = "anemone", count = 1 } },
+		{ id = "earn", text = "Earn %d shells selling coral", goal = 1000, shells = 300 },
+		{ id = "decor", text = "Place %d decorations", goal = 2, shells = 200 },
+	} :: { QuestDef },
+}
+ReefConfig.QuestById = {} :: { [string]: QuestDef }
+for _, quest in ReefConfig.Quests.pool do
+	ReefConfig.QuestById[quest.id] = quest
+end
+
+-- The day number (UTC) for a time.
+function ReefConfig.dayNumber(time: number): number
+	return time // 86400
+end
+
+-- Today's quest ids. A small fixed generator (not Random) so every server, and the tests, pick
+-- the same quests for a day.
+function ReefConfig.dailyQuests(day: number): { string }
+	local ids = {}
+	for _, quest in ReefConfig.Quests.pool do
+		table.insert(ids, quest.id)
+	end
+	local seed = (day * 7919 + 104729) % 2147483647
+	local picked = {}
+	for _ = 1, math.min(ReefConfig.Quests.perDay, #ids) do
+		seed = (seed * 48271) % 2147483647
+		table.insert(picked, table.remove(ids, seed % #ids + 1))
+	end
+	return picked
+end
+
+function ReefConfig.questShells(quest: QuestDef, unlocked: number): number
+	return math.floor(quest.shells * math.max(1, unlocked / 10))
+end
+
+-- Rebirth: start your reef over for a permanent shell bonus. You keep your pets, Reef Index,
+-- fences, decorations, gear and titles; shells, seeds, coral, your bag and reef size reset.
+ReefConfig.Rebirth = {
+	baseCost = 500000, -- shells for the first rebirth
+	costGrowth = 3, -- each rebirth after that costs this much more (500K, 1.5M, 4.5M, ...)
+	shellBonus = 0.25, -- +25% shells from selling coral and catching fish, per rebirth
+	maxRebirths = 25,
+	-- Optional Roblox badges by rebirth count: create them on the Creator Dashboard, then put
+	-- their ids here, e.g. [1] = 123456789, [5] = 987654321.
+	badges = {} :: { [number]: number },
+}
+
+function ReefConfig.rebirthCost(rebirths: number): number
+	local r = ReefConfig.Rebirth
+	return math.floor(r.baseCost * r.costGrowth ^ rebirths)
+end
+
+function ReefConfig.shellMultiplier(rebirths: number): number
+	return 1 + ReefConfig.Rebirth.shellBonus * rebirths
+end
+
+export type TitleDef = { id: string, text: string, color: Color3 }
+
+-- Titles shown over your head. Earned from Reef Index sets and from rebirthing.
+ReefConfig.Titles = {
+	{ id = "reborn", text = "Reborn", color = Color3.fromRGB(255, 150, 90) },
+	{ id = "kelpkeeper", text = "Kelp Keeper", color = Color3.fromRGB(120, 230, 120) },
+	{ id = "bigbrain", text = "Big Brain", color = Color3.fromRGB(255, 150, 190) },
+	{ id = "fanfavourite", text = "Fan Favourite", color = Color3.fromRGB(190, 140, 255) },
+	{ id = "pearlhunter", text = "Pearl Hunter", color = Color3.fromRGB(235, 240, 255) },
+	{ id = "starlight", text = "Starlight Legend", color = Color3.fromRGB(255, 225, 90) },
+	{ id = "transcendent", text = "Transcendent", color = Color3.fromRGB(130, 255, 225) },
+	{ id = "angler", text = "Master Angler", color = Color3.fromRGB(110, 190, 255) },
+} :: { TitleDef }
+ReefConfig.TitleById = {} :: { [string]: TitleDef }
+for _, title in ReefConfig.Titles do
+	ReefConfig.TitleById[title.id] = title
+end
+
+-- Reef ratings: anyone visiting can like a reef once a day, at the sign over its gate.
+ReefConfig.Likes = {
+	maxRemembered = 200, -- reefs a player's "liked today" list keeps
+}
 
 ReefConfig.SEED_ORDER = { "kelp", "brain", "fan", "anemone", "clam", "star", "seagrass" }
 
@@ -362,6 +599,16 @@ ReefConfig.Shopkeepers = {
 			"Snip snip! Best prices on the seabed.",
 		},
 	},
+	Supplies = {
+		name = "Old Shellby",
+		bob = 0.15,
+		greetings = {
+			"Fences, lanterns, anchors... make that reef your own!",
+			"A Bigger Bag holds more coral between trips to Pinch.",
+			"Fertilizer makes every coral on your reef grow faster.",
+			"Try the Bubble Wand: tap a growing coral to hurry it along.",
+		},
+	},
 } :: { [string]: ShopkeeperDef }
 
 ReefConfig.CORAL_TAG = "Coral" -- every planted coral model, for the client's labels and preview
@@ -386,9 +633,57 @@ function ReefConfig.bedRadius(unlocked: number): number
 	return ReefConfig.BED_RADIUS + ReefConfig.BED_RADIUS_PER_SLOT * (unlocked - ReefConfig.STARTING_SLOTS)
 end
 
+-- The reef's whole mound, out to the fence (the fence stands just past this).
+function ReefConfig.moundRadius(): number
+	return ReefConfig.bedRadius(ReefConfig.MAX_SLOTS) + 3
+end
+
+export type PlacedDecor = { item: string, x: number, z: number }
+
+-- Why a decoration can't go at (x, z) from the plot centre, or nil if it can. Like
+-- plantProblem, shared by the server and the client's preview.
+function ReefConfig.decorProblem(itemId: string, x: number, z: number, plants: { [any]: { x: number, z: number } }, decor: { [any]: PlacedDecor }): string?
+	local item = ReefConfig.DecorById[itemId]
+	if not item then
+		return "That isn't a decoration."
+	end
+	local placed = 0
+	for _ in decor do
+		placed += 1
+	end
+	if placed >= ReefConfig.Decor.maxPlaced then
+		return `Your reef holds {ReefConfig.Decor.maxPlaced} decorations at most. Pick one up first.`
+	end
+	local reach = ReefConfig.moundRadius() - ReefConfig.Decor.edge - item.footprint
+	if not (x * x + z * z <= reach * reach) then -- also refuses NaN
+		return "Place it inside your fence."
+	end
+	-- Keep the way in from the gate (at -Z) clear.
+	if math.abs(x) < ReefConfig.FENCE_GATE_WIDTH / 2 + item.footprint and z < -(reach - 10) then
+		return "Keep the gateway clear."
+	end
+	for _, plant in plants do
+		local dx, dz = plant.x - x, plant.z - z
+		local gap = item.footprint + ReefConfig.PLANT_SPACING / 2
+		if dx * dx + dz * dz < gap * gap then
+			return "Too close to your coral."
+		end
+	end
+	for _, other in decor do
+		local otherItem = ReefConfig.DecorById[other.item]
+		local dx, dz = other.x - x, other.z - z
+		local gap = item.footprint + (if otherItem then otherItem.footprint else 2)
+		if dx * dx + dz * dz < gap * gap then
+			return "Too close to another decoration."
+		end
+	end
+	return nil
+end
+
 -- Why a coral can't be planted at (x, z) from the plot centre, or nil if it can. Shared so
 -- the client's placement preview agrees with the server, which makes the real decision.
-function ReefConfig.plantProblem(x: number, z: number, unlocked: number, plants: { [any]: { x: number, z: number } }): string?
+-- `decor` is the reef's placed decorations, which coral can't grow on.
+function ReefConfig.plantProblem(x: number, z: number, unlocked: number, plants: { [any]: { x: number, z: number } }, decor: { [any]: PlacedDecor }?): string?
 	local count = 0
 	for _ in plants do
 		count += 1
@@ -404,6 +699,14 @@ function ReefConfig.plantProblem(x: number, z: number, unlocked: number, plants:
 		local dx, dz = plant.x - x, plant.z - z
 		if dx * dx + dz * dz < ReefConfig.PLANT_SPACING * ReefConfig.PLANT_SPACING then
 			return "Too close to another coral."
+		end
+	end
+	for _, placed in decor or {} do
+		local item = ReefConfig.DecorById[placed.item]
+		local dx, dz = placed.x - x, placed.z - z
+		local gap = (if item then item.footprint else 2) + ReefConfig.PLANT_SPACING / 2
+		if dx * dx + dz * dz < gap * gap then
+			return "Too close to a decoration."
 		end
 	end
 	return nil
@@ -571,6 +874,50 @@ ReefConfig.Pets = {
 ReefConfig.EggById = {} :: { [string]: EggDef }
 for _, egg in ReefConfig.Pets.eggs do
 	ReefConfig.EggById[egg.id] = egg
+end
+
+export type IndexReward = {
+	title: string?,
+	fence: string?,
+	decor: { id: string, count: number }?,
+	pet: { species: string, golden: boolean }?,
+}
+
+-- What each Reef Index set gives on top of its shells. Players who finished a set before
+-- these rewards existed get them the next time they join.
+ReefConfig.IndexRewards = {
+	kelp = { title = "kelpkeeper" },
+	brain = { title = "bigbrain", decor = { id = "lantern", count = 2 } },
+	fan = { title = "fanfavourite", decor = { id = "anchor", count = 1 } },
+	anemone = { fence = "crystal" },
+	clam = { title = "pearlhunter", pet = { species = "seahorse", golden = true } },
+	star = { title = "starlight", pet = { species = "octopus", golden = true } },
+	seagrass = { title = "transcendent", decor = { id = "arch", count = 1 } },
+	fish = { title = "angler", pet = { species = "pufferfish", golden = true } },
+} :: { [string]: IndexReward }
+
+-- "Kelp Keeper title, Golden Seahorse" for the Reef Index window and the reward message.
+function ReefConfig.indexRewardText(setId: string): string?
+	local reward = ReefConfig.IndexRewards[setId]
+	if not reward then
+		return nil
+	end
+	local parts = {}
+	if reward.title and ReefConfig.TitleById[reward.title] then
+		table.insert(parts, `"{ReefConfig.TitleById[reward.title].text}" title`)
+	end
+	if reward.fence and ReefConfig.FenceById[reward.fence] then
+		table.insert(parts, `{ReefConfig.FenceById[reward.fence].name} fence`)
+	end
+	if reward.decor and ReefConfig.DecorById[reward.decor.id] then
+		local name = ReefConfig.DecorById[reward.decor.id].name
+		table.insert(parts, if reward.decor.count > 1 then `{reward.decor.count} {name}s` else name)
+	end
+	if reward.pet and ReefConfig.Pets.species[reward.pet.species] then
+		local name = ReefConfig.Pets.species[reward.pet.species].name
+		table.insert(parts, if reward.pet.golden then `Golden {name} pet` else `{name} pet`)
+	end
+	return if #parts > 0 then table.concat(parts, ", ") else nil
 end
 
 return ReefConfig

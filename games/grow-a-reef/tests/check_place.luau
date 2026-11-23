@@ -12,22 +12,22 @@ local function check(cond, msg) if cond then print("ok   " .. msg) else failures
 -- 1. Place structure
 local game = roblox.deserializePlace(fs.readFile(process.args[1]))
 local rs = game:GetService("ReplicatedStorage")
-for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify", "Teleport", "Teleported", "AdminAction", "Announcement" } do
+for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify", "Teleport", "Teleported", "AdminAction", "Announcement", "BuyFence", "EquipFence", "BuyDecor", "PlaceDecor", "UpgradeGear", "ClaimQuest", "Rebirth", "EquipTitle" } do
 	local r = rs.Remotes:FindFirstChild(name)
 	check(r and r.ClassName == "RemoteEvent", "remote " .. name)
 end
 local server = game:GetService("ServerScriptService").Server
 check(server.Main.ClassName == "Script", "server Main is a Script")
-for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport", "Shipwreck", "ShipwreckVisuals", "Admin" } do
+for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport", "Shipwreck", "ShipwreckVisuals", "Admin", "Quests", "Supplies", "Likes", "Rebirth" } do
 	check(server:FindFirstChild(m) and server[m].ClassName == "ModuleScript", "server module " .. m)
 end
 local client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 check(client.Main.ClassName == "LocalScript", "client Main is a LocalScript")
-for _, m in { "Swimming", "AdminPanel" } do
+for _, m in { "Swimming", "AdminPanel", "SuppliesPanel", "QuestsPanel", "NameTags" } do
 	check(client:FindFirstChild(m) and client[m].ClassName == "ModuleScript", "client module " .. m)
 end
 check(rs.Shared.ReefConfig.ClassName == "ModuleScript", "shared ReefConfig")
-for _, m in { "CoralVisuals", "FenceVisuals" } do
+for _, m in { "CoralVisuals", "FenceVisuals", "DecorVisuals" } do
 	check(rs.Shared:FindFirstChild(m) and rs.Shared[m].ClassName == "ModuleScript", "shared " .. m)
 end
 check(math.abs(game:GetService("Workspace").Gravity - 70) < 0.01, "Workspace.Gravity = 70")
@@ -141,6 +141,69 @@ end
 for _, entry in Config.Events.treasure.seeds do
 	check(Config.Seeds[entry.id] ~= nil and entry.count >= 1, "treasure seed " .. entry.id .. " exists")
 end
+
+-- Fences, decorations and gear
+local fenceIds = {}
+for _, style in Config.Fences do
+	table.insert(fenceIds, style.id)
+	check(style.kind == "planks" or style.kind == "hedge" or style.kind == "wall" or style.kind == "ribs" or style.kind == "crystal", "fence " .. style.id .. " has a known kind")
+	check(style.price >= 0 and (style.shop == false or style.price > 0 or style.id == Config.DEFAULT_FENCE), "fence " .. style.id .. " is free (default), priced, or an Index reward")
+end
+check(table.concat(fenceIds, ",") == "shipwood,kelp,coralstone,whalebone,crystal", "five fence styles")
+for _, item in Config.Decor.items do
+	check(Config.DecorById[item.id] == item and item.price > 0 and item.footprint > 0, "decoration " .. item.id .. " has a price and footprint")
+end
+local mound = Config.moundRadius()
+check(Config.decorProblem("anchor", 30, 20, {}, {}) == nil, "a decoration fits on open reef")
+check(Config.decorProblem("anchor", mound, 0, {}, {}) ~= nil, "decorations stay inside the fence")
+check(Config.decorProblem("lantern", 0, -mound + 4, {}, {}) ~= nil, "the gateway stays clear")
+check(Config.decorProblem("anchor", 0, 0, { { x = 1, z = 0 } }, {}) ~= nil, "decorations can't go on coral")
+check(Config.decorProblem("anchor", 0, 0, {}, { { item = "chest", x = 3, z = 0 } }) ~= nil and Config.decorProblem("anchor", 0, 0, {}, { { item = "chest", x = 6, z = 0 } }) == nil, "decorations keep their footprints apart")
+check(Config.plantProblem(0, 0, 10, {}, { { item = "statue", x = 2, z = 0 } }) ~= nil and Config.plantProblem(0, 0, 10, {}, { { item = "statue", x = 6, z = 0 } }) == nil, "coral can't grow on a decoration")
+local manyDecor = {}
+for i = 1, Config.Decor.maxPlaced do manyDecor[tostring(i)] = { item = "lantern", x = 100 * i, z = 0 } end
+check(Config.decorProblem("lantern", 0, 0, {}, manyDecor) ~= nil, "a reef holds at most " .. Config.Decor.maxPlaced .. " decorations")
+for _, gearId in Config.GEAR_ORDER do
+	local costs = Config.Gear[gearId].costs
+	local rising = #costs > 0
+	for i = 2, #costs do rising = rising and costs[i] > costs[i - 1] end
+	check(rising, "gear " .. gearId .. " costs rise with each level")
+end
+check(Config.bagCapacity(0) >= 30 and Config.bagCapacity(5) > Config.bagCapacity(0), "the bag holds 30 coral, more with upgrades")
+check(Config.bagCapacity(1) >= Config.MAX_SLOTS, "one bag upgrade holds a full 50-coral reef")
+check(math.abs(Config.wandBoost(1, 1200) - 13) < 1e-9 and Config.wandBoost(0, 1200) == 0, "Bubble Wand level 1 gives 1 s + 1% (13 s for Starlight)")
+
+-- Daily quests
+local q1, q2 = Config.dailyQuests(20000), Config.dailyQuests(20000)
+check(#q1 == Config.Quests.perDay and table.concat(q1, ",") == table.concat(q2, ","), "a day's quests are the same every time")
+local distinct, valid = {}, true
+for _, id in q1 do valid = valid and Config.QuestById[id] ~= nil and not distinct[id]; distinct[id] = true end
+check(valid, "a day's quests are real and all different")
+local varied = false
+for day = 20001, 20010 do varied = varied or table.concat(Config.dailyQuests(day), ",") ~= table.concat(q1, ",") end
+check(varied, "quests change from day to day")
+check(Config.questShells(Config.QuestById.plant, 10) == 150 and Config.questShells(Config.QuestById.plant, 50) == 750, "quest rewards grow with your reef (x1 at 10 slots, x5 at 50)")
+for _, quest in Config.Quests.pool do
+	check(quest.goal > 0 and quest.shells > 0 and string.find(quest.text, "%%d") ~= nil and (not quest.seed or Config.Seeds[quest.seed.id] ~= nil), "quest " .. quest.id .. " has a goal, reward and text")
+end
+
+-- Rebirth, titles and Index rewards
+check(Config.rebirthCost(0) == 500000 and Config.rebirthCost(1) == 1500000 and Config.rebirthCost(2) == 4500000, "rebirths cost 500K, 1.5M, 4.5M ...")
+check(Config.shellMultiplier(0) == 1 and Config.shellMultiplier(2) == 1.5, "each rebirth adds +25% shells")
+for setId, reward in Config.IndexRewards do
+	local setExists = false
+	for _, set in Config.IndexSets do setExists = setExists or set.id == setId end
+	local ok = setExists
+		and (not reward.title or Config.TitleById[reward.title] ~= nil)
+		and (not reward.fence or Config.FenceById[reward.fence] ~= nil)
+		and (not reward.decor or Config.DecorById[reward.decor.id] ~= nil)
+		and (not reward.pet or Config.Pets.species[reward.pet.species] ~= nil)
+	check(ok and Config.indexRewardText(setId) ~= nil, "Index reward for " .. setId .. " is real: " .. tostring(Config.indexRewardText(setId)))
+end
+for _, set in Config.IndexSets do
+	check(Config.IndexRewards[set.id] ~= nil, "Index set " .. set.id .. " has a reward")
+end
+check(Config.FenceById.crystal.shop == false and Config.IndexRewards.anemone.fence == "crystal", "the Glow Crystal fence comes only from the Index")
 
 print(failures == 0 and "ALL PASSED" or (failures .. " FAILED"))
 process.exit(if failures > 0 then 1 else 0)

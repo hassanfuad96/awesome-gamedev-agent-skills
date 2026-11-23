@@ -25,6 +25,9 @@ export type Pet = { species: string, golden: boolean }
 -- What the player has found, by Reef Index entry, and the sets already paid out.
 export type IndexBook = { coral: { [string]: true }, fish: { [string]: true }, sets: { [string]: true } }
 
+-- Today's three daily quests (ReefConfig.dailyQuests(day)): progress and claims by position.
+export type QuestBook = { day: number, progress: { number }, claimed: { boolean } }
+
 export type Data = {
 	version: number,
 	shells: number,
@@ -40,6 +43,19 @@ export type Data = {
 	pets: { [string]: Pet }, -- keyed by pet id
 	petSeq: number, -- the last pet id handed out
 	equipped: { string }, -- pet ids, at most ReefConfig.Pets.maxEquipped
+	fences: { [string]: true }, -- fence styles owned (the default one always is)
+	fence: string, -- the style round your reef
+	decorStorage: { [string]: number }, -- decorations owned but not placed, by item id
+	decor: { [string]: ReefConfig.PlacedDecor }, -- placed decorations, keyed by decor id
+	decorSeq: number, -- the last decor id handed out
+	gear: { [string]: number }, -- gear upgrade levels
+	quests: QuestBook,
+	rebirths: number,
+	titles: { [string]: true }, -- titles earned
+	title: string, -- the title shown over your head, "" for none
+	likes: number, -- likes other players gave your reef
+	liked: { [string]: number }, -- reefs you liked (owner user id) and the day you did
+	indexRewarded: { [string]: true }, -- Reef Index sets whose IndexRewards were given
 }
 
 export type Profile = {
@@ -86,7 +102,34 @@ local function defaultData(): Data
 		pets = {},
 		petSeq = 0,
 		equipped = {},
+		fences = { [ReefConfig.DEFAULT_FENCE] = true },
+		fence = ReefConfig.DEFAULT_FENCE,
+		decorStorage = {},
+		decor = {},
+		decorSeq = 0,
+		gear = {},
+		quests = { day = ReefConfig.dayNumber(os.time()), progress = {}, claimed = {} },
+		rebirths = 0,
+		titles = {},
+		title = "",
+		likes = 0,
+		liked = {},
+		indexRewarded = {},
 	}
+end
+
+-- Starts a new day's quests when the saved ones are from an earlier day. Every slot is filled
+-- in: a remote cuts an array short at its first gap, so the client would lose later quests.
+function PlayerData.freshQuests(data: Data): QuestBook
+	local today = ReefConfig.dayNumber(os.time())
+	if data.quests.day ~= today then
+		data.quests = { day = today, progress = {}, claimed = {} }
+	end
+	for slot = 1, ReefConfig.Quests.perDay do
+		data.quests.progress[slot] = data.quests.progress[slot] or 0
+		data.quests.claimed[slot] = data.quests.claimed[slot] or false
+	end
+	return data.quests
 end
 
 -- Copies the keys of a saved set that pass `valid`, as a fresh { [key]: true }.
@@ -251,6 +294,108 @@ local function sanitize(raw: any): Data
 		end
 	end
 
+	-- Fences: the default is always owned; equipped must be owned.
+	data.fences = cleanKeySet(raw.fences, function(id)
+		return ReefConfig.FenceById[id] ~= nil
+	end)
+	data.fences[ReefConfig.DEFAULT_FENCE] = true
+	data.fence = if type(raw.fence) == "string" and data.fences[raw.fence] then raw.fence else ReefConfig.DEFAULT_FENCE
+
+	-- Decorations: placed ones must still fit where they are (a later rule change or edited
+	-- data sends the rest back to storage), and no kind can exceed maxOwned in total.
+	local owned: { [string]: number } = {}
+	data.decorSeq = math.min(EconomyMath.sanitizeAmount(raw.decorSeq), 1e6)
+	if type(raw.decor) == "table" then
+		for key, placed in raw.decor do
+			local id = tonumber(key)
+			if
+				id
+				and id == math.floor(id)
+				and id >= 1
+				and id <= 1e6
+				and type(placed) == "table"
+				and type(placed.item) == "string"
+				and ReefConfig.DecorById[placed.item]
+				and type(placed.x) == "number"
+				and type(placed.z) == "number"
+				and (owned[placed.item] or 0) < ReefConfig.Decor.maxOwned
+			then
+				owned[placed.item] = (owned[placed.item] or 0) + 1
+				if ReefConfig.decorProblem(placed.item, placed.x, placed.z, {}, data.decor) == nil then
+					data.decor[tostring(id)] = { item = placed.item, x = placed.x, z = placed.z }
+					data.decorSeq = math.max(data.decorSeq, id)
+				else
+					data.decorStorage[placed.item] = (data.decorStorage[placed.item] or 0) + 1
+				end
+			end
+		end
+	end
+	if type(raw.decorStorage) == "table" then
+		for itemId, count in raw.decorStorage do
+			if type(itemId) == "string" and ReefConfig.DecorById[itemId] then
+				local room = ReefConfig.Decor.maxOwned - (owned[itemId] or 0)
+				local clean = math.min(EconomyMath.sanitizeAmount(count), room)
+				if clean > 0 then
+					owned[itemId] = (owned[itemId] or 0) + clean
+					data.decorStorage[itemId] = (data.decorStorage[itemId] or 0) + clean
+				end
+			end
+		end
+	end
+	-- A decoration with coral on top of it (edited data) goes back to storage, so no coral is
+	-- ever lost.
+	for decorId, placed in data.decor do
+		local item = ReefConfig.DecorById[placed.item]
+		for _, plant in data.plants do
+			local dx, dz = plant.x - placed.x, plant.z - placed.z
+			local gap = item.footprint + ReefConfig.PLANT_SPACING / 2
+			if data.decor[decorId] and dx * dx + dz * dz < gap * gap then
+				data.decor[decorId] = nil
+				data.decorStorage[placed.item] = (data.decorStorage[placed.item] or 0) + 1
+			end
+		end
+	end
+
+	if type(raw.gear) == "table" then
+		for _, gearId in ReefConfig.GEAR_ORDER do
+			local level = EconomyMath.sanitizeLevel(raw.gear[gearId], #ReefConfig.Gear[gearId].costs)
+			if level > 0 then
+				data.gear[gearId] = level
+			end
+		end
+	end
+
+	local quests = if type(raw.quests) == "table" then raw.quests else {}
+	if type(quests.day) == "number" and quests.day == math.floor(quests.day) then
+		data.quests.day = quests.day
+		for i = 1, ReefConfig.Quests.perDay do
+			data.quests.progress[i] = math.min(EconomyMath.sanitizeAmount(type(quests.progress) == "table" and quests.progress[i]), 1e9)
+			data.quests.claimed[i] = type(quests.claimed) == "table" and quests.claimed[i] == true
+		end
+	end
+
+	data.rebirths = EconomyMath.sanitizeLevel(raw.rebirths, ReefConfig.Rebirth.maxRebirths)
+	data.titles = cleanKeySet(raw.titles, function(id)
+		return ReefConfig.TitleById[id] ~= nil
+	end)
+	if data.rebirths > 0 then
+		data.titles.reborn = true
+	end
+	data.title = if type(raw.title) == "string" and data.titles[raw.title] then raw.title else ""
+	data.likes = EconomyMath.sanitizeAmount(raw.likes)
+	if type(raw.liked) == "table" then
+		local kept = 0
+		for ownerId, day in raw.liked do
+			if kept < ReefConfig.Likes.maxRemembered and type(ownerId) == "string" and tonumber(ownerId) and type(day) == "number" then
+				data.liked[ownerId] = day
+				kept += 1
+			end
+		end
+	end
+	data.indexRewarded = cleanKeySet(raw.indexRewarded, function(id)
+		return ReefConfig.IndexRewards[id] ~= nil
+	end)
+
 	return data
 end
 
@@ -330,6 +475,10 @@ local function createLeaderstats(player: Player, data: Data)
 	harvested.Name = "Harvested"
 	harvested.Value = data.harvested
 	harvested.Parent = stats
+	local rebirths = Instance.new("IntValue")
+	rebirths.Name = "Rebirths"
+	rebirths.Value = data.rebirths
+	rebirths.Parent = stats
 	stats.Parent = player
 end
 
@@ -420,6 +569,7 @@ function PlayerData.addShells(player: Player, amount: number)
 	profile.data.totalEarned += clean
 end
 
+-- What the bag sells for, rebirth bonus included.
 local function inventoryValue(data: Data): number
 	local total = 0
 	for key, count in data.inventory do
@@ -428,9 +578,32 @@ local function inventoryValue(data: Data): number
 			total += ReefConfig.harvestValue(seedId, mutationId) * count
 		end
 	end
-	return total
+	return math.floor(total * ReefConfig.shellMultiplier(data.rebirths))
 end
 PlayerData.inventoryValue = inventoryValue
+
+-- Coral in the bag, and how much it holds.
+function PlayerData.bagCount(data: Data): number
+	local count = 0
+	for _, amount in data.inventory do
+		count += amount
+	end
+	return count
+end
+
+function PlayerData.bagCapacity(data: Data): number
+	return ReefConfig.bagCapacity(data.gear.bag or 0)
+end
+
+-- Placed decorations by item id.
+local function placedCounts(data: Data): { [string]: number }
+	local placed = {}
+	for _, decor in data.decor do
+		placed[decor.item] = (placed[decor.item] or 0) + 1
+	end
+	return placed
+end
+PlayerData.placedCounts = placedCounts
 
 -- Pushes this player's private state to their client and refreshes leaderstats.
 function PlayerData.sync(player: Player)
@@ -453,7 +626,15 @@ function PlayerData.sync(player: Player)
 		if harvested then
 			harvested.Value = data.harvested
 		end
+		local rebirths = stats:FindFirstChild("Rebirths") :: IntValue?
+		if rebirths then
+			rebirths.Value = data.rebirths
+		end
 	end
+	-- Public: every client's NameTags draws the title and rebirths over this player's head.
+	player:SetAttribute("Title", data.title)
+	player:SetAttribute("Rebirths", data.rebirths)
+	local quests = PlayerData.freshQuests(data)
 	Remotes.DataSync:FireClient(player, {
 		shells = data.shells,
 		seeds = data.seeds,
@@ -467,6 +648,19 @@ function PlayerData.sync(player: Player)
 		index = data.index,
 		pets = data.pets,
 		equipped = data.equipped,
+		bagCount = PlayerData.bagCount(data),
+		bagCapacity = PlayerData.bagCapacity(data),
+		fences = data.fences,
+		fence = data.fence,
+		decorStorage = data.decorStorage,
+		decorPlaced = placedCounts(data),
+		gear = data.gear,
+		quests = quests,
+		rebirths = data.rebirths,
+		rebirthCost = ReefConfig.rebirthCost(data.rebirths),
+		titles = data.titles,
+		title = data.title,
+		likes = data.likes,
 	})
 end
 
