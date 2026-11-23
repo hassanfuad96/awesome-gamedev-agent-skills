@@ -43,19 +43,65 @@ ReefConfig.MAX_SEEDS_PER_TYPE = 999
 
 -- Plot layout. Coral is planted anywhere inside the plot's round reef bed; each coral
 -- uses one slot, and every slot bought also widens the bed.
-ReefConfig.STARTING_SLOTS = 6
-ReefConfig.MAX_SLOTS = 20
-ReefConfig.BED_RADIUS = 16.5 -- studs, with the starting slots
-ReefConfig.BED_RADIUS_PER_SLOT = 0.55 -- extra radius for each slot bought (24.2 at 20 slots)
+ReefConfig.STARTING_SLOTS = 10
+ReefConfig.MAX_SLOTS = 50
+ReefConfig.BED_RADIUS = 37 -- studs, with the starting slots
+ReefConfig.BED_RADIUS_PER_SLOT = 0.425 -- extra radius for each slot bought (54 at 50 slots)
 ReefConfig.PLANT_SPACING = 5 -- minimum studs between two corals
 ReefConfig.PLANT_EDGE = 1.5 -- keep coral this far inside the bed's edge
 ReefConfig.PLANT_REACH = 60 -- how far from your character you can plant
 ReefConfig.PLOT_COUNT = 6 -- one plot per player; set the place's max players to 6
-ReefConfig.PLOT_SPACING = 64 -- studs between plot centres, along X
-ReefConfig.PLOT_ROW_Z = 55 -- the plots' row, behind the stands
+ReefConfig.PLOT_SPACING = 126 -- studs between plot centres, along X
+ReefConfig.PLOT_ROW_Z = 85 -- the plots' row, behind the stands
 
 -- Growing the reef: price of the n-th extra slot = floor(baseCost * costGrowth ^ n)
-ReefConfig.EXPAND = { baseCost = 200, costGrowth = 2 }
+ReefConfig.EXPAND = { baseCost = 200, costGrowth = 1.2 }
+
+export type FenceDef = {
+	id: string,
+	name: string,
+	postColor: Color3,
+	plankColors: { Color3 },
+	material: string,
+	height: number,
+	postSpacing: number,
+	rails: number,
+	brokenChance: number,
+	rope: boolean,
+	barnacles: boolean,
+}
+
+-- Fences around each reef, with a gap at the front to walk in. Only the first style exists
+-- so far; more go in this list. Materials are Enum.Material names.
+ReefConfig.Fences = {
+	{
+		id = "shipwood",
+		name = "Shipwreck Wood",
+		-- Salvaged hull planks, sun-bleached, tarred or green with weed. Brighter than they
+		-- look: the underwater tint darkens wood a lot.
+		postColor = Color3.fromRGB(110, 84, 62),
+		plankColors = {
+			Color3.fromRGB(176, 136, 96),
+			Color3.fromRGB(150, 116, 84),
+			Color3.fromRGB(190, 170, 136),
+			Color3.fromRGB(128, 138, 106),
+			Color3.fromRGB(100, 80, 64),
+		},
+		material = "WoodPlanks",
+		height = 4,
+		postSpacing = 7,
+		rails = 3,
+		brokenChance = 0.1, -- a plank snapped and hanging off one post
+		rope = true, -- rope lashings on some posts
+		barnacles = true,
+	},
+}
+ReefConfig.DEFAULT_FENCE = "shipwood"
+ReefConfig.FENCE_GATE_WIDTH = 12 -- studs, the opening at the front
+ReefConfig.FenceById = {} :: { [string]: FenceDef }
+for _, fence in ReefConfig.Fences do
+	ReefConfig.FenceById[fence.id] = fence
+end
 
 ReefConfig.SEED_ORDER = { "kelp", "brain", "fan", "anemone", "clam", "star" }
 
@@ -245,13 +291,13 @@ ReefConfig.CORAL_TAG = "Coral" -- every planted coral model, for the client's la
 
 -- Ambient sea life (client-side and cosmetic) and where it, and the seabed decoration, roam.
 ReefConfig.SeaLife = {
-	area = { minX = -210, maxX = 210, minZ = -110, maxZ = 150 },
-	fishSchools = 6, -- each school is one species
+	area = { minX = -440, maxX = 440, minZ = -110, maxZ = 230 },
+	fishSchools = 10, -- each school is one species
 	fishPerSchool = 9,
-	turtles = 2,
-	jellyfish = 8,
-	mantas = 1,
-	crabs = 8,
+	turtles = 3,
+	jellyfish = 14,
+	mantas = 2,
+	crabs = 14,
 }
 
 function ReefConfig.expandCost(unlocked: number): number

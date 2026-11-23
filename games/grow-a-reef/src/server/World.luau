@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
+local FenceVisuals = require(ReplicatedStorage.Shared.FenceVisuals)
 local SeabedDecor = require(script.Parent.SeabedDecor)
 local ShopkeeperVisuals = require(script.Parent.ShopkeeperVisuals)
 
@@ -47,6 +48,8 @@ local PLOT_SPACING = ReefConfig.PLOT_SPACING
 local PLOT_ROW_Z = ReefConfig.PLOT_ROW_Z
 -- How far the mound (with its lumpy rim) reaches from a plot's centre.
 local MOUND_REACH = ReefConfig.bedRadius(ReefConfig.MAX_SLOTS) + 7
+-- Rocks, light shafts and decoration spread over the sea life's roaming area.
+local AREA = ReefConfig.SeaLife.area
 
 local function part(props: { [string]: any }): Part
 	local p = Instance.new("Part")
@@ -167,13 +170,14 @@ local function buildSurface(parent: Instance, rng: Random): (BasePart, { BasePar
 		Parent = parent,
 	})
 	local shafts = {}
-	for _ = 1, 14 do
+	for _ = 1, 24 do
 		local width = rng:NextNumber(5, 12)
+		local x, z = rng:NextNumber(AREA.minX, AREA.maxX), rng:NextNumber(AREA.minZ, AREA.maxZ)
 		table.insert(shafts, part({
 			Name = "LightShaft",
 			Shape = Enum.PartType.Cylinder,
 			Size = Vector3.new(120, width, width),
-			CFrame = CFrame.new(rng:NextNumber(-200, 200), 50, rng:NextNumber(-100, 150))
+			CFrame = CFrame.new(x, 50, z)
 				* CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), math.rad(90) + rng:NextNumber(-0.25, 0.25)),
 			Color = Color3.fromRGB(190, 235, 255),
 			Material = Enum.Material.Neon,
@@ -278,8 +282,9 @@ local function buildPlot(parent: Instance, index: number): PlotParts
 
 	-- A round sand mound with a lumpy edge: one big disc plus smaller ones around the rim.
 	disc(model, "Base", radius, 1, center + Vector3.new(0, 0.5, 0), REEF_SAND, Enum.Material.Sand)
-	for i = 1, 7 do
-		local angle = (i / 7) * math.pi * 2 + rng:NextNumber(-0.3, 0.3)
+	local lumps = math.round(radius / 4)
+	for i = 1, lumps do
+		local angle = (i / lumps) * math.pi * 2 + rng:NextNumber(-0.3, 0.3)
 		local lump = rng:NextNumber(4, 7)
 		local at = center + Vector3.new(math.cos(angle), 0, math.sin(angle)) * (radius - lump * 0.5)
 		disc(model, "Base", lump, 1, at + Vector3.new(0, 0.5, 0), REEF_SAND, Enum.Material.Sand)
@@ -288,9 +293,10 @@ local function buildPlot(parent: Instance, index: number): PlotParts
 	-- The bed is where coral goes. Plots resizes it to the owner's slots.
 	local bed = disc(model, "Bed", ReefConfig.bedRadius(ReefConfig.STARTING_SLOTS), 0.4, center + Vector3.new(0, 1.2, 0), BED_SOIL, Enum.Material.Slate)
 
-	-- Rocks and sea grass around the rim, with a gap at the front (-Z) to walk in.
-	for i = 1, 16 do
-		local angle = (i / 16) * math.pi * 2 + rng:NextNumber(-0.12, 0.12)
+	-- Rocks and sea grass inside the rim, with a gap at the front (-Z) to walk in.
+	local rocks = math.round(radius * 0.6)
+	for i = 1, rocks do
+		local angle = (i / rocks) * math.pi * 2 + rng:NextNumber(-0.12, 0.12)
 		local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
 		if direction.Z > -0.85 then
 			local s = rng:NextNumber(1.6, 3.2)
@@ -309,21 +315,26 @@ local function buildPlot(parent: Instance, index: number): PlotParts
 		end
 	end
 
-	local front = center + Vector3.new(0, 0, -radius - 2)
-	for _, x in { -6.5, 6.5 } do
+	-- The fence runs along the mound's edge, open at the front.
+	local fenceRadius = radius + 0.3
+	FenceVisuals.build(ReefConfig.DEFAULT_FENCE, center + Vector3.new(0, 1, 0), fenceRadius, rng).Parent = model
+
+	-- The name sign arches over the gate, high enough to walk under.
+	local front = center + Vector3.new(0, 0, -fenceRadius - 1)
+	for _, x in { -7.5, 7.5 } do
 		part({
 			Name = "SignPost",
-			Size = Vector3.new(0.6, 6, 0.6),
-			Position = front + Vector3.new(x, 3, 0.3),
-			Color = Color3.fromRGB(120, 90, 60),
+			Size = Vector3.new(0.8, 11, 0.8),
+			Position = front + Vector3.new(x, 5.5, 0.3),
+			Color = Color3.fromRGB(96, 72, 52),
 			Material = Enum.Material.Wood,
 			Parent = model,
 		})
 	end
 	local signPart = part({
 		Name = "Sign",
-		Size = Vector3.new(14, 3.5, 0.5),
-		Position = front + Vector3.new(0, 4.6, 0),
+		Size = Vector3.new(16, 3.5, 0.5),
+		Position = front + Vector3.new(0, 9.75, 0),
 		Color = Color3.fromRGB(40, 90, 120),
 		Parent = model,
 	})
@@ -408,9 +419,9 @@ function World.build(): WorldParts
 		return math.abs(z - PLOT_ROW_Z) > MOUND_REACH + 3 and not (math.abs(x) < 60 and z > -60 and z < 10)
 	end
 	local rng = Random.new(42)
-	for i = 1, 40 do
-		local x = rng:NextNumber(-210, 210)
-		local z = rng:NextNumber(-110, 150)
+	for i = 1, 80 do
+		local x = rng:NextNumber(AREA.minX, AREA.maxX)
+		local z = rng:NextNumber(AREA.minZ, AREA.maxZ)
 		if clearOfPlayArea(x, z) then
 			local s = rng:NextNumber(3, 10)
 			local rock = part({
@@ -477,7 +488,7 @@ function World.build(): WorldParts
 	stream.EmissionDirection = Enum.NormalId.Right
 	stream.Speed = NumberRange.new(40, 55)
 	stream.Lifetime = NumberRange.new(span / 45, span / 40)
-	stream.Rate = 60
+	stream.Rate = 120
 	stream.Size = NumberSequence.new(0.5, 1.2)
 	stream.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 1),

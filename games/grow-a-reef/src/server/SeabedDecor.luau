@@ -93,9 +93,9 @@ function SeabedDecor.build(root: Instance, rng: Random, isClear: (number, number
 
 	-- Kelp forests stand towards the edges, where they frame the view without hiding reefs.
 	local function nearEdge(x: number, z: number): boolean
-		return math.abs(x) > 165 or z < -75 or z > 110
+		return math.abs(x) > AREA.maxX - 60 or z < AREA.minZ + 35 or z > AREA.maxZ - 40
 	end
-	for _ = 1, 7 do
+	for _ = 1, 12 do
 		local center = spot(rng, isClear, nearEdge)
 		if center then
 			for _ = 1, rng:NextInteger(6, 9) do
@@ -106,7 +106,7 @@ function SeabedDecor.build(root: Instance, rng: Random, isClear: (number, number
 	end
 
 	-- Coral clusters reuse the planted coral models, grown well past full size.
-	for _ = 1, 9 do
+	for _ = 1, 14 do
 		local center = spot(rng, isClear)
 		if center then
 			for _ = 1, rng:NextInteger(3, 5) do
@@ -120,13 +120,13 @@ function SeabedDecor.build(root: Instance, rng: Random, isClear: (number, number
 		end
 	end
 
-	for _ = 1, 16 do
+	for _ = 1, 28 do
 		local at = spot(rng, isClear)
 		if at then
 			starfish(folder, at, rng)
 		end
 	end
-	for _ = 1, 12 do
+	for _ = 1, 20 do
 		local at = spot(rng, isClear)
 		if at then
 			urchin(folder, at, rng)

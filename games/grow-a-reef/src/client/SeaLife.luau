@@ -31,6 +31,8 @@ type PartOptions = {
 
 local SETTINGS = ReefConfig.SeaLife
 local AREA = SETTINGS.area
+-- The middle of the roaming area, which turtles and mantas circle.
+local MIDDLE_Z = (AREA.minZ + AREA.maxZ) / 2
 local UPDATE_DISTANCE = 320 -- creatures further from the camera than this wait (it's all haze)
 
 local rng = Random.new()
@@ -141,8 +143,8 @@ local function addSchool()
 end
 
 local function addTurtle()
-	local center = Vector3.new(0, rng:NextNumber(24, 34), 20)
-	local turtle = newCreature("SeaTurtle", along(loop(center, rng:NextNumber(90, 130), rng:NextNumber(70, 110), 3, 4)))
+	local center = Vector3.new(0, rng:NextNumber(24, 34), MIDDLE_Z)
+	local turtle = newCreature("SeaTurtle", along(loop(center, rng:NextNumber(200, 320), rng:NextNumber(80, 130), 3, 5)))
 	local shell = Color3.fromRGB(95, 115, 60)
 	local skin = Color3.fromRGB(130, 150, 95)
 	add(turtle, Vector3.new(4.8, 1.7, 6), shell, CFrame.identity, { shape = Enum.PartType.Ball, material = Enum.Material.Slate })
@@ -203,8 +205,8 @@ local function addJellyfish()
 end
 
 local function addManta()
-	local center = Vector3.new(0, rng:NextNumber(38, 46), 20)
-	local manta = newCreature("MantaRay", along(loop(center, 150, 120, 4, 8)))
+	local center = Vector3.new(0, rng:NextNumber(38, 46), MIDDLE_Z)
+	local manta = newCreature("MantaRay", along(loop(center, 300, 140, 4, 9)))
 	local back = Color3.fromRGB(40, 55, 80)
 	add(manta, Vector3.new(3.6, 0.9, 5), back, CFrame.identity, { shape = Enum.PartType.Ball })
 	add(manta, Vector3.new(3.2, 0.6, 4.6), Color3.fromRGB(225, 230, 235), CFrame.new(0, -0.2, 0), { shape = Enum.PartType.Ball })
@@ -221,8 +223,8 @@ end
 
 -- The Whale Pass whale crosses the whole map overhead during the event. Its path runs on
 -- server time, so every player sees it in the same place.
-local WHALE_FROM = Vector3.new(-320, 55, 30)
-local WHALE_TO = Vector3.new(320, 55, 30)
+local WHALE_FROM = Vector3.new(AREA.minX - 40, 55, ReefConfig.PLOT_ROW_Z)
+local WHALE_TO = Vector3.new(AREA.maxX + 40, 55, ReefConfig.PLOT_ROW_Z)
 
 local function addWhale(startedAt: number, endsAt: number): Creature
 	local serverOffset = Workspace:GetServerTimeNow() - os.clock()

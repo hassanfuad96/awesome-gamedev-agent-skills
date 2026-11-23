@@ -24,7 +24,9 @@ end
 local client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 check(client.Main.ClassName == "LocalScript", "client Main is a LocalScript")
 check(rs.Shared.ReefConfig.ClassName == "ModuleScript", "shared ReefConfig")
-check(rs.Shared:FindFirstChild("CoralVisuals") and rs.Shared.CoralVisuals.ClassName == "ModuleScript", "shared CoralVisuals")
+for _, m in { "CoralVisuals", "FenceVisuals" } do
+	check(rs.Shared:FindFirstChild(m) and rs.Shared[m].ClassName == "ModuleScript", "shared " .. m)
+end
 check(math.abs(game:GetService("Workspace").Gravity - 70) < 0.01, "Workspace.Gravity = 70")
 
 -- 2. Every require(script.Parent.X) / Shared.X points at a real sibling
@@ -48,12 +50,19 @@ local Econ = load("src/shared/EconomyMath.luau")
 
 check(Config.harvestValue("brain", "Golden") == 375, "Golden Brain Coral sells for 375")
 check(Config.harvestValue("nope", "None") == 0, "unknown seed sells for 0")
-check(Config.expandCost(6) == 200 and Config.expandCost(7) == 400 and Config.expandCost(19) == 1638400, "expand costs 200, 400 ... 1,638,400")
-check(Config.bedRadius(6) == 16.5 and math.abs(Config.bedRadius(20) - 24.2) < 1e-9, "reef bed grows from 16.5 to 24.2 studs")
+check(Config.expandCost(10) == 200 and Config.expandCost(11) == 240 and Config.expandCost(49) == 244961, "expand costs 200, 240 ... 244,961")
+check(Config.bedRadius(10) == 37 and math.abs(Config.bedRadius(50) - 54) < 1e-9, "reef bed grows from 37 to 54 studs")
 local maxReach = Config.bedRadius(Config.MAX_SLOTS) + 7
 check(Config.PLOT_SPACING >= maxReach * 2, "neighbouring reef mounds don't overlap")
-check(Config.plantProblem(0, 0, 6, {}) == nil, "coral fits in the middle of an empty bed")
-check(Config.plantProblem(15.1, 0, 6, {}) ~= nil and Config.plantProblem(14.9, 0, 6, {}) == nil, "coral must stay 1.5 studs inside the bed edge")
+local rowHalf = (Config.PLOT_COUNT - 1) * Config.PLOT_SPACING / 2 + maxReach
+check(rowHalf < Config.SeaLife.area.maxX and rowHalf < 600, "the row of reefs fits inside the sea area and the seabed")
+check(Config.plantProblem(0, 0, 10, {}) == nil, "coral fits in the middle of an empty bed")
+check(Config.plantProblem(35.6, 0, 10, {}) ~= nil and Config.plantProblem(35.4, 0, 10, {}) == nil, "coral must stay 1.5 studs inside the bed edge")
+local fence = Config.FenceById[Config.DEFAULT_FENCE]
+check(fence ~= nil and fence.name == "Shipwreck Wood" and #fence.plankColors > 0, "the default fence is Shipwreck Wood")
+for _, style in Config.Fences do
+	check(style.height > 0 and style.postSpacing > 0 and style.rails >= 1 and type(style.material) == "string", "fence " .. style.id .. " has a height, post spacing, rails and a material")
+end
 check(Config.plantProblem(4.9, 0, 6, { { x = 0, z = 0 } }) ~= nil and Config.plantProblem(5, 0, 6, { { x = 0, z = 0 } }) == nil, "coral needs 5 studs of spacing")
 local full = {}
 for i = 1, 6 do full[tostring(i)] = { x = (i - 3.5) * 100, z = 0 } end
