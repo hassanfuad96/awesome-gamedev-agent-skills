@@ -115,21 +115,22 @@ local function surfaceLabel(target: BasePart, face: Enum.NormalId, text: string,
 end
 
 local function setupLighting()
-	Lighting.Ambient = Color3.fromRGB(40, 80, 110)
-	Lighting.OutdoorAmbient = Color3.fromRGB(70, 120, 160)
+	Lighting.Ambient = Color3.fromRGB(80, 125, 150)
+	Lighting.OutdoorAmbient = Color3.fromRGB(115, 160, 185)
 	Lighting.ClockTime = 13
-	Lighting.Brightness = 1.6
+	Lighting.Brightness = 2.1
 	Lighting.GlobalShadows = true
 
-	-- Deep water: a dense blue Atmosphere hides the sky and fades distance into blue, so the
-	-- seabed has no visible edge. (Atmosphere replaces Lighting's fog settings.)
+	-- Clear, sunlit water: a light blue Atmosphere hides the sky and fades only the far
+	-- distance into blue, so neighbouring reefs stay visible but the seabed has no visible
+	-- edge. (Atmosphere replaces Lighting's fog settings.)
 	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
-	atmosphere.Density = 0.52
-	atmosphere.Offset = 0.2
-	atmosphere.Color = Color3.fromRGB(70, 170, 205)
-	atmosphere.Decay = Color3.fromRGB(20, 80, 130)
+	atmosphere.Density = 0.36
+	atmosphere.Offset = 0
+	atmosphere.Color = Color3.fromRGB(95, 190, 220)
+	atmosphere.Decay = Color3.fromRGB(45, 125, 175)
 	atmosphere.Glare = 0
-	atmosphere.Haze = 2.5
+	atmosphere.Haze = 1.3
 	atmosphere.Parent = Lighting
 
 	-- No sun, moon or stars overhead; the water surface (buildSurface) takes their place.
@@ -144,8 +145,9 @@ local function setupLighting()
 
 	local tint = Instance.new("ColorCorrectionEffect")
 	tint.Name = "UnderwaterTint"
-	tint.TintColor = Color3.fromRGB(170, 225, 255)
-	tint.Saturation = 0.05
+	tint.TintColor = Color3.fromRGB(195, 232, 255)
+	tint.Contrast = 0.1
+	tint.Saturation = 0.2
 	tint.Parent = Lighting
 
 	local bloom = Instance.new("BloomEffect")
