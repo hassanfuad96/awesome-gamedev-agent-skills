@@ -14,6 +14,7 @@ local World = require(script.Parent.World)
 local PlayerData = require(script.Parent.PlayerData)
 local CoralVisuals = require(script.Parent.CoralVisuals)
 local RateLimit = require(script.Parent.RateLimit)
+local EventState = require(script.Parent.EventState)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 
@@ -139,7 +140,7 @@ local function plant(player: Player, profile: Profile, plot: PlotParts, x: numbe
 		profile.selected = nil
 	end
 
-	local mutation = EconomyMath.pickWeighted(ReefConfig.Mutations, rng:NextNumber())
+	local mutation = EconomyMath.pickWeighted(EventState.mutationWeights(), rng:NextNumber())
 	profile.data.plantSeq += 1
 	local plantId = tostring(profile.data.plantSeq)
 	local newPlant = { seed = seedId, plantedAt = os.time(), mutation = mutation, x = x, z = z }
@@ -328,6 +329,26 @@ function Plots.unmutatedPlants(player: Player): { string }
 		end
 	end
 	return result
+end
+
+-- Whale Pass: every growing coral counts as planted `seconds` earlier, so it grows faster.
+-- Shifting the saved planting time keeps growth a plain timestamp, offline included.
+function Plots.boostGrowth(seconds: number)
+	for player, models in coralModels do
+		local profile = PlayerData.get(player)
+		if profile then
+			for plantId, growing in profile.data.plants do
+				local seed = ReefConfig.Seeds[growing.seed]
+				if seed and growthOf(growing) < 1 then
+					growing.plantedAt -= seconds
+					local model = models[plantId]
+					if model then
+						model:SetAttribute("ReadyAt", growing.plantedAt + seed.growSeconds)
+					end
+				end
+			end
+		end
+	end
 end
 
 function Plots.setMutation(player: Player, plantId: string, mutationId: string): boolean

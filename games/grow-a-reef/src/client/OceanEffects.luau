@@ -1,6 +1,7 @@
 --!nonstrict
 -- Underwater feel close to the player: specks of "marine snow" drifting around the camera,
--- and bubbles rising from every diver's head. Client-only and cosmetic.
+-- and bubbles rising from every diver's head. During a Bioluminescent Night the specks turn
+-- into glowing plankton. Client-only and cosmetic.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -39,9 +40,16 @@ local function marineSnow()
 		NumberSequenceKeypoint.new(0.8, 0.45),
 		NumberSequenceKeypoint.new(1, 1),
 	})
-	snow.Color = ColorSequence.new(Color3.fromRGB(220, 240, 255))
-	snow.LightEmission = 0.4
 	snow.Parent = box
+
+	local function restyle()
+		local night = Workspace:GetAttribute("EventId") == "Night"
+		snow.Color = ColorSequence.new(if night then Color3.fromRGB(90, 255, 220) else Color3.fromRGB(220, 240, 255))
+		snow.LightEmission = if night then 1 else 0.4
+		snow.Rate = if night then 90 else 45
+	end
+	restyle()
+	Workspace:GetAttributeChangedSignal("EventId"):Connect(restyle)
 
 	RunService.RenderStepped:Connect(function()
 		box.CFrame = CFrame.new(Workspace.CurrentCamera.CFrame.Position)

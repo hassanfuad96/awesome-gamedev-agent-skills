@@ -1,5 +1,5 @@
 --!nonstrict
--- Always-on HUD: shells, bag value, ocean-current timer, toasts and the seed hotbar.
+-- Always-on HUD: shells, bag value, sea-event timer, toasts and the seed hotbar.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -19,7 +19,7 @@ export type Hud = typeof(setmetatable(
 		gui: ScreenGui,
 		shells: TextLabel,
 		bag: TextLabel,
-		current: TextLabel,
+		event: TextLabel,
 		toasts: Frame,
 		hotbar: ScrollingFrame,
 		hint: TextLabel,
@@ -89,8 +89,8 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> ()): Hud
 		TextColor3 = Ui.Colors.muted,
 		Parent = shellsPill,
 	})
-	local current = Ui.label({
-		Name = "Current",
+	local event = Ui.label({
+		Name = "SeaEvent",
 		LayoutOrder = 2,
 		Text = "",
 		MaxTextSize = 16,
@@ -159,7 +159,7 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> ()): Hud
 		gui = gui,
 		shells = shells,
 		bag = bag,
-		current = current,
+		event = event,
 		toasts = toasts,
 		hotbar = hotbar,
 		hint = hint,
@@ -300,16 +300,17 @@ end
 
 function Hud.updateTimers(self: Hud)
 	local now = Workspace:GetServerTimeNow()
-	local endsAt = Workspace:GetAttribute("CurrentEndsAt")
-	local nextAt = Workspace:GetAttribute("NextCurrentAt")
-	if type(endsAt) == "number" and endsAt > now then
-		self.current.Text = `Ocean current flowing! {Ui.formatTime(endsAt - now)}`
-		self.current.TextColor3 = Ui.Colors.rare
+	local event = ReefConfig.EventById[Workspace:GetAttribute("EventId")]
+	local endsAt = Workspace:GetAttribute("EventEndsAt")
+	local nextAt = Workspace:GetAttribute("NextEventAt")
+	if event and type(endsAt) == "number" and endsAt > now then
+		self.event.Text = `{event.name}! {Ui.formatTime(endsAt - now)}`
+		self.event.TextColor3 = event.color
 	elseif type(nextAt) == "number" then
-		self.current.Text = `Next ocean current in {Ui.formatTime(nextAt - now)}`
-		self.current.TextColor3 = Ui.Colors.muted
+		self.event.Text = `Next sea event in {Ui.formatTime(nextAt - now)}`
+		self.event.TextColor3 = Ui.Colors.muted
 	else
-		self.current.Text = ""
+		self.event.Text = ""
 	end
 end
 

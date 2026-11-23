@@ -100,13 +100,75 @@ end
 
 ReefConfig.RESTOCK_SECONDS = 300
 
--- Ocean currents flow from plot i to plot i + 1 (the last plot wraps to the first).
+-- Ocean currents (one of the sea events below) flow from plot i to plot i + 1 (the last
+-- plot wraps to the first).
 ReefConfig.Current = {
-	interval = 240, -- seconds between currents
-	duration = 40, -- how long a current lasts
 	tick = 8, -- seconds between spread attempts while it flows
 	spreadChance = 0.35, -- chance per tick, per plot, that one mutation drifts downstream
 }
+
+export type EventDef = {
+	id: string,
+	name: string,
+	weight: number, -- how often it is picked, against the other events
+	duration: number, -- seconds
+	color: Color3, -- HUD timer colour while it runs
+	message: string, -- announced to everyone when it starts
+}
+
+-- Sea events: one at a time, picked at random (never the same twice in a row).
+ReefConfig.Events = {
+	interval = 180, -- seconds from the end of one event to the start of the next
+	list = {
+		{
+			id = "Current", name = "Ocean Current", weight = 30, duration = 40,
+			color = Color3.fromRGB(110, 200, 255),
+			message = "An ocean current is flowing! Mutations can drift between reefs.",
+		},
+		{
+			id = "Night", name = "Bioluminescent Night", weight = 20, duration = 75,
+			color = Color3.fromRGB(120, 255, 220),
+			message = "Bioluminescent Night! The sea goes dark, and Glowing mutations are 3x as likely. Plant now!",
+		},
+		{
+			id = "Frenzy", name = "Feeding Frenzy", weight = 20, duration = 60,
+			color = Color3.fromRGB(255, 170, 90),
+			message = "Feeding Frenzy! Fish come to your coral twice as fast.",
+		},
+		{
+			id = "Treasure", name = "Treasure Storm", weight = 15, duration = 40,
+			color = Color3.fromRGB(255, 205, 80),
+			message = "Treasure Storm! Chests are sinking from the surface. Open them for shells and seeds!",
+		},
+		{
+			id = "Whale", name = "Whale Pass", weight = 15, duration = 50,
+			color = Color3.fromRGB(150, 190, 255),
+			message = "A giant whale is passing overhead! Coral grows twice as fast while it's here.",
+		},
+	} :: { EventDef },
+	glowingMultiplier = 3, -- Bioluminescent Night: Glowing mutation weight x this
+	fishSpawnMultiplier = 2, -- Feeding Frenzy: fish spawn clock runs this much faster
+	growthMultiplier = 2, -- Whale Pass: coral grows this much faster
+	treasure = {
+		every = 3, -- seconds between chests during a storm
+		lifetime = 45, -- seconds before an unopened chest washes away
+		maxChests = 12,
+		shells = { min = 30, max = 200 },
+		seedChance = 0.35, -- otherwise the chest holds shells
+		seeds = {
+			{ id = "brain", weight = 40, count = 2 },
+			{ id = "fan", weight = 30, count = 1 },
+			{ id = "anemone", weight = 18, count = 1 },
+			{ id = "clam", weight = 9, count = 1 },
+			{ id = "star", weight = 3, count = 1 },
+		},
+	},
+}
+
+ReefConfig.EventById = {} :: { [string]: EventDef }
+for _, event in ReefConfig.Events.list do
+	ReefConfig.EventById[event.id] = event
+end
 
 -- Fully grown coral attracts fish that the plot owner can click to catch.
 ReefConfig.Fish = {

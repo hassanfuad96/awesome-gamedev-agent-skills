@@ -10,6 +10,7 @@ local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
 local EconomyMath = require(ReplicatedStorage.Shared.EconomyMath)
 local PlayerData = require(script.Parent.PlayerData)
 local Plots = require(script.Parent.Plots)
+local EventState = require(script.Parent.EventState)
 local RateLimit = require(script.Parent.RateLimit)
 
 local Fish = {}
@@ -175,8 +176,15 @@ function Fish.start()
 	end)
 
 	task.spawn(function()
+		-- A spawn clock rather than a plain wait, so a Feeding Frenzy speeds it up mid-wait.
+		local clock = 0
 		while true do
-			task.wait(ReefConfig.Fish.spawnInterval)
+			task.wait(1)
+			clock += EventState.fishSpawnMultiplier()
+			if clock < ReefConfig.Fish.spawnInterval then
+				continue
+			end
+			clock = 0
 			for _, player in Players:GetPlayers() do
 				for _, coral in Plots.readyCorals(player) do
 					if countFish(player) >= ReefConfig.Fish.maxPerPlot then

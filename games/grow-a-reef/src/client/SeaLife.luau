@@ -1,5 +1,6 @@
 --!nonstrict
--- Ambient sea life: schools of reef fish, sea turtles, jellyfish, a manta ray and crabs.
+-- Ambient sea life: schools of reef fish, sea turtles, jellyfish, a manta ray and crabs,
+-- plus the giant whale of the Whale Pass sea event.
 -- Purely cosmetic, so each client builds and moves its own (nothing replicates, and the
 -- motion stays smooth). Every part has CanQuery off, so clicks and the planting ray pass
 -- straight through to the reef and the catchable fish.
@@ -25,6 +26,7 @@ type PartOptions = {
 	swing: Vector3?, -- swing amplitude in radians around X, Y and Z
 	speed: number?,
 	phase: number?,
+	shadow: boolean?, -- only the biggest creatures cast one
 }
 
 local SETTINGS = ReefConfig.SeaLife
@@ -51,7 +53,7 @@ local function add(creature: Creature, size: Vector3, color: Color3, offset: CFr
 	p.CanCollide = false
 	p.CanTouch = false
 	p.CanQuery = false
-	p.CastShadow = false
+	p.CastShadow = o.shadow == true
 	p.Shape = o.shape or Enum.PartType.Block
 	p.Size = size
 	p.Color = color
@@ -217,6 +219,46 @@ local function addManta()
 	end
 end
 
+-- The Whale Pass whale crosses the whole map overhead during the event. Its path runs on
+-- server time, so every player sees it in the same place.
+local WHALE_FROM = Vector3.new(-320, 55, 30)
+local WHALE_TO = Vector3.new(320, 55, 30)
+
+local function addWhale(startedAt: number, endsAt: number): Creature
+	local serverOffset = Workspace:GetServerTimeNow() - os.clock()
+	local whale = newCreature("Whale", along(function(t)
+		local progress = (t + serverOffset - startedAt) / (endsAt - startedAt)
+		return WHALE_FROM:Lerp(WHALE_TO, progress) + Vector3.new(0, math.sin(progress * math.pi * 3) * 3, 0)
+	end))
+	local skin = Color3.fromRGB(70, 92, 125)
+	add(whale, Vector3.new(14, 12, 42), skin, CFrame.identity, { shape = Enum.PartType.Ball, shadow = true })
+	add(whale, Vector3.new(12, 8, 38), Color3.fromRGB(200, 210, 220), CFrame.new(0, -2.6, -1), { shape = Enum.PartType.Ball })
+	add(whale, Vector3.new(0.8, 2.5, 4), skin, CFrame.new(0, 6, 8) * CFrame.Angles(-0.4, 0, 0))
+	for side = -1, 1, 2 do
+		add(whale, Vector3.new(1.2, 1.2, 1.2), Color3.new(0.05, 0.05, 0.05), CFrame.new(side * 6.3, 0.5, -13), { shape = Enum.PartType.Ball })
+		add(whale, Vector3.new(12, 0.8, 4.5), skin, CFrame.new(side * 6, 0, 0), {
+			pivot = CFrame.new(side * 6, -3, -7) * CFrame.Angles(0, -side * 0.4, -side * 0.3),
+			swing = Vector3.new(0, 0, side * 0.25),
+			speed = 0.7,
+			shadow = true,
+		})
+	end
+	-- The tail stock and flukes beat up and down together from the same pivot.
+	local tailPivot = CFrame.new(0, 0.5, 16)
+	local beat = Vector3.new(0.3, 0, 0)
+	add(whale, Vector3.new(6, 5, 18), skin, CFrame.new(0, 0, 8), { shape = Enum.PartType.Ball, pivot = tailPivot, swing = beat, speed = 0.9, shadow = true })
+	add(whale, Vector3.new(22, 0.8, 6), skin, CFrame.new(0, 0, 17), { pivot = tailPivot, swing = beat, speed = 0.9, shadow = true })
+	return whale
+end
+
+local function removeCreature(creature: Creature)
+	local index = table.find(creatures, creature)
+	if index then
+		table.remove(creatures, index)
+	end
+	creature.model:Destroy()
+end
+
 local CRAB_COLORS = { Color3.fromRGB(220, 80, 50), Color3.fromRGB(240, 130, 40), Color3.fromRGB(180, 60, 90) }
 
 local function addCrab()
@@ -292,8 +334,26 @@ function SeaLife.start()
 		end
 		Workspace:BulkMoveTo(moving, targets, Enum.BulkMoveMode.FireCFrameChanged)
 	end
+	-- The whale exists only while a Whale Pass runs (Events sets these attributes).
+	local whale: Creature? = nil
+	local function onEvent()
+		local startedAt = Workspace:GetAttribute("EventStartedAt")
+		local endsAt = Workspace:GetAttribute("EventEndsAt")
+		local passing = Workspace:GetAttribute("EventId") == "Whale" and type(startedAt) == "number" and type(endsAt) == "number"
+		if passing and not whale then
+			whale = addWhale(startedAt, endsAt)
+			update(true)
+		elseif not passing and whale then
+			removeCreature(whale)
+			whale = nil
+		end
+	end
+	Workspace:GetAttributeChangedSignal("EventId"):Connect(onEvent)
+	Workspace:GetAttributeChangedSignal("EventEndsAt"):Connect(onEvent)
+
 	-- Place everything once, so far-off creatures don't wait at the origin until approached.
 	update(true)
+	onEvent()
 	RunService.Heartbeat:Connect(function()
 		update(false)
 	end)

@@ -30,6 +30,8 @@ export type WorldParts = {
 	sellStand: BasePart,
 	boardList: Frame,
 	currentStream: ParticleEmitter,
+	surface: BasePart,
+	lightShafts: { BasePart },
 }
 
 local World = {}
@@ -148,8 +150,8 @@ local function setupLighting()
 end
 
 -- The water surface far overhead, glowing, with soft shafts of light coming down from it.
-local function buildSurface(parent: Instance, rng: Random)
-	part({
+local function buildSurface(parent: Instance, rng: Random): (BasePart, { BasePart })
+	local surface = part({
 		Name = "WaterSurface",
 		Size = Vector3.new(1400, 2, 1200),
 		Position = Vector3.new(0, 110, 20),
@@ -161,9 +163,10 @@ local function buildSurface(parent: Instance, rng: Random)
 		CastShadow = false, -- it would shade the whole map
 		Parent = parent,
 	})
+	local shafts = {}
 	for _ = 1, 14 do
 		local width = rng:NextNumber(5, 12)
-		part({
+		table.insert(shafts, part({
 			Name = "LightShaft",
 			Shape = Enum.PartType.Cylinder,
 			Size = Vector3.new(120, width, width),
@@ -176,8 +179,9 @@ local function buildSurface(parent: Instance, rng: Random)
 			CanQuery = false,
 			CastShadow = false,
 			Parent = parent,
-		})
+		}))
 	end
+	return surface, shafts
 end
 
 local function bubbleVent(parent: Instance, position: Vector3)
@@ -420,7 +424,7 @@ function World.build(): WorldParts
 		end
 	end
 	SeabedDecor.build(root, rng, clearOfPlayArea)
-	buildSurface(root, rng)
+	local surface, lightShafts = buildSurface(root, rng)
 
 	local spawnLocation = Instance.new("SpawnLocation")
 	spawnLocation.Anchored = true
@@ -487,6 +491,8 @@ function World.build(): WorldParts
 		sellStand = sellStand,
 		boardList = boardList,
 		currentStream = stream,
+		surface = surface,
+		lightShafts = lightShafts,
 	}
 end
 

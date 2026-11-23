@@ -28,7 +28,7 @@ Each stand has a shopkeeper: Captain Coralie, a diver behind the Seed Shop count
 a crab on the Sell Coral counter. They turn to face you and greet you when you walk up. Their
 names and lines are in `ReefConfig.Shopkeepers`.
 
-### Mutations and currents
+### Mutations and sea events
 
 When a seed is planted it can sprout with a mutation that multiplies its sell value:
 
@@ -38,10 +38,19 @@ When a seed is planted it can sprout with a mutation that multiplies its sell va
 | Golden | 2.2% | x5 |
 | Prismatic | 0.3% | x15 |
 
-Every 4 minutes an **ocean current** flows along the row of reefs for 40 seconds. While it
-flows, a fully grown mutated coral can copy its mutation onto an un-mutated coral on the next
-player's reef downstream (the last reef wraps around to the first). Fish caught near
-mutated coral are worth more as well.
+Fish caught near mutated coral are worth more as well.
+
+Every 3 minutes a **sea event** starts for everyone on the server. It is picked at random and
+never the same twice in a row. The timer under your shells counts down to the next one, then
+shows the event running.
+
+| Event | Length | What happens |
+|---|---|---|
+| Ocean Current | 40 s | A grown mutated coral can copy its mutation onto an un-mutated coral on the next player's reef downstream (the last reef wraps around to the first). |
+| Bioluminescent Night | 75 s | The sea goes dark so glowing things stand out, and Glowing mutations are 3x as likely on coral planted now. |
+| Feeding Frenzy | 60 s | Fish come to grown coral twice as fast. |
+| Treasure Storm | 40 s | Chests sink onto the plaza and reefs. Anyone can hold E (or tap) to open one for 30-200 shells, or sometimes rare seeds. Unopened chests wash away after 45 s. |
+| Whale Pass | 50 s | A giant whale crosses overhead, and all coral grows twice as fast while it's there. |
 
 ### Seeds
 
@@ -83,7 +92,7 @@ stored as a timestamp, so coral keeps growing while you're offline.
 ```
 default.project.json        Rojo mapping; also creates the RemoteEvents and sets Gravity = 70
 src/shared/                 -> ReplicatedStorage.Shared
-  ReefConfig.luau           every tunable number: seeds, mutations, fish, currents, prices
+  ReefConfig.luau           every tunable number: seeds, mutations, fish, sea events, prices
   EconomyMath.luau          copied unchanged from skills/other-engines/roblox-simulator-economy
 src/server/                 -> ServerScriptService.Server
   Main.server.luau          starts everything in order
@@ -96,14 +105,17 @@ src/server/                 -> ServerScriptService.Server
   ShopkeeperVisuals.luau    the shopkeeper models made from Parts, tagged "Shopkeeper"
   Shop.luau                 shared stock, buying, expanding, seed selection, selling
   Fish.luau                 fish spawning, swimming and catching
-  Currents.luau             ocean current event and mutation spreading
+  Events.luau               sea event scheduler: timer, banner, night lighting, whale growth boost
+  EventState.luau           the running event's modifiers, read by Plots and Fish
+  Currents.luau             ocean current mutation spreading
+  TreasureStorm.luau        treasure chests: dropping, opening, rewards
   Leaderboard.luau          global "Top Reefs" board (OrderedDataStore of shells earned)
   RateLimit.luau            per-player token bucket for every request
 src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   Main.client.luau          connects remotes and UI
   OceanEffects.luau         marine snow around the camera, bubbles from divers
   CoralLabels.luau          name and growth countdown over each coral
-  Hud.luau                  shells, bag, current timer, toasts, seed hotbar
+  Hud.luau                  shells, bag, sea-event timer, toasts, seed hotbar
   Planter.luau              placement preview ring and click/tap to plant
   SeaLife.luau              fish schools, turtles, jellyfish, manta ray, crabs (client only)
   ShopPanel.luau            seed shop window
@@ -129,7 +141,7 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
 ## Tuning
 
 Change numbers in `src/shared/ReefConfig.luau`. Things you might want to change first:
-`STARTING_SHELLS`, seed prices and grow times, `Mutations` weights, `Current.interval`,
+`STARTING_SHELLS`, seed prices and grow times, `Mutations` weights, `Events` (interval, event weights and lengths, chest rewards),
 `Fish.spawnChance`, `EXPAND` (slot prices are 200, 500, 1,250, 3,125, 7,812, 19,531), and the bed:
 `BED_RADIUS`, `BED_RADIUS_PER_SLOT` and `PLANT_SPACING`. `SeaLife` sets how many of each sea
 creature swim around; the underwater look (Atmosphere, tint) is in `World.luau`'s `setupLighting`.
@@ -154,9 +166,13 @@ expand prices, mutation odds over 200,000 rolls).
 **Checked in Studio** (solo Play through the Studio MCP server, on 2026-11-23): items 1 and 2
 below with the free-planting reef (mouse planting with the green and red preview, the
 too-close and edge refusals, harvesting, fish), and the shopkeepers turning, bobbing and
-greeting. Output showed no game errors, only the expected DataStore warning. Item 5 was checked
-before the reef redesign. Not yet checked: tap-to-plant on a phone, growing the reef (the bed
-widening), and items 3 and 4, which need a published place and two clients.
+greeting. All five sea events were started with item 6 and checked: their timer and banner, the
+night lighting fading out and back, chests landing and paying out, the whale crossing with
+coral growing at 2x, and the current's stream. Growing the reef widened the bed. Output showed
+no game errors, only the expected DataStore warning. Item 5 was checked before the reef
+redesign. Not yet checked: tap-to-plant on a phone, the Glowing odds at night and the fish
+rate in a frenzy (both random, so they need many tries), and items 3 and 4, which need a
+published place and two clients.
 
 Roblox engine behaviour (parts, UI, DataStores, ClickDetectors) only runs inside Studio.
 After changes, run these and check Output:
@@ -170,9 +186,12 @@ After changes, run these and check Output:
 3. **Saving (published test place with API access):** earn shells, stop, play again. The shells,
    seeds, bag and planted coral should all be back, and coral should have kept growing.
 4. **Server & Clients with 2 players** (Test tab): each gets their own reef; trying to plant on the
-   other reef says it's theirs. To test currents quickly, set `Current.interval = 20` and raise the
-   Glowing weight, then check that a mutation crosses to the other reef.
+   other reef says it's theirs. Start a current (see item 6) and raise the Glowing weight, then
+   check that a mutation crosses to the other reef.
 5. **Phone:** Device Simulator, check the hotbar and shop fit and can be tapped.
+6. **Sea events:** in Studio you don't have to wait. In the Command Bar, in the server view, run
+   `workspace:SetAttribute("DebugSeaEvent", "Whale")` (or `Current`, `Night`, `Frenzy`,
+   `Treasure`) to start that event now. This only works in Studio.
 
 ## Known limits and next steps
 

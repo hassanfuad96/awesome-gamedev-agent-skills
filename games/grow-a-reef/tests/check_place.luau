@@ -18,7 +18,7 @@ for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "RequestSync"
 end
 local server = game:GetService("ServerScriptService").Server
 check(server.Main.ClassName == "Script", "server Main is a Script")
-for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "CoralVisuals", "ShopkeeperVisuals", "SeabedDecor" } do
+for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "CoralVisuals", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm" } do
 	check(server:FindFirstChild(m) and server[m].ClassName == "ModuleScript", "server module " .. m)
 end
 local client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
@@ -70,6 +70,15 @@ for _ = 1, 200000 do local id = Econ.pickWeighted(Config.Mutations, math.random(
 check(math.abs(counts.Golden / 200000 * 100 - odds.Golden) < 0.2, string.format("200k rolls: Golden %.2f%% vs %.2f%% expected", counts.Golden / 2000, odds.Golden))
 local fishWeights = Econ.oddsPercent(Config.Fish.kinds)
 check(fishWeights.Moonfish == 2, "Moonfish odds 2%")
+local eventIds = {}
+for _, event in Config.Events.list do
+	check(Config.EventById[event.id] == event and event.duration > 0 and event.weight > 0, "sea event " .. event.id .. " is listed with a duration and weight")
+	table.insert(eventIds, event.id)
+end
+check(table.concat(eventIds, ",") == "Current,Night,Frenzy,Treasure,Whale", "five sea events")
+for _, entry in Config.Events.treasure.seeds do
+	check(Config.Seeds[entry.id] ~= nil and entry.count >= 1, "treasure seed " .. entry.id .. " exists")
+end
 
 print(failures == 0 and "ALL PASSED" or (failures .. " FAILED"))
 process.exit(if failures > 0 then 1 else 0)
