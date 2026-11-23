@@ -12,17 +12,18 @@ local function check(cond, msg) if cond then print("ok   " .. msg) else failures
 -- 1. Place structure
 local game = roblox.deserializePlace(fs.readFile(process.args[1]))
 local rs = game:GetService("ReplicatedStorage")
-for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify" } do
+for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify", "Teleport", "Teleported" } do
 	local r = rs.Remotes:FindFirstChild(name)
 	check(r and r.ClassName == "RemoteEvent", "remote " .. name)
 end
 local server = game:GetService("ServerScriptService").Server
 check(server.Main.ClassName == "Script", "server Main is a Script")
-for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets" } do
+for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport" } do
 	check(server:FindFirstChild(m) and server[m].ClassName == "ModuleScript", "server module " .. m)
 end
 local client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 check(client.Main.ClassName == "LocalScript", "client Main is a LocalScript")
+check(client:FindFirstChild("Swimming") and client.Swimming.ClassName == "ModuleScript", "client module Swimming")
 check(rs.Shared.ReefConfig.ClassName == "ModuleScript", "shared ReefConfig")
 for _, m in { "CoralVisuals", "FenceVisuals" } do
 	check(rs.Shared:FindFirstChild(m) and rs.Shared[m].ClassName == "ModuleScript", "shared " .. m)
@@ -43,7 +44,7 @@ for _, s in game:GetDescendants() do
 end
 
 -- 3. Config and economy logic, run for real with Lune's Roblox datatypes
-local env = { Color3 = roblox.Color3, math = math, string = string, table = table, pairs = pairs, ipairs = ipairs, type = type, tostring = tostring, tonumber = tonumber, error = error, setmetatable = setmetatable }
+local env = { Color3 = roblox.Color3, Vector3 = roblox.Vector3, math = math, string = string, table = table, pairs = pairs, ipairs = ipairs, type = type, tostring = tostring, tonumber = tonumber, error = error, setmetatable = setmetatable }
 local function load(path) return luau.load(fs.readFile(path), { debugName = path, environment = env })() end
 local Config = load("src/shared/ReefConfig.luau")
 local Econ = load("src/shared/EconomyMath.luau")
@@ -58,6 +59,8 @@ local rowHalf = (Config.PLOT_COUNT - 1) * Config.PLOT_SPACING / 2 + maxReach
 check(rowHalf < Config.SeaLife.area.maxX and rowHalf < 600, "the row of reefs fits inside the sea area and the seabed")
 check(Config.plantProblem(0, 0, 10, {}) == nil, "coral fits in the middle of an empty bed")
 check(Config.plantProblem(35.6, 0, 10, {}) ~= nil and Config.plantProblem(35.4, 0, 10, {}) == nil, "coral must stay 1.5 studs inside the bed edge")
+check(Config.Swim.speed > 16 and Config.Swim.rise > 0 and Config.Swim.sink > 0, "swimming is faster than walking (16)")
+check(Config.Teleport.cooldown > 0 and Config.Teleport.shopsPad.Z > -15, "teleport has a cooldown and the shops pad clears the stands")
 local fence = Config.FenceById[Config.DEFAULT_FENCE]
 check(fence ~= nil and fence.name == "Shipwreck Wood" and #fence.plankColors > 0, "the default fence is Shipwreck Wood")
 for _, style in Config.Fences do

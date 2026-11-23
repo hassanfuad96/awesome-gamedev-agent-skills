@@ -17,6 +17,7 @@ local Planter = require(script.Parent.Planter)
 local SeaLife = require(script.Parent.SeaLife)
 local ShopPanel = require(script.Parent.ShopPanel)
 local Shopkeepers = require(script.Parent.Shopkeepers)
+local Swimming = require(script.Parent.Swimming)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local player = Players.LocalPlayer
@@ -31,6 +32,8 @@ end, function(panel: string)
 	local opening = if panel == "index" then not index.gui.Enabled else not pets.gui.Enabled
 	index:setOpen(panel == "index" and opening)
 	pets:setOpen(panel == "pets" and opening)
+end, function(destination: string)
+	Remotes.Teleport:FireServer(destination)
 end)
 local shop = ShopPanel.new(playerGui)
 
@@ -55,6 +58,11 @@ Remotes.Notify.OnClientEvent:Connect(function(text, tone)
 	if type(text) == "string" then
 		hud:toast(text, if type(tone) == "string" then tone else nil)
 	end
+end)
+
+Remotes.Teleported.OnClientEvent:Connect(function()
+	Swimming.stop()
+	hud:flash()
 end)
 
 ProximityPromptService.PromptTriggered:Connect(function(prompt, triggeredBy)
@@ -88,6 +96,7 @@ Shopkeepers.start(playerGui)
 SeaLife.start()
 OceanEffects.start()
 PetFollowers.start()
+Swimming.start()
 
 -- Ask for a snapshot in case DataSync fired before these handlers connected.
 Remotes.RequestSync:FireServer()

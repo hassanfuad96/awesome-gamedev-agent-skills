@@ -71,6 +71,21 @@ export type FenceDef = {
 	barnacles: boolean,
 }
 
+-- Teleporting between the shops and your reef, from the HUD's Shop and Home buttons or the
+-- whirlpool pads (one by the stands, one in front of every reef's gate).
+ReefConfig.Teleport = {
+	cooldown = 3, -- seconds between teleports
+	shopsPad = Vector3.new(0, 0, 4), -- the plaza pad in front of the stands
+}
+
+-- Swimming: jumping pushes off into a swim, which is faster than walking (16 studs/s).
+ReefConfig.Swim = {
+	speed = 34, -- studs per second, in the direction the camera points
+	rise = 20, -- extra upward speed while jump is held
+	sink = 5, -- how fast you drift down when not moving
+	maxHeight = 80, -- swim no higher than this, well below the water surface
+}
+
 -- Fences around each reef, with a gap at the front to walk in. Only the first style exists
 -- so far; more go in this list. Materials are Enum.Material names.
 ReefConfig.Fences = {

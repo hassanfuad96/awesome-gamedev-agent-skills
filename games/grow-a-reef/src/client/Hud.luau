@@ -24,6 +24,7 @@ export type Hud = typeof(setmetatable(
 		toasts: Frame,
 		hotbar: ScrollingFrame,
 		hint: TextLabel,
+		flashFrame: Frame,
 		onSelect: (string?) -> (),
 	},
 	Hud
@@ -36,8 +37,9 @@ local TONE_COLORS = {
 	bad = Ui.Colors.bad,
 }
 
--- onOpen is called with "index" or "pets" when a side button is pressed.
-function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (string) -> ()): Hud
+-- onOpen is called with "index" or "pets" when a side button is pressed, and onTeleport with
+-- "shops" or "home" for the teleport buttons on the right.
+function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (string) -> (), onTeleport: (string) -> ()): Hud
 	local gui = Ui.new("ScreenGui", {
 		Name = "ReefHud",
 		ResetOnSpawn = false,
@@ -142,6 +144,40 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 		end)
 	end
 
+	-- Right edge: teleports, above where the touch jump button sits.
+	local teleports = Ui.new("Frame", {
+		Name = "TeleportButtons",
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -10, 0.5, -30),
+		Size = UDim2.fromOffset(72, 152),
+		BackgroundTransparency = 1,
+		Parent = gui,
+	}, { Ui.new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) }) })
+	for order, place in { { id = "shops", text = "Shop" }, { id = "home", text = "Home" } } do
+		local button = Ui.button({
+			Name = place.text,
+			LayoutOrder = order,
+			Text = place.text,
+			Size = UDim2.fromOffset(72, 72),
+			BackgroundColor3 = Ui.Colors.panel,
+			Parent = teleports,
+		})
+		Ui.stroke(Ui.Colors.good, 2).Parent = button
+		button.Activated:Connect(function()
+			onTeleport(place.id)
+		end)
+	end
+
+	-- A flash of light over the screen when you teleport.
+	local flash = Ui.new("Frame", {
+		Name = "TeleportFlash",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.fromRGB(190, 245, 255),
+		BackgroundTransparency = 1,
+		ZIndex = 10,
+		Parent = gui,
+	})
+
 	-- Bottom: seed hotbar. Kept narrow so it sits between the touch thumbstick and jump button.
 	local hotbarHolder = Ui.new("Frame", {
 		Name = "Hotbar",
@@ -201,7 +237,7 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeStatus)
 
 	-- Smaller on phones. The hotbar keeps its share of the screen width so more seeds fit.
-	Ui.autoScale({ top, toasts, side, hotbarHolder }, function(scale)
+	Ui.autoScale({ top, toasts, side, teleports, hotbarHolder }, function(scale)
 		currentScale = scale
 		hotbarHolder.Size = UDim2.new(0.55 / scale, 0, 0, 96)
 		placeStatus()
@@ -215,6 +251,7 @@ function Hud.new(playerGui: PlayerGui, onSelect: (string?) -> (), onOpen: (strin
 		toasts = toasts,
 		hotbar = hotbar,
 		hint = hint,
+		flashFrame = flash,
 		onSelect = onSelect,
 	}, Hud)
 	return self
@@ -348,6 +385,14 @@ function Hud.toast(self: Hud, text: string, tone: string?)
 		task.wait(0.45)
 		toast:Destroy()
 	end)
+end
+
+function Hud.flash(self: Hud)
+	if Ui.reducedMotion() then
+		return
+	end
+	self.flashFrame.BackgroundTransparency = 0.15
+	TweenService:Create(self.flashFrame, TweenInfo.new(0.6), { BackgroundTransparency = 1 }):Play()
 end
 
 function Hud.updateTimers(self: Hud)

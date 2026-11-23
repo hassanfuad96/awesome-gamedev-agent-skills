@@ -30,6 +30,7 @@ export type WorldParts = {
 	shopStand: BasePart,
 	sellStand: BasePart,
 	hatcheryStand: BasePart,
+	shopsPad: BasePart, -- the teleport pad's pool by the stands
 	boardList: Frame,
 	currentStream: ParticleEmitter,
 	surface: BasePart,
@@ -214,6 +215,70 @@ local function bubbleVent(parent: Instance, position: Vector3)
 	bubbles.Parent = vent
 end
 
+-- A whirlpool teleport pad: a stone ring round a glowing pool, four marker stones with
+-- glowing tips, and bubbles rising off it. The server's Teleport module answers its prompt.
+local function teleportPad(parent: Instance, position: Vector3, kind: string, action: string): BasePart
+	local model = Instance.new("Model")
+	model.Name = "TeleportPad"
+	model.Parent = parent
+	local glow = Color3.fromRGB(90, 220, 240)
+	disc(model, "Ring", 4.5, 0.6, position + Vector3.new(0, 0.3, 0), ROCK, Enum.Material.Slate)
+	local pool = disc(model, "Pool", 3.6, 0.1, position + Vector3.new(0, 0.62, 0), glow, Enum.Material.Neon)
+	pool.Transparency = 0.25
+	pool.CanCollide = false
+	for i = 1, 4 do
+		local angle = (i / 4) * math.pi * 2 + math.pi / 4
+		local at = position + Vector3.new(math.cos(angle), 0, math.sin(angle)) * 4.2
+		part({
+			Name = "MarkerStone",
+			Size = Vector3.new(0.9, 2.6, 0.9),
+			Position = at + Vector3.new(0, 1.3, 0),
+			Color = ROCK,
+			Material = Enum.Material.Basalt,
+			Parent = model,
+		})
+		part({
+			Name = "MarkerGlow",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.7, 0.7, 0.7),
+			Position = at + Vector3.new(0, 2.8, 0),
+			Color = glow,
+			Material = Enum.Material.Neon,
+			CanCollide = false,
+			Parent = model,
+		})
+	end
+	local light = Instance.new("PointLight")
+	light.Color = glow
+	light.Range = 12
+	light.Brightness = 1.5
+	light.Parent = pool
+	local bubbles = Instance.new("ParticleEmitter")
+	bubbles.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	bubbles.Color = ColorSequence.new(Color3.fromRGB(200, 245, 255))
+	bubbles.LightEmission = 0.5
+	bubbles.Size = NumberSequence.new(0.3, 0.7)
+	bubbles.Transparency = NumberSequence.new(0.2, 1)
+	bubbles.Lifetime = NumberRange.new(2, 4)
+	bubbles.Rate = 10
+	bubbles.Speed = NumberRange.new(3, 6)
+	bubbles.RotSpeed = NumberRange.new(-90, 90)
+	bubbles.SpreadAngle = Vector2.new(20, 20)
+	bubbles.EmissionDirection = Enum.NormalId.Top
+	bubbles.Parent = pool
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "TeleportPrompt"
+	prompt.ActionText = action
+	prompt.ObjectText = "Whirlpool"
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 8
+	prompt.RequiresLineOfSight = false
+	prompt:SetAttribute("Kind", kind)
+	prompt.Parent = pool
+	return pool
+end
+
 local function stand(parent: Instance, name: string, position: Vector3, color: Color3, title: string, kind: string, action: string): BasePart
 	local model = Instance.new("Model")
 	model.Name = name
@@ -340,7 +405,9 @@ local function buildPlot(parent: Instance, index: number): PlotParts
 	})
 	local sign = surfaceLabel(signPart, Enum.NormalId.Front, "Empty reef", Color3.fromRGB(200, 240, 255))
 
+	-- You arrive on this pad when teleporting home, and it takes you back to the shops.
 	local spawnPosition = center + Vector3.new(0, 3, -radius - 7)
+	teleportPad(model, spawnPosition - Vector3.new(0, 3, 0), "TeleportShops", "Go to the shops")
 	return {
 		index = index,
 		model = model,
@@ -462,6 +529,7 @@ function World.build(): WorldParts
 	ShopkeeperVisuals.build("Sell", sellStand.CFrame * onCounter * facePlayers).Parent = sellStand.Parent
 	local hatcheryStand = stand(root, "PetHatchery", Vector3.new(0, 0, -26), Color3.fromRGB(150, 95, 220), "Pet Hatchery", "Hatchery", "Hatch eggs")
 	local boardList = buildBoard(root)
+	local shopsPad = teleportPad(root, ReefConfig.Teleport.shopsPad, "TeleportHome", "Go to your reef")
 
 	local plotsFolder = Instance.new("Folder")
 	plotsFolder.Name = "Plots"
@@ -506,6 +574,7 @@ function World.build(): WorldParts
 		shopStand = shopStand,
 		sellStand = sellStand,
 		hatcheryStand = hatcheryStand,
+		shopsPad = shopsPad,
 		boardList = boardList,
 		currentStream = stream,
 		surface = surface,

@@ -273,6 +273,12 @@ function Plots.release(player: Player)
 	coralModels[player] = nil
 end
 
+-- Where the player arrives home: on the pad in front of their reef's gate.
+function Plots.homeFor(player: Player): CFrame?
+	local plot = plotByPlayer[player]
+	return plot and plot.spawn
+end
+
 -- Called after the reef grows: widens the bed to the new slot count.
 function Plots.refresh(player: Player)
 	local profile = PlayerData.get(player)

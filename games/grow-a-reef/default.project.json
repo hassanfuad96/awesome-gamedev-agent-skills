@@ -41,6 +41,12 @@
         },
         "Notify": {
           "$className": "RemoteEvent"
+        },
+        "Teleport": {
+          "$className": "RemoteEvent"
+        },
+        "Teleported": {
+          "$className": "RemoteEvent"
         }
       }
     },

@@ -21,6 +21,8 @@ repository (`skills/other-engines/roblox-*`).
 | Fence | Every reef has a Shipwreck Wood fence with a gate at the front, under the name sign. More fence styles can be added to `ReefConfig.Fences`. |
 | Reef Index | Press **Index** on the left. Every coral in every mutation combo, and every fish. |
 | Pets | Hatch eggs at the **Pet Hatchery** (purple stand), then take pets out from **Pets** on the left. |
+| Teleport | **Shop** and **Home** on the right take you to the stands or your reef (3 s cooldown). The glowing whirlpool pads by the stands and in front of each reef gate do the same. |
+| Swim | Jump to start swimming: about twice walking speed, in the direction the camera points (tilt it well down or up to dive or rise). Hold jump to swim up; let go of everything to drift down and land. |
 
 The whole map is underwater: deep-blue haze instead of sky, a glowing surface with light shafts
 far overhead, kelp forests, coral clusters, starfish and urchins on the seabed, and drifting
@@ -146,6 +148,7 @@ src/server/                 -> ServerScriptService.Server
   Plots.luau                plot assignment, free planting (PlantAt), growth, harvesting
   ReefIndex.luau            Reef Index finds and set rewards
   Pets.luau                 eggs, taking pets out, releasing, and the pet perks
+  Teleport.luau             Shop/Home teleports, the whirlpool pads and their bubble effect
   ShopkeeperVisuals.luau    the shopkeeper models made from Parts, tagged "Shopkeeper"
   Shop.luau                 shared stock, buying, expanding, seed selection, selling
   Fish.luau                 fish spawning, swimming and catching
@@ -159,7 +162,8 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   Main.client.luau          connects remotes and UI
   OceanEffects.luau         marine snow around the camera, bubbles from divers
   CoralLabels.luau          name and growth countdown over each coral
-  Hud.luau                  shells, bag, sea-event timer, toasts, seed hotbar, Index/Pets buttons
+  Hud.luau                  shells, bag, sea-event timer, toasts, seed hotbar, Index/Pets and Shop/Home buttons
+  Swimming.luau             jump-to-swim movement and animation (client only)
   IndexPanel.luau           the Reef Index window (3D entries, silhouettes, set progress)
   PetPanel.luau             the Pets window (eggs with odds, your pets)
   PetVisuals.luau           pet models made from Parts
@@ -205,8 +209,8 @@ To change the economy with the pacing calculator, see
 
 ```bash
 rojo build default.project.json -o GrowAReef.rbxlx   # builds
-lune run tests/compile_check.luau src                # all 33 scripts compile
-lune run tests/check_place.luau GrowAReef.rbxlx      # 189 checks pass
+lune run tests/compile_check.luau src                # all 35 scripts compile
+lune run tests/check_place.luau GrowAReef.rbxlx      # 202 checks pass
 ```
 
 `check_place` confirms that the remotes exist, that each script has the right class and every
