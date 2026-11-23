@@ -52,6 +52,13 @@ local function isTile(instance: Instance): boolean
 	return instance:IsA("BasePart") and instance:GetAttribute("TileIndex") ~= nil
 end
 
+-- Only the next tile to unlock gets a "Locked" label, so six of them don't pile up on screen.
+local function isFirstLocked(tile: BasePart, plot: Instance): boolean
+	local index = tile:GetAttribute("TileIndex")
+	local previous = if type(index) == "number" then plot:FindFirstChild("Tile_" .. (index - 1)) else nil
+	return previous == nil or previous:GetAttribute("Locked") ~= true
+end
+
 local function refresh(tile: BasePart, label: Label, now: number)
 	local seedId = tile:GetAttribute("Seed")
 	local plot = tile.Parent
@@ -77,7 +84,7 @@ local function refresh(tile: BasePart, label: Label, now: number)
 			label.status.Text = if mine then "Ready! Click to harvest" else "Ready!"
 			label.status.TextColor3 = Ui.Colors.good
 		end
-	elseif mine and tile:GetAttribute("Locked") == true then
+	elseif mine and tile:GetAttribute("Locked") == true and isFirstLocked(tile, plot :: Instance) then
 		label.gui.Enabled = true
 		label.title.Text = "Locked"
 		label.title.TextColor3 = Ui.Colors.muted

@@ -30,7 +30,7 @@ local spawnConnections: { [Player]: RBXScriptConnection } = {}
 local rng = Random.new()
 
 local MIN_SCALE = 0.25
-local EMPTY_COLOR = Color3.fromRGB(120, 96, 70)
+local EMPTY_COLOR = Color3.fromRGB(140, 100, 66) -- matches the tile colour World.luau builds
 local LOCKED_COLOR = Color3.fromRGB(60, 56, 52)
 
 local function notify(player: Player, text: string, tone: string?)

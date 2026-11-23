@@ -216,8 +216,9 @@ local function buildPlot(parent: Instance, index: number): PlotParts
 				Name = "Tile_" .. tileIndex,
 				Size = Vector3.new(size - 1, 0.4, size - 1),
 				Position = center + offset,
-				Color = Color3.fromRGB(120, 96, 70),
-				Material = Enum.Material.Ground,
+				-- Ground renders almost black under the underwater lighting; Slate stays brown.
+				Color = Color3.fromRGB(140, 100, 66),
+				Material = Enum.Material.Slate,
 				Parent = model,
 			})
 			tile:SetAttribute("TileIndex", tileIndex)

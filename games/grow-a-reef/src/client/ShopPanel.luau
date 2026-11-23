@@ -5,6 +5,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GuiService = game:GetService("GuiService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
@@ -46,7 +47,8 @@ function ShopPanel.new(playerGui: PlayerGui): ShopPanel
 		Name = "Root",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(0.92, 0.8),
+		-- Nearly full height: a landscape phone is ~340 px tall, and 0.8 left room for one seed row.
+		Size = UDim2.fromScale(0.92, 0.94),
 		BackgroundColor3 = Ui.Colors.panel,
 		Parent = gui,
 	}, {
@@ -208,9 +210,12 @@ function ShopPanel.setOpen(self: ShopPanel, open: boolean, stand: BasePart?)
 	self.stand = if open then stand else nil
 	if open then
 		self:render()
-		-- Give gamepad players a focused button straight away.
-		local first = self.rows[ReefConfig.SEED_ORDER[1]]
-		GuiService.SelectedObject = if first then first.button else nil
+		-- Give gamepad players a focused button straight away. Mouse and touch players
+		-- don't need it, and the selection box reads as a stuck highlight to them.
+		if string.find(UserInputService:GetLastInputType().Name, "^Gamepad") then
+			local first = self.rows[ReefConfig.SEED_ORDER[1]]
+			GuiService.SelectedObject = if first then first.button else nil
+		end
 	elseif GuiService.SelectedObject and GuiService.SelectedObject:IsDescendantOf(self.gui) then
 		GuiService.SelectedObject = nil
 	end
