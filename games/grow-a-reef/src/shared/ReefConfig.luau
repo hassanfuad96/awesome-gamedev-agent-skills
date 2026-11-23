@@ -722,7 +722,7 @@ ReefConfig.Hunt = {
 	shells = 4000, -- x the digger's coral slots / 10
 	seeds = { { id = "star", count = 1 }, { id = "clam", count = 2 } },
 	seagrassChance = 0.1,
-	clearOfBuildings = 30, -- studs from any lagoon building
+	clearOfBuildings = 50, -- studs from any lagoon building's centre (the Lab dome is 36 across its radius)
 	rimFallback = 180, -- lagoon edge if ReefConfig.Lagoon.rimRadius isn't set
 }
 

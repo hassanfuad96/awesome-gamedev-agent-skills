@@ -30,9 +30,10 @@ local found = false
 
 -- Lagoon landmarks a clue can point at, by their ReefConfig.Lagoon key.
 local LANDMARKS = {
-	{ key = "research", name = "the Research Station" },
-	{ key = "upgrade", name = "the Upgrade Station" },
-	{ key = "coralShop", name = "the Coral Shop" },
+	{ key = "research", name = "the Research Laboratory" },
+	{ key = "aquarium", name = "the Aquarium" },
+	{ key = "coralShop", name = "the Coral Market" },
+	{ key = "upgrade", name = "the Equipment Station" },
 	{ key = "oceanGate", name = "the Ocean Gate" },
 	{ key = "boards", name = "the leaderboards" },
 	{ key = "guide", name = "Inky" },
