@@ -359,7 +359,8 @@ tappable. The orca glides to its goal under its movers. The Whale Pass whale swi
 forward. All four animate near the camera.
 Batch 4 (same day): all sixteen templates build. The coelacanth, anglerfish and sea dragon swap
 to their meshes in the Ruins, face along their paths, have no leftover Parts and the lure glows.
-The squid wasn't due to rise during the test, so it hasn't been seen in Play yet.
+In a later Play test the squid rose out of the Wreck Basin on time as its mesh: upright, all five
+pieces animating, no Parts left behind.
 Batch 5 (same day): all twenty templates build. The four Abyss creatures swap to their meshes,
 face along their paths, keep their lights, stay level where upright, and the octopus's ears
 and arms animate near the camera.
