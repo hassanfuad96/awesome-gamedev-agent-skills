@@ -32,6 +32,8 @@ local Suits = require(script.Parent.Suits)
 local CreatureModels = require(script.Parent.CreatureModels)
 local ShopkeeperVisuals = require(script.Parent.ShopkeeperVisuals)
 local Monetization = require(script.Parent.Monetization)
+local Rewards = require(script.Parent.Rewards)
+local Social = require(script.Parent.Social)
 
 CreatureModels.start() -- the mesh creatures' templates load in the background
 local worldParts = World.build()
@@ -58,6 +60,8 @@ Kelp.start(worldParts.kelp)
 Research.start(worldParts)
 Oxygen.start()
 Monetization.start() -- Robux purchases: before PlayerData, so pass checks run on every join
+Rewards.start() -- daily streak, offline earnings, boosts, codes, group, referrals, weekly board
+Social.start(worldParts) -- visiting, watering and trading
 -- The crew and diving suits are cosmetic: if one of them breaks (say a place synced without
 -- the ChooseSuit remote), warn and carry on, so saves, reefs and teleports still start.
 -- Crew goes after every world is built: the crew stand at their counters.

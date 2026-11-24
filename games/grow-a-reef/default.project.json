@@ -92,6 +92,33 @@
         },
         "ChooseSuit": {
           "$className": "RemoteEvent"
+        },
+        "SetGiftTarget": {
+          "$className": "RemoteEvent"
+        },
+        "RedeemCode": {
+          "$className": "RemoteEvent"
+        },
+        "ClaimGroup": {
+          "$className": "RemoteEvent"
+        },
+        "WeeklyBoard": {
+          "$className": "RemoteEvent"
+        },
+        "Welcome": {
+          "$className": "RemoteEvent"
+        },
+        "VisitReef": {
+          "$className": "RemoteEvent"
+        },
+        "TradeRequest": {
+          "$className": "RemoteEvent"
+        },
+        "TradeAction": {
+          "$className": "RemoteEvent"
+        },
+        "TradeSync": {
+          "$className": "RemoteEvent"
         }
       }
     },

@@ -70,12 +70,25 @@ export type Data = {
 	research: { [string]: true }, -- coral species researched at the lab (ReefConfig.Research)
 	ownedPasses: { [string]: true }, -- Store game passes owned (ReefConfig.Store keys), re-checked on join
 	receipts: { [string]: number }, -- recent developer product purchase ids → when granted (Monetization)
+	giftedPasses: { [string]: true }, -- passes a friend gifted (Store gifts); kept, never re-checked
+	starterBought: boolean, -- bought the Starter Pack
+	joinedAt: number, -- first join (os.time); the Starter Pack is offered for a few days after it
+	lastSeen: number, -- os.time of the last save, for offline earnings; 0 before the first one
+	login: { day: number, streak: number }, -- daily login streak (Rewards)
+	codes: { [string]: true }, -- codes redeemed
+	groupRewarded: boolean,
+	referredBy: number, -- the user id whose invite brought this player here first, 0 if none
+	referralsClaimed: number, -- friends this player invited who've been rewarded
+	weekly: { week: number, start: number, prized: number }, -- weekly board: totalEarned when the week began, last week prized
+	watering: { day: number, given: number, received: number, reefs: { [string]: true } },
 }
 
 export type Profile = {
 	data: Data,
 	persist: boolean, -- false when DataStores are unavailable (Studio without API access)
 	selected: string?, -- seed chosen in the hotbar; not saved
+	isNew: boolean?, -- first time in the game (no save yet)
+	awaySeconds: number?, -- how long since the last save, at join (0 for new players)
 }
 
 local STORE_NAME = "GrowAReef_PlayerData_v1"
@@ -138,7 +151,26 @@ local function defaultData(): Data
 		research = {},
 		ownedPasses = {},
 		receipts = {},
+		giftedPasses = {},
+		starterBought = false,
+		joinedAt = os.time(),
+		lastSeen = 0,
+		login = { day = 0, streak = 0 },
+		codes = {},
+		groupRewarded = false,
+		referredBy = 0,
+		referralsClaimed = 0,
+		weekly = { week = ReefConfig.weekNumber(os.time()), start = 0, prized = 0 },
+		watering = { day = 0, given = 0, received = 0, reefs = {} },
 	}
+end
+
+-- A whole number from a save, else `default`.
+local function wholeNumber(value: any, default: number): number
+	if type(value) == "number" and value == value and value == math.floor(value) and math.abs(value) < 1e15 then
+		return value
+	end
+	return default
 end
 
 -- Starts a new day's quests when the saved ones are from an earlier day. Every slot is filled
@@ -447,6 +479,42 @@ local function sanitize(raw: any): Data
 			data.receipts[recent[i].id] = recent[i].at
 		end
 	end
+	data.giftedPasses = cleanKeySet(raw.giftedPasses, function(key)
+		return ReefConfig.StorePassByKey[key] ~= nil
+	end)
+	data.starterBought = raw.starterBought == true
+	-- Saves from before joinedAt existed count from now, so they get the Starter Pack's days too.
+	data.joinedAt = wholeNumber(raw.joinedAt, os.time())
+	-- Saves from before lastSeen existed aren't new players: count them as just seen.
+	data.lastSeen = wholeNumber(raw.lastSeen, os.time())
+	if type(raw.login) == "table" then
+		data.login = { day = wholeNumber(raw.login.day, 0), streak = math.max(0, wholeNumber(raw.login.streak, 0)) }
+	end
+	data.codes = cleanKeySet(raw.codes, function(code)
+		return #code <= 24
+	end)
+	data.groupRewarded = raw.groupRewarded == true
+	data.referredBy = math.max(0, wholeNumber(raw.referredBy, 0))
+	data.referralsClaimed = math.max(0, wholeNumber(raw.referralsClaimed, 0))
+	if type(raw.weekly) == "table" then
+		data.weekly = {
+			week = wholeNumber(raw.weekly.week, data.weekly.week),
+			start = math.max(0, wholeNumber(raw.weekly.start, data.totalEarned)),
+			prized = wholeNumber(raw.weekly.prized, 0),
+		}
+	else
+		data.weekly.start = data.totalEarned -- this week counts from now
+	end
+	if type(raw.watering) == "table" then
+		data.watering = {
+			day = wholeNumber(raw.watering.day, 0),
+			given = math.max(0, wholeNumber(raw.watering.given, 0)),
+			received = math.max(0, wholeNumber(raw.watering.received, 0)),
+			reefs = cleanKeySet(raw.watering.reefs, function(id)
+				return tonumber(id) ~= nil
+			end),
+		}
+	end
 	-- Saves from before the tutorial: anyone who has already grown or earned something has
 	-- played, so they skip it.
 	local finished = #ReefConfig.Tutorial.steps + 1
@@ -610,7 +678,16 @@ local function onPlayerAdded(player: Player)
 		return
 	end
 
-	local profile: Profile = { data = data, persist = persist, selected = nil }
+	local now = os.time()
+	local isNew = data.lastSeen == 0
+	local profile: Profile = {
+		data = data,
+		persist = persist,
+		selected = nil,
+		isNew = isNew,
+		awaySeconds = if isNew then 0 else math.max(0, now - data.lastSeen),
+	}
+	data.lastSeen = now
 	profiles[player] = profile
 	createLeaderstats(player, data)
 	player:SetAttribute("DataLoaded", true)
@@ -626,6 +703,7 @@ function PlayerData.save(player: Player, release: boolean): boolean
 	if not profile or not profile.persist then
 		return false
 	end
+	profile.data.lastSeen = os.time()
 	return write(keyFor(player), deepCopy(profile.data), release)
 end
 
@@ -654,11 +732,26 @@ function PlayerData.addShells(player: Player, amount: number)
 	profile.data.totalEarned += clean
 end
 
+-- Whether the player has a Store pass, bought or gifted.
+function PlayerData.hasPass(data: Data, key: string): boolean
+	return data.ownedPasses[key] == true or data.giftedPasses[key] == true
+end
+
+-- Sale bonuses that aren't saved (Roblox Premium, friends in the server), set by Rewards.
+local boosts: { [Data]: number } = setmetatable({}, { __mode = "k" }) :: any
+
+function PlayerData.setBoost(player: Player, boost: number)
+	local profile = profiles[player]
+	if profile then
+		boosts[profile.data] = boost
+	end
+end
+
 -- What selling coral and catching fish pay on top of their value: the rebirth bonus, doubled
--- with the 2x Shells game pass.
+-- with the 2x Shells game pass, plus the Premium and friend boosts.
 function PlayerData.saleMultiplier(data: Data): number
-	local passBonus = if data.ownedPasses.doubleShells then ReefConfig.Store.doubleShells else 1
-	return ReefConfig.shellMultiplier(data.rebirths) * passBonus
+	local passBonus = if PlayerData.hasPass(data, "doubleShells") then ReefConfig.Store.doubleShells else 1
+	return ReefConfig.shellMultiplier(data.rebirths) * passBonus * (1 + (boosts[data] or 0))
 end
 
 -- What the bag sells for, bonuses included.
@@ -684,7 +777,7 @@ function PlayerData.bagCount(data: Data): number
 end
 
 function PlayerData.bagCapacity(data: Data): number
-	local passBonus = if data.ownedPasses.vipBag then ReefConfig.Store.vipBagBonus else 0
+	local passBonus = if PlayerData.hasPass(data, "vipBag") then ReefConfig.Store.vipBagBonus else 0
 	return ReefConfig.bagCapacity(data.gear.bag or 0) + passBonus
 end
 
@@ -728,6 +821,19 @@ function PlayerData.sync(player: Player)
 	player:SetAttribute("Title", data.title)
 	player:SetAttribute("Rebirths", data.rebirths)
 	local quests = PlayerData.freshQuests(data)
+	-- Passes bought or gifted: for the Store window, and (as an attribute) for anyone picking a
+	-- gift for this player.
+	local passes = {}
+	local passList = {}
+	for _, pass in ReefConfig.Store.passes do
+		if PlayerData.hasPass(data, pass.key) then
+			passes[pass.key] = true
+			table.insert(passList, pass.key)
+		end
+	end
+	player:SetAttribute("Passes", table.concat(passList, ","))
+	local now = os.time()
+	local starterEnds = data.joinedAt + ReefConfig.Store.starter.days * 86400
 	Remotes.DataSync:FireClient(player, {
 		shells = data.shells,
 		pearls = data.pearls,
@@ -756,7 +862,14 @@ function PlayerData.sync(player: Player)
 		titles = data.titles,
 		title = data.title,
 		likes = data.likes,
-		ownedPasses = data.ownedPasses,
+		ownedPasses = passes,
+		starterEndsAt = if data.starterBought or now >= starterEnds then nil else starterEnds,
+		boost = boosts[data] or 0,
+		login = data.login,
+		groupRewarded = data.groupRewarded,
+		referrals = data.referralsClaimed,
+		weeklyEarned = if data.weekly.week == ReefConfig.weekNumber(now) then math.max(0, data.totalEarned - data.weekly.start) else 0,
+		watering = data.watering,
 		tutorial = data.tutorial,
 		ruins = data.ruins,
 		abyss = data.abyss,

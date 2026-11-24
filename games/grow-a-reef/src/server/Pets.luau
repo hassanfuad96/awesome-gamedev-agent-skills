@@ -67,6 +67,7 @@ local function publish(player: Player)
 	end
 	player:SetAttribute("EquippedPets", table.concat(shown, ","))
 end
+Pets.publish = publish -- after a trade moves pets (Social)
 
 local function count(t: { [any]: any }): number
 	local n = 0

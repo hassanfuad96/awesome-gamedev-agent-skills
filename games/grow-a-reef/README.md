@@ -525,12 +525,59 @@ Dashboard (Monetization) and the Store shows the new one.
 | Personal Restock | product | 25 R$ | Every seed fully stocked, just for you, for 5 minutes. |
 | Shell Pouch | product | 49 R$ | 25,000 shells. |
 | Shell Chest | product | 299 R$ | 250,000 shells. |
+| Starter Pack | product | 99 R$ | Golden Seahorse, 5 Glow Anemone and 2 Pearl Clam seeds, 20,000 shells. Shown only in a player's first 3 days, until bought. |
+| Gift: Shell Chest | product | 299 R$ | 250,000 shells for a friend in the server. |
+| Gift: 2x Shells | product | 349 R$ | The 2x Shells pass for a friend, forever. |
+| Gift: VIP Bag | product | 149 R$ | The VIP Bag pass for a friend, forever. |
+
+Gifts: pressing **Gift** asks who it's for (anyone else in the server; people who already have
+that pass are greyed out), then opens the purchase. The friend gets it if they're still in the
+server; if they left, the buyer gets it instead. A gifted pass the friend already has turns
+into 250,000 shells. Gifted passes are saved in `giftedPasses` and count just like bought ones.
 
 `Monetization.luau` is the only purchase handler: passes are checked with Roblox on join and after
 a purchase; each product receipt is recorded with its grant and saved before Roblox is told it
 was granted, so a repeated receipt never pays twice. The game's owner owns every pass, so in
 Studio the Store shows them as Owned; test product purchases in Studio are free. The icons are
 in `store-icons/`.
+
+### Rewards and friends
+
+Under the Store button are **Rewards** and **Friends**. Everything here is decided on the server
+(`Rewards.luau`, `Social.luau`) and recorded in the save, so each reward is given once. The
+numbers are in `ReefConfig.Rewards`.
+
+- **Daily streak:** one reward a day (UTC) on joining, or at midnight while playing. Days 1 to 7:
+  500 shells, 1,000, 2 Glow Anemone seeds, 2,500, 1 Pearl Clam seed, 5,000, then 10,000 plus a
+  Starlight Coral seed; then it starts again at day 1. Missing one day keeps the streak.
+- **Offline earnings:** 1 shell a minute for each unlocked planter while you're away (at least
+  5 minutes, at most 8 hours), times your sale bonus. Coral keeps growing too. A "Welcome back!"
+  popup shows what you earned, your daily reward and how much coral is ready.
+- **Shell boost:** +10% on sales for Roblox Premium members, and +10% for each friend in the
+  same server (up to +50%). It stacks with rebirths and 2x Shells.
+- **Invite friends:** the Invite button opens Roblox's invite prompt. A friend who joins from it
+  for the first time gets 2,000 shells; once they've stayed 5 minutes, you get 5,000 (in any
+  server, within about 5 minutes). 3 friends gives the Reef Ambassador title.
+- **Codes:** players type a code in the Rewards window. The codes are in `Rewards.luau` (on the
+  server, so nobody can read them from the game): `REEFLAUNCH` (5,000 shells), `BUBBLES`
+  (2 Glow Anemone seeds), `SEAHORSE` (2,500 shells and a Pearl Clam seed). Add one there, with
+  an optional `expires` time, and publish.
+- **Group:** set `ReefConfig.Rewards.group.id` to the game's Roblox group id and publish. Members
+  then get 5,000 shells and the Reef Crew title once. While it's 0 the section is hidden.
+- **Notifications:** the Notify me button asks Roblox to let the game send this player
+  notifications. Sending them needs a notification string made on the Creator Dashboard
+  (Engagement → Notifications) and the Open Cloud user-notifications API with an API key.
+- **Weekly board:** the top 10 by shells earned since Monday 00:00 UTC (in the Rewards window).
+  Last week's top 10 get prizes the next time they play: 100,000 shells and the Weekly Champion
+  title for 1st, 50,000 for 2nd, 25,000 for 3rd, 10,000 for 4th to 10th.
+- **Visiting and watering:** Friends lists everyone in the server with **Visit** (whirl to their
+  reef) and **Trade**. At another player's gate sign, **Water reef** (F) makes their growing coral
+  jump 60 seconds ahead and gives you 200 shells. You can water each reef once a day and 10
+  reefs a day; a reef takes 30 waterings a day at most.
+- **Trading:** seeds and pets, with someone in the same server. Asking someone who has asked you
+  opens the trade. Both put in offers, both Accept (any change clears both), then both
+  Confirm. The server checks both saves again and swaps everything in one step; leaving cancels
+  it. Trading is only for accounts whose Roblox policy allows trading paid items.
 
 ### Admins
 
@@ -619,6 +666,10 @@ src/server/                 -> ServerScriptService.Server
   Supplies.luau             Upgrade Station: fences, decorations, gear upgrades, Fertilizer
   Quests.luau               daily quests: progress and claiming
   Likes.luau                reef likes at each gate sign
+  Monetization.luau         Robux passes and products: the only ProcessReceipt, gifts, Starter Pack
+  Rewards.luau              daily streak, offline earnings, Premium/friend boost, codes, group,
+                            referrals, the weekly board and its prizes
+  Social.luau               visiting reefs, watering them, and trading
   Rebirth.luau              rebirths and picking a title
   Pets.luau                 eggs, taking pets out, releasing, and the pet perks
   Teleport.luau             Shop/Home teleports, the whirlpool pads and their bubble effect
@@ -679,6 +730,10 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   SuitPicker.luau           the Choose your diving suit window, with 3D previews
   MarineCast.luau           the shark and the dolphin pod, with their steering AI (client only)
   CreatureAnimator.luau     swims the mesh creatures near the camera (client only)
+  StorePanel.luau           the Store window: passes, products, Starter Pack, gifts
+  RewardsPanel.luau         the Rewards window and the welcome-back popup
+  SocialPanel.luau          the Friends window: players here, Visit, trade requests and trading
+  MenuButtons.luau          the Store / Rewards / Friends buttons under Music
   Ui.luau                   shared colours and UI helpers
 ```
 

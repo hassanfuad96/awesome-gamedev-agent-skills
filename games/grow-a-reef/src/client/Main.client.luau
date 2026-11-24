@@ -13,6 +13,8 @@ local AdminPanel = require(script.Parent.AdminPanel)
 local Audio = require(script.Parent.Audio)
 local EventBars = require(script.Parent.EventBars)
 local StorePanel = require(script.Parent.StorePanel)
+local RewardsPanel = require(script.Parent.RewardsPanel)
+local SocialPanel = require(script.Parent.SocialPanel)
 local CoralLabels = require(script.Parent.CoralLabels)
 local Hud = require(script.Parent.Hud)
 local IndexPanel = require(script.Parent.IndexPanel)
@@ -77,6 +79,10 @@ end)
 local shop = ShopPanel.new(playerGui)
 local merchant = MerchantPanel.new(playerGui)
 local store = StorePanel.new(playerGui) -- Robux passes and products (the gold Store button)
+local rewards = RewardsPanel.new(playerGui) -- daily streak, invites, codes, weekly board
+local social = SocialPanel.new(playerGui, function(text, tone) -- visiting and trading
+	hud:toast(text, tone)
+end)
 local supplies = SuppliesPanel.new(playerGui, function(itemId: string)
 	Planter.startPlacing(itemId)
 	hud:toast("Teleport Home, then tap inside your fence to place it.", "info")
@@ -101,6 +107,8 @@ Remotes.DataSync.OnClientEvent:Connect(function(data)
 	supplies:setData(data)
 	merchant:setData(data)
 	store:setData(data)
+	rewards:setData(data)
+	social:setData(data)
 	Audio.onData(data)
 	hud:setQuestReady(QuestsPanel.readyToClaim(data))
 	TutorialPanel.setData(data)
@@ -200,8 +208,8 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, triggeredBy)
 end)
 
 -- Some prompts are only for some players: "Pick up" only on your own decorations, and
--- "Like this reef" only on other people's reefs. Prompts are made by the server, so each
--- client hides the ones that aren't for it.
+-- "Like this reef" and "Water reef" only on other people's reefs. Prompts are made by the
+-- server, so each client hides the ones that aren't for it.
 -- Both prompts sit on a part whose parent (the decoration, or the plot) has OwnerUserId.
 local function ownerOf(prompt: ProximityPrompt): number?
 	local holder = prompt.Parent and prompt.Parent.Parent
@@ -209,7 +217,8 @@ local function ownerOf(prompt: ProximityPrompt): number?
 end
 ProximityPromptService.PromptShown:Connect(function(prompt)
 	local kind = prompt:GetAttribute("Kind")
-	if kind ~= "Decor" and kind ~= "LikeReef" then
+	local otherReefsOnly = kind == "LikeReef" or kind == "WaterReef"
+	if kind ~= "Decor" and not otherReefsOnly then
 		return
 	end
 	local owner = ownerOf(prompt)
@@ -218,7 +227,7 @@ ProximityPromptService.PromptShown:Connect(function(prompt)
 		prompt.Enabled = false
 		-- A reef changes hands when players come and go: check again when it does.
 		local plot = prompt.Parent and prompt.Parent.Parent
-		if kind == "LikeReef" and plot then
+		if otherReefsOnly and plot then
 			local connection
 			connection = plot:GetAttributeChangedSignal("OwnerUserId"):Connect(function()
 				connection:Disconnect()
@@ -246,6 +255,9 @@ RunService.Heartbeat:Connect(function(dt)
 	abyssShop:update()
 	kelpJournal:update()
 	lab:update()
+	store:update()
+	rewards:update()
+	social:update()
 end)
 
 CoralLabels.start(playerGui)

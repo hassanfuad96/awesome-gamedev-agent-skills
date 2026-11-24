@@ -629,7 +629,21 @@ function ReefConfig.shellMultiplier(rebirths: number): number
 end
 
 export type StorePass = { key: string, id: number, icon: number, name: string, price: number, description: string }
-export type StoreProduct = { key: string, id: number, icon: number, name: string, price: number, description: string, shells: number? }
+-- A product is one of: shells (a shell pack), a boost (instantGrow, restock), the Starter Pack
+-- (starter), or a gift (gift = true): a gift goes to the friend the buyer picked, either shells or
+-- a game pass (pass = its key) that the friend keeps forever.
+export type StoreProduct = {
+	key: string,
+	id: number,
+	icon: number,
+	name: string,
+	price: number,
+	description: string,
+	shells: number?,
+	gift: boolean?,
+	pass: string?,
+	starter: boolean?,
+}
 
 -- Robux purchases (the Store button). These ids are the game passes and developer products
 -- created for this game on Roblox; their prices are set there (Creator Dashboard → Monetization),
@@ -647,7 +661,21 @@ ReefConfig.Store = {
 		{ key = "restock", id = 3735507942, icon = 72061199940919, name = "Personal Restock", price = 25, description = "Every seed fully stocked in the Seed Shop, just for you, for 5 minutes." },
 		{ key = "shellPouch", id = 3735508014, icon = 103748338573033, name = "Shell Pouch", price = 49, description = "25,000 shells.", shells = 25000 },
 		{ key = "shellChest", id = 3735508029, icon = 129559014498909, name = "Shell Chest", price = 299, description = "250,000 shells. Best value!", shells = 250000 },
+		{ key = "starterPack", id = 3735602585, icon = 101305712359335, name = "Starter Pack", price = 99, description = "Golden Seahorse, 5 Glow Anemone, 2 Pearl Clam seeds and 20,000 shells.", starter = true },
+		{ key = "giftShellChest", id = 3735602600, icon = 103011145197660, name = "Gift: Shell Chest", price = 299, description = "250,000 shells for a friend.", shells = 250000, gift = true },
+		{ key = "giftDoubleShells", id = 3735602621, icon = 97945944794612, name = "Gift: 2x Shells", price = 349, description = "The 2x Shells pass for a friend, forever.", pass = "doubleShells", gift = true },
+		{ key = "giftVipBag", id = 3735602677, icon = 87700947803393, name = "Gift: VIP Bag", price = 149, description = "The VIP Bag pass for a friend, forever.", pass = "vipBag", gift = true },
 	} :: { StoreProduct },
+	-- The Starter Pack: offered for the first `days` days after a player first joins, once.
+	starter = {
+		days = 3,
+		pet = { species = "seahorse", golden = true },
+		seeds = { anemone = 5, clam = 2 },
+		shells = 20000,
+		fullPetsShells = 15000, -- instead of the pet, when the player has no room for another
+	},
+	-- A gifted pass the friend already has turns into this many shells for them instead.
+	giftOwnedShells = 250000,
 	doubleShells = 2, -- sale multiplier with the 2x Shells pass
 	vipBagBonus = 100, -- extra bag space with the VIP Bag pass
 	speedFinsMultiplier = 1.5, -- swim speed with the Speed Fins pass
@@ -662,8 +690,86 @@ for _, pass in ReefConfig.Store.passes do
 	ReefConfig.StorePassById[pass.id] = pass
 end
 ReefConfig.StoreProductById = {} :: { [number]: StoreProduct }
+ReefConfig.StoreProductByKey = {} :: { [string]: StoreProduct }
 for _, product in ReefConfig.Store.products do
 	ReefConfig.StoreProductById[product.id] = product
+	ReefConfig.StoreProductByKey[product.key] = product
+end
+
+-- Rewards for coming back and bringing friends (Rewards.luau, Social.luau). Codes live on the
+-- server only (Rewards.luau), so they can't be read from the game files.
+export type RewardBundle = { shells: number?, seeds: { [string]: number }? }
+
+ReefConfig.Rewards = {
+	-- Daily login streak, by day of the streak; after day 7 it starts again at day 1 (the
+	-- streak count keeps going). Missing a day (UTC) restarts at day 1.
+	daily = {
+		{ shells = 500 },
+		{ shells = 1000 },
+		{ seeds = { anemone = 2 } },
+		{ shells = 2500 },
+		{ seeds = { clam = 1 } },
+		{ shells = 5000 },
+		{ shells = 10000, seeds = { star = 1 } },
+	} :: { RewardBundle },
+	-- While you're away your reef's planters bring in shells (and coral keeps growing).
+	offline = {
+		minSeconds = 5 * 60, -- shorter absences don't count
+		maxSeconds = 8 * 3600, -- at most 8 hours' worth
+		shellsPerPlanterMinute = 1, -- per unlocked planter, times the sale bonus
+	},
+	-- Sale bonuses on top of rebirths and 2x Shells.
+	premiumBonus = 0.1, -- Roblox Premium members
+	friendBonus = 0.1, -- per friend in the same server
+	friendBonusMax = 0.5,
+	-- The game's Roblox group. 0 = no group yet: the group reward stays hidden.
+	group = { id = 0, shells = 5000, title = "reefcrew" },
+	-- Inviting friends: the inviter gets `shells` for each friend who joins from their invite
+	-- for the first time and stays `stayMinutes`; the friend gets `newcomerShells`.
+	referral = { shells = 5000, newcomerShells = 2000, stayMinutes = 5, ambassadorAt = 3, title = "ambassador" },
+	-- The weekly board ranks shells earned since Monday 00:00 UTC. Prizes by rank last week.
+	weekly = {
+		size = 10,
+		prizes = { 100000, 50000, 25000, 10000, 10000, 10000, 10000, 10000, 10000, 10000 },
+		title = "champion", -- for first place
+	},
+	-- Watering a friend's reef at its gate sign: their growing coral jumps ahead.
+	watering = {
+		growSeconds = 60,
+		visitorShells = 200,
+		givenPerDay = 10, -- reefs one player can water a day (each reef once)
+		receivedPerDay = 30, -- waterings one reef can take a day
+	},
+	-- Trading seeds and pets with someone in the same server.
+	trade = {
+		maxSeedKinds = 8,
+		maxPets = 4,
+		requestSeconds = 60, -- how long a trade request stays open
+		cooldown = 3, -- seconds between trade requests
+	},
+	visitCooldown = 5,
+}
+
+-- The Monday-based week number (UTC) of a time.
+function ReefConfig.weekNumber(time: number): number
+	return (time - 4 * 86400) // (7 * 86400) -- 1 Jan 1970 was a Thursday; weeks start on Monday
+end
+
+-- "500 shells, 2 Glow Anemone seeds" for a reward bundle.
+function ReefConfig.bundleText(bundle: RewardBundle): string
+	local parts = {}
+	if bundle.shells and bundle.shells > 0 then
+		local formatted = tostring(bundle.shells):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+		table.insert(parts, `{formatted} shells`)
+	end
+	for _, seedId in ReefConfig.SEED_ORDER do
+		local count = bundle.seeds and bundle.seeds[seedId]
+		local seed = ReefConfig.Seeds[seedId]
+		if count and count > 0 and seed then
+			table.insert(parts, `{count} {seed.name} seed{if count == 1 then "" else "s"}`)
+		end
+	end
+	return table.concat(parts, ", ")
 end
 
 export type TitleDef = { id: string, text: string, color: Color3 }
@@ -689,6 +795,10 @@ ReefConfig.Titles = {
 	{ id = "abyssdiver", text = "Abyss Diver", color = Color3.fromRGB(150, 140, 255) },
 	{ id = "deepglow", text = "Deep Glow", color = Color3.fromRGB(110, 210, 255) },
 	{ id = "voidwalker", text = "Void Walker", color = Color3.fromRGB(130, 255, 215) },
+	-- Rewards: joining the group, inviting friends, and winning the weekly board.
+	{ id = "reefcrew", text = "Reef Crew", color = Color3.fromRGB(120, 220, 255) },
+	{ id = "ambassador", text = "Reef Ambassador", color = Color3.fromRGB(255, 170, 220) },
+	{ id = "champion", text = "Weekly Champion", color = Color3.fromRGB(255, 200, 60) },
 } :: { TitleDef }
 ReefConfig.TitleById = {} :: { [string]: TitleDef }
 for _, title in ReefConfig.Titles do

@@ -12,18 +12,18 @@ local function check(cond, msg) if cond then print("ok   " .. msg) else failures
 -- 1. Place structure
 local game = roblox.deserializePlace(fs.readFile(process.args[1]))
 local rs = game:GetService("ReplicatedStorage")
-for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify", "Teleport", "Teleported", "AdminAction", "Announcement", "BuyFence", "EquipFence", "BuyDecor", "PlaceDecor", "UpgradeGear", "ClaimQuest", "Rebirth", "EquipTitle", "GuideLine", "BuyMerchant", "BuyAbyssSeed", "ResearchSpecies", "ChooseSuit" } do
+for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify", "Teleport", "Teleported", "AdminAction", "Announcement", "BuyFence", "EquipFence", "BuyDecor", "PlaceDecor", "UpgradeGear", "ClaimQuest", "Rebirth", "EquipTitle", "GuideLine", "BuyMerchant", "BuyAbyssSeed", "ResearchSpecies", "ChooseSuit", "SetGiftTarget", "RedeemCode", "ClaimGroup", "WeeklyBoard", "Welcome", "VisitReef", "TradeRequest", "TradeAction", "TradeSync" } do
 	local r = rs.Remotes:FindFirstChild(name)
 	check(r and r.ClassName == "RemoteEvent", "remote " .. name)
 end
 local server = game:GetService("ServerScriptService").Server
 check(server.Main.ClassName == "Script", "server Main is a Script")
-for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport", "Shipwreck", "ShipwreckVisuals", "Admin", "Quests", "Supplies", "Likes", "Rebirth", "Tutorial", "RuinsWorld", "Ruins", "AbyssWorld", "Abyss", "Crew", "Outfits", "Suits", "WorldKit", "MainReef", "Collectibles", "Volcano", "GiantOctopus", "Merchant", "TreasureHunt", "EventVisuals", "KelpWorld", "Kelp", "Hub", "Research", "Oxygen", "CreatureModels", "Monetization" } do
+for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport", "Shipwreck", "ShipwreckVisuals", "Admin", "Quests", "Supplies", "Likes", "Rebirth", "Tutorial", "RuinsWorld", "Ruins", "AbyssWorld", "Abyss", "Crew", "Outfits", "Suits", "WorldKit", "MainReef", "Collectibles", "Volcano", "GiantOctopus", "Merchant", "TreasureHunt", "EventVisuals", "KelpWorld", "Kelp", "Hub", "Research", "Oxygen", "CreatureModels", "Monetization", "Rewards", "Social" } do
 	check(server:FindFirstChild(m) and server[m].ClassName == "ModuleScript", "server module " .. m)
 end
 local client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 check(client.Main.ClassName == "LocalScript", "client Main is a LocalScript")
-for _, m in { "Swimming", "AdminPanel", "SuppliesPanel", "QuestsPanel", "NameTags", "TutorialPanel", "MerchantPanel", "RuinsPanel", "RuinsLife", "AbyssPanel", "AbyssLife", "Audio", "KelpPanel", "KelpLife", "LabPanel", "OxygenBar", "AquariumDisplay", "SuitPicker", "MarineCast", "CreatureAnimator", "StorePanel" } do
+for _, m in { "Swimming", "AdminPanel", "SuppliesPanel", "QuestsPanel", "NameTags", "TutorialPanel", "MerchantPanel", "RuinsPanel", "RuinsLife", "AbyssPanel", "AbyssLife", "Audio", "KelpPanel", "KelpLife", "LabPanel", "OxygenBar", "AquariumDisplay", "SuitPicker", "MarineCast", "CreatureAnimator", "StorePanel", "MenuButtons", "RewardsPanel", "SocialPanel" } do
 	check(client:FindFirstChild(m) and client[m].ClassName == "ModuleScript", "client module " .. m)
 end
 check(rs.Shared.ReefConfig.ClassName == "ModuleScript", "shared ReefConfig")
@@ -604,26 +604,70 @@ check(backgroundOk, "the background sea life (schools, turtles, jellyfish, manta
 
 -- Store (Robux): real ids, unique, priced, with icons; the pass perks point at real things
 local Store = Config.Store
-local seenIds, storeOk = {}, #Store.passes == 4 and #Store.products == 4
+local seenIds, storeOk = {}, #Store.passes == 4 and #Store.products == 8
 for _, item in Store.passes do
 	storeOk = storeOk and item.id > 0 and item.icon > 0 and item.price > 0 and not seenIds[item.id] and Config.StorePassByKey[item.key] == item and Config.StorePassById[item.id] == item
 	seenIds[item.id] = true
 end
 for _, item in Store.products do
-	storeOk = storeOk and item.id > 0 and item.icon > 0 and item.price > 0 and not seenIds[item.id] and Config.StoreProductById[item.id] == item
+	storeOk = storeOk and item.id > 0 and item.icon > 0 and item.price > 0 and not seenIds[item.id] and Config.StoreProductById[item.id] == item and Config.StoreProductByKey[item.key] == item
 	seenIds[item.id] = true
 end
-check(storeOk, "4 game passes and 4 developer products, each with a unique id, an icon and a price")
+check(storeOk, "4 game passes and 8 developer products, each with a unique id, an icon and a price")
+-- Gifts: each is shells or a real pass; the Starter Pack's contents are real.
+local giftsOk, gifts, starters = true, 0, 0
+for _, item in Store.products do
+	if item.gift then
+		gifts += 1
+		giftsOk = giftsOk and ((item.shells or 0) > 0) ~= (item.pass ~= nil) and (item.pass == nil or Config.StorePassByKey[item.pass] ~= nil)
+	end
+	if item.starter then
+		starters += 1
+	end
+end
+check(giftsOk and gifts == 3 and Store.giftOwnedShells > 0, "3 gifts: shells or a real game pass")
+local starter = Store.starter
+local starterOk = starters == 1 and starter.days > 0 and starter.shells > 0 and starter.fullPetsShells > 0 and Config.Pets.species[starter.pet.species] ~= nil
+for seedId, count in starter.seeds do
+	starterOk = starterOk and Config.Seeds[seedId] ~= nil and count > 0
+end
+check(starterOk, "the Starter Pack gives a real pet, real seeds and shells")
 check(Config.FenceById[Store.royalFence] ~= nil and Config.FenceById[Store.royalFence].shop == false and Config.StorePassByKey[Config.FenceById[Store.royalFence].pass] ~= nil, "the Royal Pearl fence is pass-only")
 check(Config.TitleById[Store.royalTitle] ~= nil, "the VIP title exists")
 check(Store.doubleShells == 2 and Store.vipBagBonus > 0 and Store.speedFinsMultiplier > 1 and Store.receiptsKept >= 50, "pass perks and receipt memory are sane")
 local shellsPerRobux = {}
-for _, item in Store.products do if item.shells then table.insert(shellsPerRobux, item.shells / item.price) end end
+for _, item in Store.products do if item.shells and not item.gift then table.insert(shellsPerRobux, item.shells / item.price) end end
 table.sort(shellsPerRobux)
 check(#shellsPerRobux == 2 and shellsPerRobux[2] > shellsPerRobux[1], "the bigger shell pack is better value")
 local royalRewardedByIndex = false
 for _, reward in Config.IndexRewards do royalRewardedByIndex = royalRewardedByIndex or reward.fence == Store.royalFence end
 check(not royalRewardedByIndex, "the Reef Index never gives away the pass fence")
+
+-- Rewards: daily streak, boosts, group, referrals, the weekly board, watering, trading
+local Rewards = Config.Rewards
+local dailyOk = #Rewards.daily == 7
+for _, bundle in Rewards.daily do
+	dailyOk = dailyOk and ((bundle.shells or 0) > 0 or bundle.seeds ~= nil)
+	for seedId, count in bundle.seeds or {} do
+		dailyOk = dailyOk and Config.Seeds[seedId] ~= nil and count > 0
+	end
+end
+check(dailyOk, "7 daily rewards, each shells or real seeds")
+check(Config.bundleText({ shells = 2500, seeds = { anemone = 2 } }) == "2,500 shells, 2 Glow Anemone seeds", "reward text reads well")
+check(Rewards.offline.minSeconds > 0 and Rewards.offline.maxSeconds <= 24 * 3600 and Rewards.offline.shellsPerPlanterMinute > 0, "offline earnings are capped")
+check(Rewards.premiumBonus > 0 and Rewards.friendBonus > 0 and Rewards.friendBonusMax >= Rewards.friendBonus, "Premium and friend boosts are set")
+check(Config.TitleById[Rewards.group.title] ~= nil and Config.TitleById[Rewards.referral.title] ~= nil and Config.TitleById[Rewards.weekly.title] ~= nil, "reward titles exist")
+local prizesOk = #Rewards.weekly.prizes == Rewards.weekly.size
+for i = 2, #Rewards.weekly.prizes do
+	prizesOk = prizesOk and Rewards.weekly.prizes[i] <= Rewards.weekly.prizes[i - 1]
+end
+check(prizesOk, "weekly prizes for every rank, best first")
+local monday = 1795392000 -- Monday 23 November 2026, 00:00 UTC
+check(Config.weekNumber(monday) == Config.weekNumber(monday + 7 * 86400 - 1) and Config.weekNumber(monday - 1) == Config.weekNumber(monday) - 1, "weeks start on Monday (UTC)")
+check(Rewards.watering.givenPerDay > 0 and Rewards.watering.receivedPerDay >= Rewards.watering.givenPerDay and Rewards.watering.growSeconds > 0, "watering is capped per day")
+check(Rewards.trade.maxSeedKinds > 0 and Rewards.trade.maxPets > 0 and Rewards.trade.maxPets <= Config.Pets.maxEquipped * 4, "trades are limited")
+local rewardsSource = fs.readFile("src/server/Rewards.luau")
+check(string.find(rewardsSource, "local CODES", 1, true) ~= nil and string.find(fs.readFile("src/shared/ReefConfig.luau"), "REEFLAUNCH", 1, true) == nil, "codes live on the server only")
 
 print(failures == 0 and "ALL PASSED" or (failures .. " FAILED"))
 process.exit(if failures > 0 then 1 else 0)

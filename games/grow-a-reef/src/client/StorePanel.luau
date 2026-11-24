@@ -3,6 +3,8 @@
 -- Store button under the Music button. Buttons only open Roblox's own purchase prompt; the
 -- server (Monetization) checks ownership and gives what was bought. Prices shown are the live
 -- ones from Roblox when it answers, else the configured ones.
+-- The Starter Pack shows at the top while it's on offer. Gifts first ask who they're for
+-- (someone else in the server), tell the server (SetGiftTarget), then open the prompt.
 -- Also applies the Speed Fins pass to swimming, which runs on this client.
 
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -10,8 +12,11 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
+local MenuButtons = require(script.Parent.MenuButtons)
 local Swimming = require(script.Parent.Swimming)
 local Ui = require(script.Parent.Ui)
+
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 local StorePanel = {}
 StorePanel.__index = StorePanel
@@ -25,6 +30,12 @@ export type StorePanel = typeof(setmetatable(
 		productCards: { [number]: Card },
 		owned: { [string]: true },
 		prices: { [number]: number },
+		starterSection: { GuiObject },
+		starterTimer: TextLabel,
+		starterEndsAt: number?,
+		picker: Frame,
+		pickerList: ScrollingFrame,
+		pickerTitle: TextLabel,
 	},
 	StorePanel
 ))
@@ -129,49 +140,63 @@ local function section(parent: Instance, order: number, title: string, subtitle:
 	})
 end
 
--- The gold Store button, just under the Music button (which sits under the teleports).
-local function storeButton(playerGui: PlayerGui, onPress: () -> ())
-	local gui = Ui.new("ScreenGui", {
-		Name = "StoreButton",
-		ResetOnSpawn = false,
-		IgnoreGuiInset = true,
-		DisplayOrder = 2,
-		Parent = playerGui,
-	})
-	local button = Ui.button({
-		Name = "Store",
-		Text = "Store",
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(1, -46, 0.5, 140),
-		Size = UDim2.fromOffset(64, 30),
-		BackgroundColor3 = Color3.fromRGB(230, 160, 30),
-		MaxTextSize = 15,
-		Parent = gui,
-	})
-	Ui.stroke(GOLD, 2).Parent = button
-	button.Activated:Connect(onPress)
-	local currentScale = 1
-	local music: GuiObject? = nil
-	local function place()
-		if music then
-			local offset = music.AbsolutePosition - gui.AbsolutePosition
-			button.Position = UDim2.fromOffset(offset.X + music.AbsoluteSize.X / 2, offset.Y + music.AbsoluteSize.Y + 8 * currentScale)
-		end
+-- "2d 5h", "5h 12m" or "12m" until a time.
+local function timeLeft(seconds: number): string
+	local s = math.max(0, seconds)
+	if s >= 86400 then
+		return `{s // 86400}d {(s % 86400) // 3600}h`
+	elseif s >= 3600 then
+		return `{s // 3600}h {(s % 3600) // 60}m`
 	end
-	Ui.autoScale({ button }, function(scale)
-		currentScale = scale
-		task.defer(place)
-	end)
-	-- Audio makes the Music button a moment later; follow it once it's there.
-	task.spawn(function()
-		local toggle = playerGui:WaitForChild("AudioToggle", 15)
-		music = toggle and toggle:WaitForChild("Music", 5) :: GuiObject?
-		if music then
-			music:GetPropertyChangedSignal("AbsolutePosition"):Connect(place)
-			music:GetPropertyChangedSignal("AbsoluteSize"):Connect(place)
-			place()
-		end
-	end)
+	return `{math.max(1, math.ceil(s / 60))}m`
+end
+
+-- The overlay that asks who a gift is for.
+local function giftPicker(root: Frame): (Frame, TextLabel, ScrollingFrame, TextButton)
+	local picker = Ui.new("Frame", {
+		Name = "GiftPicker",
+		Active = true,
+		Visible = false,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Ui.Colors.panel,
+		ZIndex = 10,
+		Parent = root,
+	}, { Ui.corner(12) })
+	local title = Ui.label({
+		Name = "Title",
+		Text = "Who is this gift for?",
+		Font = Ui.TitleFont,
+		MaxTextSize = 24,
+		Size = UDim2.new(1, -60, 0, 34),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = GOLD,
+		ZIndex = 10,
+		Parent = picker,
+	})
+	local back = Ui.button({
+		Name = "Back",
+		Text = "Back",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 0),
+		Size = UDim2.fromOffset(70, 34),
+		BackgroundColor3 = Ui.Colors.bad,
+		ZIndex = 10,
+		Parent = picker,
+	})
+	local list = Ui.new("ScrollingFrame", {
+		Name = "Players",
+		Position = UDim2.fromOffset(0, 44),
+		Size = UDim2.new(1, 0, 1, -44),
+		BackgroundTransparency = 1,
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		CanvasSize = UDim2.new(),
+		ScrollBarThickness = 6,
+		ZIndex = 10,
+		Parent = picker,
+	}, {
+		Ui.new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) }),
+	})
+	return picker, title, list, back
 end
 
 function StorePanel.new(playerGui: PlayerGui): StorePanel
@@ -230,15 +255,42 @@ function StorePanel.new(playerGui: PlayerGui): StorePanel
 		Ui.new("UIPadding", { PaddingRight = UDim.new(0, 8) }),
 	})
 
+	local picker, pickerTitle, pickerList, pickerBack = giftPicker(root)
 	local self = setmetatable({
 		gui = gui,
 		passCards = {},
 		productCards = {},
 		owned = {},
 		prices = {},
+		starterSection = {},
+		starterTimer = nil :: any,
+		starterEndsAt = nil,
+		picker = picker,
+		pickerList = pickerList,
+		pickerTitle = pickerTitle,
 	}, StorePanel)
+	pickerBack.Activated:Connect(function()
+		picker.Visible = false
+	end)
 
 	local player = Players.LocalPlayer
+	-- The Starter Pack, while it's on offer.
+	local starterGrid = section(body, -10, "Starter Pack", "A one-time welcome deal for new divers.")
+	for _, product in ReefConfig.Store.products do
+		if product.starter then
+			local frame, price, buy = card(starterGrid, 1, product.name, product.icon, product.description)
+			Ui.stroke(GOLD, 3).Parent = frame
+			buy.Activated:Connect(function()
+				MarketplaceService:PromptProductPurchase(player, product.id)
+			end)
+			self.productCards[product.id] = { buy = buy, price = price }
+		end
+	end
+	-- The section's note line shows how long the offer has left.
+	self.starterTimer = body:FindFirstChild("Starter PackNote") :: TextLabel
+	self.starterTimer.TextColor3 = GOLD
+	self.starterSection = { body:FindFirstChild("Starter Pack") :: GuiObject, body:FindFirstChild("Starter PackNote") :: GuiObject, starterGrid }
+
 	local passGrid = section(body, 1, "Game Passes", "Buy once, keep forever.")
 	for order, pass in ReefConfig.Store.passes do
 		local _, price, buy = card(passGrid, order, pass.name, pass.icon, pass.description)
@@ -250,10 +302,21 @@ function StorePanel.new(playerGui: PlayerGui): StorePanel
 		self.passCards[pass.key] = { buy = buy, price = price }
 	end
 	local productGrid = section(body, 10, "Boosts and Shells", "Buy as many times as you like.")
+	local giftGrid = section(body, 20, "Gifts", "Buy something for a friend in this server. They keep it.")
 	for order, product in ReefConfig.Store.products do
-		local _, price, buy = card(productGrid, order, product.name, product.icon, product.description)
+		if product.starter then
+			continue
+		end
+		local _, price, buy = card(if product.gift then giftGrid else productGrid, order, product.name, product.icon, product.description)
+		if product.gift then
+			buy.Text = "Gift"
+		end
 		buy.Activated:Connect(function()
-			MarketplaceService:PromptProductPurchase(player, product.id)
+			if product.gift then
+				self:pickFriend(product)
+			else
+				MarketplaceService:PromptProductPurchase(player, product.id)
+			end
 		end)
 		self.productCards[product.id] = { buy = buy, price = price }
 	end
@@ -278,15 +341,75 @@ function StorePanel.new(playerGui: PlayerGui): StorePanel
 	close.Activated:Connect(function()
 		self:setOpen(false)
 	end)
-	storeButton(playerGui, function()
+	MenuButtons.add("Store", "Store", Color3.fromRGB(230, 160, 30), 1, function()
 		self:setOpen(not self.gui.Enabled)
 	end)
 	self:render()
 	return self
 end
 
+-- Lists everyone else here for a gift; picking one tells the server, then opens the prompt.
+function StorePanel.pickFriend(self: StorePanel, product: ReefConfig.StoreProduct)
+	for _, child in self.pickerList:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+	self.pickerTitle.Text = `Who is {(string.gsub(product.name, "^Gift: ", ""))} for?`
+	local me = Players.LocalPlayer
+	local others = 0
+	for order, other in Players:GetPlayers() do
+		if other == me then
+			continue
+		end
+		others += 1
+		local passes = string.split(tostring(other:GetAttribute("Passes") or ""), ",")
+		local hasIt = product.pass ~= nil and table.find(passes, product.pass) ~= nil
+		local row = Ui.button({
+			Name = other.Name,
+			LayoutOrder = order,
+			Text = if hasIt then `{other.DisplayName} (already has it)` else other.DisplayName,
+			Size = UDim2.new(1, -10, 0, 44),
+			BackgroundColor3 = if hasIt then Ui.Colors.buttonDisabled else Ui.Colors.panelLight,
+			AutoButtonColor = not hasIt,
+			MaxTextSize = 18,
+			ZIndex = 10,
+			Parent = self.pickerList,
+		})
+		if not hasIt then
+			row.Activated:Connect(function()
+				self.picker.Visible = false
+				Remotes.SetGiftTarget:FireServer(other.UserId)
+				MarketplaceService:PromptProductPurchase(me, product.id)
+			end)
+		end
+	end
+	if others == 0 then
+		Ui.label({
+			Name = "Nobody",
+			Text = "Nobody else is here yet. Invite friends from the Rewards window, then gift them something!",
+			TextWrapped = true,
+			MaxTextSize = 18,
+			Size = UDim2.new(1, -10, 0, 60),
+			TextColor3 = Ui.Colors.muted,
+			ZIndex = 10,
+			Parent = self.pickerList,
+		})
+	end
+	self.picker.Visible = true
+end
+
+-- Counts down the Starter Pack's offer while the window is open.
+function StorePanel.update(self: StorePanel)
+	if self.gui.Enabled and self.starterEndsAt then
+		local left = self.starterEndsAt - os.time()
+		self.starterTimer.Text = if left > 0 then `A one-time welcome deal for new divers. Ends in {timeLeft(left)}!` else "Offer ended"
+	end
+end
+
 function StorePanel.setOpen(self: StorePanel, open: boolean)
 	self.gui.Enabled = open
+	self.picker.Visible = false
 	if open then
 		self:render()
 	end
@@ -294,6 +417,7 @@ end
 
 function StorePanel.setData(self: StorePanel, data: any)
 	self.owned = if type(data.ownedPasses) == "table" then data.ownedPasses else {}
+	self.starterEndsAt = if type(data.starterEndsAt) == "number" then data.starterEndsAt else nil
 	Swimming.setSpeedMultiplier(if self.owned.speedFins then ReefConfig.Store.speedFinsMultiplier else 1)
 	self:render()
 end
@@ -311,6 +435,10 @@ function StorePanel.render(self: StorePanel)
 		local c = self.productCards[product.id]
 		c.price.Text = ROBUX .. (self.prices[product.id] or product.price)
 	end
+	for _, item in self.starterSection do
+		item.Visible = self.starterEndsAt ~= nil
+	end
+	self:update()
 end
 
 return StorePanel
