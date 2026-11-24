@@ -504,7 +504,7 @@ end
 check(suitsOk and Config.Suits.byId.blue and Config.Suits.byId.pink, "players pick the Blue or Pink Explorer suit, each a real outfit")
 check(string.find(Config.Tutorial.steps[1].hint, "Kai", 1, true) ~= nil and string.find(fs.readFile("src/client/TutorialPanel.luau"), '"Kai"', 1, true) ~= nil, "the tutorial and its tracker point at Kai the guide")
 
--- The mesh creatures (catalog batches 1-3: catchable fish, pets, shopkeepers, event characters)
+-- The mesh creatures (catalog batches 1-7: catchable fish, pets, shopkeepers, event characters, Ruins, Abyss, Kelp fish, background life)
 local CreatureMeshes = load("src/shared/CreatureMeshes.luau")
 local roles = { body = true, tail = true, fin = true, flutter = true, dangle = true, fluke = true }
 local meshesOk, meshCount = true, 0
@@ -576,6 +576,31 @@ for _, id in Kelp.FISH_IDS do
 	kelpMeshOk = kelpMeshOk and kind ~= nil and kind.creature ~= nil and CreatureMeshes[kind.creature] ~= nil
 end
 check(kelpMeshOk, "every Kelp Forest fish is a mesh creature")
+-- Batch 7, the background sea life: every school species, the turtles, jellyfish, mantas and
+-- crabs (SeaLife), and the Kelp Forest's turtles and fish (KelpLife) swap to real meshes.
+local function meshIds(source: string, pattern: string): { string }
+	local ids = {}
+	for id in string.gmatch(source, pattern) do
+		table.insert(ids, id)
+	end
+	return ids
+end
+local seaSource = fs.readFile("src/client/SeaLife.luau")
+local kelpSource = fs.readFile("src/client/KelpLife.luau")
+local schoolIds = meshIds(seaSource, 'mesh = "(%w+)", length = [%d%.]+ }')
+local seaIds = meshIds(seaSource, '%.spec = { id = "(%w+)"')
+local kelpIds = meshIds(kelpSource, '{ id = "(%w+)", length')
+local backgroundOk = #schoolIds == 6 and #seaIds == 4 and #kelpIds >= 3
+	and string.find(seaSource, "Creatures.onReady", 1, true) ~= nil and string.find(kelpSource, "Creatures.onReady", 1, true) ~= nil
+for _, list in { schoolIds, seaIds, kelpIds } do
+	for _, id in list do
+		backgroundOk = backgroundOk and CreatureMeshes[id] ~= nil
+	end
+end
+for _, def in CreatureMeshes do
+	backgroundOk = backgroundOk and (def.turn == nil or type(def.turn) == "number")
+end
+check(backgroundOk, "the background sea life (schools, turtles, jellyfish, mantas, crabs, Kelp turtles and fish) uses real meshes")
 
 -- Store (Robux): real ids, unique, priced, with icons; the pass perks point at real things
 local Store = Config.Store

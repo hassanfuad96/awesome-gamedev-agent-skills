@@ -7,6 +7,8 @@
 --   sea turtles     three turtles swimming slow loops round the habitats and the forest
 --   fish schools    dark silhouettes drifting between the kelp, like the concept art
 --   hatchlings      guiding a hatchling sends a baby turtle paddling up and away
+-- The turtles and fish are Part models until the mesh creatures load (Creatures.onReady),
+-- then they swap to the sea turtle mesh and dark Kelp Bass silhouettes.
 -- Purely cosmetic; the server decides everything (Kelp).
 
 local CollectionService = game:GetService("CollectionService")
@@ -18,6 +20,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
+local Creatures = require(ReplicatedStorage.Shared.Creatures)
 local KelpConfig = require(ReplicatedStorage.Shared.KelpConfig)
 local Ui = require(script.Parent.Ui)
 
@@ -30,7 +33,10 @@ local GREEN = Color3.fromRGB(175, 240, 170) -- the forest's sunlit green water
 local FADE = TweenInfo.new(1.6, Enum.EasingStyle.Sine)
 
 type Kelp = { model: Model, home: CFrame, phase: number, swing: number }
-type Swimmer = { model: Model, path: (number) -> CFrame }
+-- `mesh` is the mesh creature that replaces the Part model once loaded: its id, length,
+-- swimming Pace and, for the school fish, the silhouette colour.
+type MeshSpec = { id: string, length: number, pace: number, shade: Color3? }
+type Swimmer = { model: Model, path: (number) -> CFrame, mesh: MeshSpec? }
 
 local kelps: { [Model]: Kelp } = {}
 local swimmers: { Swimmer } = {}
@@ -81,8 +87,8 @@ local function turtleModel(scale: number): Model
 	return model
 end
 
--- A dark fish silhouette.
-local function fishModel(): Model
+-- A dark fish silhouette, and its colour.
+local function fishModel(): (Model, Color3)
 	local model = newModel("KelpSchoolFish")
 	local color = Color3.fromRGB(28, 40, 52):Lerp(Color3.fromRGB(50, 70, 70), rng:NextNumber(0, 1))
 	local body = piece(model, Vector3.new(0.8, 1, 2.2), CFrame.identity, color)
@@ -90,7 +96,7 @@ local function fishModel(): Model
 	mesh.MeshType = Enum.MeshType.Sphere
 	mesh.Parent = body
 	piece(model, Vector3.new(0.15, 0.9, 0.8), CFrame.new(0, 0, 1.4), color)
-	return model
+	return model, color
 end
 
 -- A loop round `center` (radii rx, rz), bobbing gently, one lap every `lap` seconds.
@@ -123,8 +129,26 @@ local function addKelp(instance: Instance)
 	end)
 end
 
+local function meshModel(spec: MeshSpec): Model?
+	local model = Creatures.clone(spec.id, spec.length)
+	if not model then
+		return nil
+	end
+	model:SetAttribute("Pace", spec.pace)
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.CanQuery = false
+			part.CastShadow = false
+		end
+	end
+	if spec.shade then
+		Creatures.silhouette(model, spec.shade)
+	end
+	return model
+end
+
 local function hatchling(at: Vector3)
-	local baby = turtleModel(0.3)
+	local baby = meshModel({ id = "seaTurtle", length = 1.6, pace = 2 }) or turtleModel(0.3)
 	local start = CFrame.new(at + Vector3.new(0, 1.2, 0)) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
 	baby:PivotTo(start)
 	baby.Parent = folder
@@ -165,18 +189,22 @@ function KelpLife.start()
 	for i, habitat in KelpConfig.Habitats do
 		local turtle = turtleModel(1)
 		turtle.Parent = folder
-		table.insert(swimmers, { model = turtle, path = loop(habitat.at, habitat.radius + 10, habitat.radius + 6, 9 + i * 3, 70, i) })
+		table.insert(swimmers, {
+			model = turtle,
+			path = loop(habitat.at, habitat.radius + 10, habitat.radius + 6, 9 + i * 3, 70, i),
+			mesh = { id = "seaTurtle", length = 5.5, pace = -0.3 },
+		})
 	end
 	local cruiser = turtleModel(1.3)
 	cruiser.Parent = folder
-	table.insert(swimmers, { model = cruiser, path = loop(KelpConfig.center, 120, 150, 30, 160, 0) })
+	table.insert(swimmers, { model = cruiser, path = loop(KelpConfig.center, 120, 150, 30, 160, 0), mesh = { id = "seaTurtle", length = 7, pace = -0.4 } })
 	-- Schools of dark fish weaving through the kelp.
 	for s = 1, 4 do
 		local angle = s * 1.6
 		local center = KelpConfig.center + Vector3.new(math.cos(angle) * 80, 0, math.sin(angle) * 80)
 		local height = 14 + s * 7
 		for f = 1, 7 do
-			local fish = fishModel()
+			local fish, shade = fishModel()
 			fish.Parent = folder
 			local offset = Vector3.new(rng:NextNumber(-4, 4), rng:NextNumber(-2.5, 2.5), rng:NextNumber(-4, 4))
 			local path = loop(center, 45 + s * 6, 38 + s * 5, height, 45 + s * 8, s)
@@ -185,9 +213,22 @@ function KelpLife.start()
 				path = function(t)
 					return path(t + f * 0.12) + offset
 				end,
+				mesh = { id = "kelpBass", length = 2.4, pace = 1, shade = shade },
 			})
 		end
 	end
+
+	Creatures.onReady(function()
+		for _, swimmer in swimmers do
+			local mesh = swimmer.mesh and meshModel(swimmer.mesh)
+			if mesh then
+				mesh:PivotTo(swimmer.model:GetPivot())
+				mesh.Parent = folder
+				swimmer.model:Destroy()
+				swimmer.model = mesh
+			end
+		end
+	end)
 
 	for _, instance in CollectionService:GetTagged(KelpConfig.KELP_TAG) do
 		addKelp(instance)

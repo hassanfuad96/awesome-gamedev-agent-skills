@@ -18,6 +18,8 @@
 -- `style` is how the whole creature swims: "fish" sways from the head, "whale" (orca, whale)
 -- rolls gently up and down, "upright" (seahorse, octopus, the shopkeepers) rocks in place. `length` is the size it's built at, in
 -- studs along `measure` ("x", "y" or "z"; by default Z for fish and the height for upright).
+-- `turn` (degrees about Y) turns a creature the generator made facing the wrong way: each
+-- piece's `at` is as generated, but its `side` is the side it ends up on after the turn.
 
 export type Piece = {
 	name: string,
@@ -35,6 +37,7 @@ export type CreatureDef = {
 	style: "fish" | "whale" | "upright",
 	length: number,
 	measure: ("x" | "y" | "z")?,
+	turn: number?,
 	pieces: { Piece },
 }
 
@@ -367,6 +370,121 @@ local CreatureMeshes: { [string]: CreatureDef } = {
 			{ name = "BellyFin", role = "body", mesh = "rbxassetid://118925175856188", texture = "rbxassetid://128923200368022", size = Vector3.new(0.184, 0.331, 0.418), at = Vector3.new(0.003, -0.653, 0.442) },
 			{ name = "LeftFin", role = "fin", side = -1, mesh = "rbxassetid://104659200527066", texture = "rbxassetid://72606710428966", size = Vector3.new(0.669, 0.721, 0.716), at = Vector3.new(-0.563, -0.528, -0.134) },
 			{ name = "RightFin", role = "fin", side = 1, mesh = "rbxassetid://132974300618507", texture = "rbxassetid://105669375314300", size = Vector3.new(0.666, 0.719, 0.716), at = Vector3.new(0.569, -0.527, -0.132) },
+		},
+	},
+	-- Batch 7: the background sea life (SeaLife's schools, turtles, jellyfish, mantas; the
+	-- Kelp Forest's turtles). Where the generator's "tail fin" came out as a fin along the
+	-- belly or middle, it's kept as body.
+	clownfish = {
+		id = "clownfish",
+		name = "Clownfish",
+		style = "fish",
+		length = 1.6,
+		pieces = {
+			{ name = "Body", role = "body", mesh = "rbxassetid://113726764758740", texture = "rbxassetid://81286235286393", size = Vector3.new(1, 0.939, 1.178), at = Vector3.new(0.003, -0.001, 0.003) },
+			{ name = "BackFin", role = "body", mesh = "rbxassetid://99318343582461", texture = "rbxassetid://93860655558006", size = Vector3.new(0.041, 0.716, 0.305), at = Vector3.new(0.002, -0.042, 0.223) },
+			{ name = "LeftFin", role = "fin", side = -1, mesh = "rbxassetid://95480940577096", texture = "rbxassetid://98948470261640", size = Vector3.new(0.209, 0.179, 0.149), at = Vector3.new(-0.391, -0.136, -0.143) },
+			{ name = "RightFin", role = "fin", side = 1, mesh = "rbxassetid://74837429461340", texture = "rbxassetid://103601092044169", size = Vector3.new(0.209, 0.178, 0.148), at = Vector3.new(0.395, -0.136, -0.144) },
+		},
+	},
+	blueTang = {
+		id = "blueTang",
+		name = "Blue Tang",
+		style = "fish",
+		length = 2,
+		pieces = {
+			{ name = "Body", role = "body", mesh = "rbxassetid://103727076681058", texture = "rbxassetid://99600135967472", size = Vector3.new(0.577, 0.777, 1.016), at = Vector3.new(0.002, -0.003, 0.001) },
+			{ name = "MidFins", role = "body", mesh = "rbxassetid://123947205239418", texture = "rbxassetid://103182378849351", size = Vector3.new(0.051, 0.777, 0.584), at = Vector3.new(0.001, -0.002, 0.029) },
+			{ name = "LeftFin", role = "fin", side = -1, mesh = "rbxassetid://117135568697263", texture = "rbxassetid://73422499477866", size = Vector3.new(0.305, 0.37, 0.21), at = Vector3.new(-0.246, -0.172, -0.128) },
+			{ name = "RightFin", role = "fin", side = 1, mesh = "rbxassetid://96575036353328", texture = "rbxassetid://77548412888488", size = Vector3.new(0.305, 0.371, 0.211), at = Vector3.new(0.249, -0.172, -0.128) },
+		},
+	},
+	yellowTang = {
+		id = "yellowTang",
+		name = "Yellow Tang",
+		style = "fish",
+		length = 1.8,
+		pieces = {
+			{ name = "Body", role = "body", mesh = "rbxassetid://122346923166223", texture = "rbxassetid://130417599417274", size = Vector3.new(0.7, 0.81, 0.868), at = Vector3.new(0.001, 0.018, -0.079) },
+			{ name = "Tail", role = "tail", mesh = "rbxassetid://128253097917593", texture = "rbxassetid://91440751136925", size = Vector3.new(0.066, 0.388, 0.251), at = Vector3.new(0.001, -0.019, 0.391) },
+			{ name = "BellyFin", role = "body", mesh = "rbxassetid://124156626207953", texture = "rbxassetid://82705931500456", size = Vector3.new(0.094, 0.117, 0.267), at = Vector3.new(-0.15, -0.369, -0.058) },
+			{ name = "Fins", role = "body", mesh = "rbxassetid://119511892975178", texture = "rbxassetid://76753440101359", size = Vector3.new(0.549, 0.394, 0.353), at = Vector3.new(-0.075, -0.23, -0.099) },
+		},
+	},
+	angelfish = {
+		id = "angelfish",
+		name = "Angelfish",
+		style = "fish",
+		length = 1.9,
+		pieces = {
+			{ name = "Body", role = "body", mesh = "rbxassetid://126564137932195", texture = "rbxassetid://91456724285550", size = Vector3.new(0.397, 2.2, 1.414), at = Vector3.new(0.002, -0.004, -0.072) },
+			{ name = "Tail", role = "tail", mesh = "rbxassetid://115533525383160", texture = "rbxassetid://75768504348037", size = Vector3.new(0.079, 0.651, 0.421), at = Vector3.new(0.003, -0.002, 0.573) },
+			{ name = "LeftFin", role = "fin", side = -1, mesh = "rbxassetid://121950128371827", texture = "rbxassetid://115304828941452", size = Vector3.new(0.195, 0.274, 0.485), at = Vector3.new(-0.189, -0.004, -0.219) },
+			{ name = "RightFin", role = "fin", side = 1, mesh = "rbxassetid://78620664349255", texture = "rbxassetid://137326270928344", size = Vector3.new(0.194, 0.273, 0.483), at = Vector3.new(0.194, -0.004, -0.22) },
+		},
+	},
+	sardine = {
+		id = "sardine",
+		name = "Sardine",
+		style = "fish",
+		length = 1.3,
+		pieces = {
+			{ name = "Body", role = "body", mesh = "rbxassetid://122612087755464", texture = "rbxassetid://70893659768984", size = Vector3.new(0.348, 0.445, 0.899), at = Vector3.new(0.001, -0.002, -0.071) },
+			{ name = "Tail", role = "tail", mesh = "rbxassetid://118187785243254", texture = "rbxassetid://71308505892851", size = Vector3.new(0.095, 0.332, 0.233), at = Vector3.new(0.002, 0.002, 0.406) },
+			-- The generator swapped its left and right fin names; these go by position.
+			{ name = "LeftFin", role = "fin", side = -1, mesh = "rbxassetid://133091823145729", texture = "rbxassetid://123630384053142", size = Vector3.new(0.159, 0.113, 0.131), at = Vector3.new(-0.169, -0.148, -0.159) },
+			{ name = "RightFin", role = "fin", side = 1, mesh = "rbxassetid://128707598703776", texture = "rbxassetid://137303198587152", size = Vector3.new(0.158, 0.113, 0.131), at = Vector3.new(0.172, -0.148, -0.16) },
+		},
+	},
+	wrasse = {
+		id = "wrasse",
+		name = "Wrasse",
+		style = "fish",
+		length = 1.9,
+		pieces = {
+			{ name = "Body", role = "body", mesh = "rbxassetid://119873673808959", texture = "rbxassetid://97324138209315", size = Vector3.new(0.451, 0.687, 1.22), at = Vector3.new(0.003, -0.002, 0.002) },
+			{ name = "BellyFin", role = "body", mesh = "rbxassetid://103002950512363", texture = "rbxassetid://78718227802496", size = Vector3.new(0.106, 0.139, 0.247), at = Vector3.new(0.002, -0.187, 0.156) },
+			{ name = "LeftFin", role = "fin", side = -1, mesh = "rbxassetid://126678273291520", texture = "rbxassetid://129177227615890", size = Vector3.new(0.178, 0.146, 0.202), at = Vector3.new(-0.209, -0.041, -0.184) },
+			{ name = "RightFin", role = "fin", side = 1, mesh = "rbxassetid://90959303958137", texture = "rbxassetid://134889027112810", size = Vector3.new(0.179, 0.146, 0.202), at = Vector3.new(0.212, -0.041, -0.185) },
+		},
+	},
+	seaTurtle = {
+		id = "seaTurtle",
+		name = "Sea Turtle",
+		style = "whale",
+		length = 8.5,
+		pieces = {
+			{ name = "Shell", role = "body", mesh = "rbxassetid://134714026275517", texture = "rbxassetid://90624535839521", size = Vector3.new(2.222, 1.844, 2.877), at = Vector3.new(0.003, 0.174, -0.01) },
+			{ name = "LeftFrontFlipper", role = "fin", side = -1, mesh = "rbxassetid://83730821850265", texture = "rbxassetid://123169985364162", size = Vector3.new(0.963, 0.882, 0.606), at = Vector3.new(-0.991, -0.662, -0.408) },
+			{ name = "RightFrontFlipper", role = "fin", side = 1, mesh = "rbxassetid://72352275305515", texture = "rbxassetid://133110202100867", size = Vector3.new(0.964, 0.884, 0.606), at = Vector3.new(1, -0.662, -0.409) },
+			{ name = "LeftBackFlipper", role = "fin", side = -1, mesh = "rbxassetid://121780432742420", texture = "rbxassetid://120773038641638", size = Vector3.new(0.719, 0.829, 0.799), at = Vector3.new(-0.693, -0.389, 1.058) },
+			{ name = "RightBackFlipper", role = "fin", side = 1, mesh = "rbxassetid://87948733342765", texture = "rbxassetid://104499693380439", size = Vector3.new(0.716, 0.83, 0.794), at = Vector3.new(0.699, -0.389, 1.057) },
+		},
+	},
+	jellyfish = {
+		id = "jellyfish",
+		name = "Jellyfish",
+		style = "upright",
+		length = 5,
+		pieces = {
+			{ name = "Bell", role = "body", mesh = "rbxassetid://123666898161159", texture = "rbxassetid://81734011599503", size = Vector3.new(2.995, 3.911, 3), at = Vector3.new(0.006, 0.132, 0.009) },
+			{ name = "Tentacles", role = "dangle", mesh = "rbxassetid://73431141443627", texture = "rbxassetid://82910617391828", size = Vector3.new(2.454, 2.432, 2.111), at = Vector3.new(0.005, -0.888, 0.008) },
+		},
+	},
+	-- Generated facing +Z (its tail hangs at -Z), so it's turned round. The wing pieces sit
+	-- on top of the body's own flat wings, so they stay with the body; the manta glides on
+	-- the whale roll.
+	mantaRay = {
+		id = "mantaRay",
+		name = "Manta Ray",
+		style = "whale",
+		length = 14,
+		measure = "x",
+		turn = 180,
+		pieces = {
+			{ name = "Body", role = "body", mesh = "rbxassetid://77761351243299", texture = "rbxassetid://119341479812728", size = Vector3.new(2.029, 1.2, 1.034), at = Vector3.new(0.004, -0.001, 0.004) },
+			{ name = "LeftWing", role = "body", mesh = "rbxassetid://139009548374121", texture = "rbxassetid://128940493774842", size = Vector3.new(0.743, 0.473, 0.627), at = Vector3.new(-0.64, 0.225, 0.055) },
+			{ name = "RightWing", role = "body", mesh = "rbxassetid://122373354476750", texture = "rbxassetid://79435705055853", size = Vector3.new(0.741, 0.478, 0.628), at = Vector3.new(0.643, 0.224, 0.054) },
 		},
 	},
 }

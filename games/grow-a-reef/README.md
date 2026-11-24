@@ -331,7 +331,18 @@ coiled the gulper eel up under its big head instead of making it long.
 Batch 6 is the Kelp Forest's catchable fish: **Garibaldi, Kelp Bass, Opaleye, Sheephead** and the
 rare **Giant Sea Bass** (4.5 studs). They're ordinary fish kinds with a `creature` field in
 `ReefConfig.Fish.kinds`, so the wild fish, the Reef Index and the aquarium all show the meshes.
-Still to do: the background sea life.
+
+Batch 7, the last, is the background sea life. On the Main Reef (`SeaLife`) the six school
+species (**Clownfish, Blue Tang, Yellow Tang, Angelfish, Sardine, Wrasse**), the **Sea Turtles**,
+**Jellyfish** and **Manta Rays** get their own meshes, and the crabs reuse Pinch's crab mesh at
+crab size, standing on the seabed. In the Kelp Forest (`KelpLife`) the turtles and hatchlings
+use the sea turtle mesh, and the dark fish schools are Kelp Bass meshes drawn as silhouettes.
+All of them are built from Parts first and swap to their meshes once the templates are ready
+(`Creatures.onReady`), so the Parts stay as the fallback. Every jellyfish uses the same pink
+mesh; its light still comes in four colours. The manta took three tries: the first two came
+out as chubby blobs. The one used was generated facing backwards, so creature definitions can
+now say `turn = 180`. Its wing pieces sit on top of its flat body, so it glides on the gentle
+whale roll without flapping.
 
 Checked in Studio (2026-11-24): all five templates build at their game sizes with no errors. New
 wild fish spawn as meshes, their pieces stay attached while they swim, and they keep their click
@@ -354,6 +365,11 @@ face along their paths, keep their lights, stay level where upright, and the oct
 and arms animate near the camera.
 Batch 6 (same day): all twenty-five templates build, and wild Kelp Forest fish spawn as meshes
 with their click detectors.
+Batch 7 (same day): all thirty-four templates build. Every Main Reef school fish, turtle,
+jellyfish, manta and crab, and all 31 Kelp Forest turtles and fish, swap to their meshes, with no
+Parts left behind. Their pieces animate near the camera, travelling creatures face along their
+paths (crabs scuttle sideways), and the jellyfish keep their lights. The client held 60 fps with
+21 mesh creatures animating around the camera.
 
 **Checked in Studio** (solo Play through the Studio MCP server, on 2026-11-24): all five crew
 spawn at their posts, dressed and playing their idle animations; Dr. Pearl, Captain Mako and

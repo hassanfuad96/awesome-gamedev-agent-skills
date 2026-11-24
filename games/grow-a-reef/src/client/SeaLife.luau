@@ -7,6 +7,8 @@
 --
 -- A creature is a set of Parts placed relative to a root CFrame that its path gives for
 -- the current time. A part can swing around a pivot (tails, flippers, wings, tentacles).
+-- Once the mesh creatures have loaded (Creatures.onReady), each one with a `spec` swaps its
+-- Parts for its 3D mesh, which CreatureAnimator swims; the Parts stay as the fallback.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -18,8 +20,11 @@ local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
 local SeaLife = {}
 
 type Joint = { pivot: CFrame, offset: CFrame, swing: Vector3?, speed: number, phase: number }
+-- Which mesh creature replaces the Parts: its id, length in studs, swimming Pace, how far
+-- its centre sits above the path (crabs walk on the seabed) and a light colour (jellyfish).
+type MeshSpec = { id: string, length: number, pace: number, lift: number?, glow: Color3? }
 -- `mesh` is a mesh creature (Creatures) moved whole along the path instead of part by part.
-type Creature = { model: Model, parts: { BasePart }, joints: { Joint }, path: (number) -> CFrame, mesh: Model? }
+type Creature = { model: Model, parts: { BasePart }, joints: { Joint }, path: (number) -> CFrame, mesh: Model?, spec: MeshSpec? }
 type PartOptions = {
 	shape: Enum.PartType?,
 	material: Enum.Material?,
@@ -104,16 +109,18 @@ local function loop(center: Vector3, radiusX: number, radiusZ: number, rise: num
 end
 
 local SPECIES = {
-	{ body = Color3.fromRGB(255, 122, 30), tail = Color3.fromRGB(255, 122, 30), band = Color3.fromRGB(250, 250, 250), size = 0.8 }, -- clownfish
-	{ body = Color3.fromRGB(40, 90, 230), tail = Color3.fromRGB(250, 210, 40), size = 1 }, -- blue tang
-	{ body = Color3.fromRGB(250, 215, 40), tail = Color3.fromRGB(250, 215, 40), size = 0.9, tall = 1.3 }, -- yellow tang
-	{ body = Color3.fromRGB(235, 235, 245), tail = Color3.fromRGB(235, 235, 245), band = Color3.fromRGB(45, 45, 65), size = 1.3, tall = 1.6 }, -- angelfish
-	{ body = Color3.fromRGB(175, 195, 215), tail = Color3.fromRGB(175, 195, 215), size = 0.6, material = Enum.Material.Metal }, -- sardine
-	{ body = Color3.fromRGB(240, 110, 170), tail = Color3.fromRGB(120, 80, 220), size = 0.9 }, -- wrasse
+	{ body = Color3.fromRGB(255, 122, 30), tail = Color3.fromRGB(255, 122, 30), band = Color3.fromRGB(250, 250, 250), size = 0.8, mesh = "clownfish", length = 1.6 },
+	{ body = Color3.fromRGB(40, 90, 230), tail = Color3.fromRGB(250, 210, 40), size = 1, mesh = "blueTang", length = 2 },
+	{ body = Color3.fromRGB(250, 215, 40), tail = Color3.fromRGB(250, 215, 40), size = 0.9, tall = 1.3, mesh = "yellowTang", length = 1.8 },
+	{ body = Color3.fromRGB(235, 235, 245), tail = Color3.fromRGB(235, 235, 245), band = Color3.fromRGB(45, 45, 65), size = 1.3, tall = 1.6, mesh = "angelfish", length = 1.9 },
+	{ body = Color3.fromRGB(175, 195, 215), tail = Color3.fromRGB(175, 195, 215), size = 0.6, material = Enum.Material.Metal, mesh = "sardine", length = 1.3 },
+	{ body = Color3.fromRGB(240, 110, 170), tail = Color3.fromRGB(120, 80, 220), size = 0.9, mesh = "wrasse", length = 1.9 },
 }
 
 local function addFish(species, path: (number) -> CFrame)
 	local fish = newCreature("Fish", path)
+	-- `length` is the mesh's length; the tall angelfish is a little shorter than its Part fish.
+	fish.spec = { id = species.mesh, length = species.length, pace = 1.2 }
 	local s = species.size
 	local tall = species.tall or 1
 	add(fish, Vector3.new(0.6, 0.8 * tall, 1.7) * s, species.body, CFrame.identity, { shape = Enum.PartType.Ball, material = species.material })
@@ -147,6 +154,7 @@ end
 local function addTurtle()
 	local center = Vector3.new(0, rng:NextNumber(24, 34), MIDDLE_Z)
 	local turtle = newCreature("SeaTurtle", along(loop(center, rng:NextNumber(200, 320), rng:NextNumber(80, 130), 3, 5)))
+	turtle.spec = { id = "seaTurtle", length = 8.5, pace = -0.3 }
 	local shell = Color3.fromRGB(95, 115, 60)
 	local skin = Color3.fromRGB(130, 150, 95)
 	add(turtle, Vector3.new(4.8, 1.7, 6), shell, CFrame.identity, { shape = Enum.PartType.Ball, material = Enum.Material.Slate })
@@ -183,6 +191,7 @@ local function addJellyfish()
 		return CFrame.new(position) * CFrame.Angles(math.sin(t * 0.5 + drift) * 0.12, t * 0.1, math.cos(t * 0.4 + drift) * 0.12)
 	end)
 	local color = JELLY_COLORS[rng:NextInteger(1, #JELLY_COLORS)]
+	jelly.spec = { id = "jellyfish", length = 5, pace = -0.2, glow = color }
 	add(jelly, Vector3.new(2.6, 1.8, 2.6), color, CFrame.identity, { shape = Enum.PartType.Ball, material = Enum.Material.Glass, transparency = 0.35 })
 	local core = add(jelly, Vector3.new(1.2, 0.8, 1.2), color:Lerp(Color3.new(1, 1, 1), 0.4), CFrame.new(0, -0.1, 0), {
 		shape = Enum.PartType.Ball,
@@ -209,6 +218,7 @@ end
 local function addManta()
 	local center = Vector3.new(0, rng:NextNumber(38, 46), MIDDLE_Z)
 	local manta = newCreature("MantaRay", along(loop(center, 300, 140, 4, 9)))
+	manta.spec = { id = "mantaRay", length = 14, pace = -0.4 }
 	local back = Color3.fromRGB(40, 55, 80)
 	add(manta, Vector3.new(3.6, 0.9, 5), back, CFrame.identity, { shape = Enum.PartType.Ball })
 	add(manta, Vector3.new(3.2, 0.6, 4.6), Color3.fromRGB(225, 230, 235), CFrame.new(0, -0.2, 0), { shape = Enum.PartType.Ball })
@@ -294,6 +304,8 @@ local function addCrab()
 		return CFrame.new(home + facing.RightVector * math.sin(t * 0.4 + phase) * 5) * facing
 	end)
 	local color = CRAB_COLORS[rng:NextInteger(1, #CRAB_COLORS)]
+	-- The pet crab mesh, smaller (its length is its width), standing on the seabed.
+	crab.spec = { id = "crab", length = 2.6, pace = 1.5, lift = 0.7 }
 	add(crab, Vector3.new(2.1, 0.9, 1.7), color, CFrame.new(0, 0.55, 0), { shape = Enum.PartType.Ball })
 	for side = -1, 1, 2 do
 		add(crab, Vector3.new(0.35, 0.35, 0.35), Color3.new(1, 1, 1), CFrame.new(side * 0.35, 1.25, -0.45), { shape = Enum.PartType.Ball })
@@ -307,6 +319,41 @@ local function addCrab()
 			})
 		end
 	end
+end
+
+-- Swaps a creature's Parts for its mesh (no-op if it has no spec or the mesh didn't load).
+local function useMesh(creature: Creature)
+	local spec = creature.spec
+	local mesh = spec and Creatures.clone(spec.id, spec.length)
+	if not mesh or not creature.model.Parent then
+		return
+	end
+	for _, part in creature.parts do
+		part:Destroy()
+	end
+	table.clear(creature.parts)
+	table.clear(creature.joints)
+	mesh:SetAttribute("Pace", spec.pace)
+	for _, part in mesh:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.CanQuery = false
+			part.CastShadow = false
+		end
+	end
+	if spec.glow then
+		local glow = Instance.new("PointLight")
+		glow.Color = spec.glow
+		glow.Range = 7
+		glow.Brightness = 1
+		glow.Parent = mesh.PrimaryPart
+		for _, part in mesh:GetDescendants() do
+			if part:IsA("MeshPart") then
+				part.Transparency = 0.15 -- a little see-through, like a real bell
+			end
+		end
+	end
+	mesh.Parent = creature.model
+	creature.mesh = mesh
 end
 
 function SeaLife.start()
@@ -341,7 +388,8 @@ function SeaLife.start()
 			local root = creature.path(t)
 			if everything or (root.Position - camera).Magnitude <= UPDATE_DISTANCE then
 				if creature.mesh then
-					creature.mesh:PivotTo(root)
+					local lift = creature.spec and creature.spec.lift
+					creature.mesh:PivotTo(if lift then root * CFrame.new(0, lift, 0) else root)
 				end
 				for i, p in creature.parts do
 					local joint = creature.joints[i]
@@ -376,6 +424,12 @@ function SeaLife.start()
 
 	-- Place everything once, so far-off creatures don't wait at the origin until approached.
 	update(true)
+	Creatures.onReady(function()
+		for _, creature in creatures do
+			useMesh(creature)
+		end
+		update(true)
+	end)
 	onEvent()
 	RunService.Heartbeat:Connect(function()
 		update(false)

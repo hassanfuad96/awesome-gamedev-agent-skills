@@ -51,9 +51,11 @@ local function build(def: CreatureMeshes.CreatureDef): Model
 	root.Parent = model
 	model.PrimaryPart = root
 
+	-- A creature generated facing the wrong way is turned round about its centre.
+	local turn = CFrame.Angles(0, math.rad(def.turn or 0), 0)
 	for _, piece in def.pieces do
 		local part = meshPart(piece)
-		local offset = CFrame.new(piece.at)
+		local offset = turn * CFrame.new(piece.at)
 		part.CFrame = offset
 		local weld = Instance.new("Weld")
 		weld.Name = piece.name
