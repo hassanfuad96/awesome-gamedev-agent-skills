@@ -1,6 +1,6 @@
 --!nonstrict
 -- The Starter Lagoon tutorial tracker: a card under the top bar with the current step, and
--- a glowing beam plus a marker over the place to go next (Inky, your reef, the Coral Market or
+-- a glowing beam plus a marker over the place to go next (Kai the guide, your reef, the Coral Market or
 -- the Research Laboratory). Only shows what the server synced (data.tutorial); the server
 -- decides when a step is done (Tutorial).
 -- Landmark positions come from attributes on Workspace.Reef, which reach every client even
@@ -44,7 +44,7 @@ local function target(): (Vector3?, string?, number)
 		return index and reef:GetAttribute(`PlotHome_{index}`)
 	end
 	if step.action == "guide" then
-		return reef:GetAttribute("Landmark_Guide"), "Inky", ARRIVED
+		return reef:GetAttribute("Landmark_Guide"), "Kai", ARRIVED
 	elseif step.action == "plant" or step.action == "fish" then
 		return home(), "Your reef", ON_REEF
 	elseif step.action == "sell" then

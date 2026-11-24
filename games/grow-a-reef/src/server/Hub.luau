@@ -7,9 +7,10 @@
 --   Aquarium / Collection Center (north-east): a smaller dome of display tanks that each
 --     player sees filled with what they've discovered (AquariumDisplay), the Reef Index and
 --     the Pet Hatchery.
---   Coral Market (south-east): seeds (Captain Coralie), selling (Pinch), decorations and
+--   Coral Market (south-east): seeds (Coralie, one of the Crew), selling (Pinch), decorations and
 --     fences, and a case of rare species, under a glass canopy.
---   Equipment Station (south-west): diving gear, the Oxygen Tank and Swim Fins (Old Shellby).
+--   Equipment Station (south-west): diving gear, the Oxygen Tank and Swim Fins (Captain Mako,
+--     the Master Diver, one of the Crew). Dr. Pearl (Crew) staffs the Lab counter.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -140,12 +141,13 @@ end
 
 -- The glowing coral on top of the Lab: a trunk forking three times into neon branches.
 local function coralEmblem(parent: Instance, base: Vector3, rng: Random)
-	local colors = { Color3.fromRGB(255, 120, 170), Color3.fromRGB(255, 170, 90), Color3.fromRGB(120, 240, 230) }
+	-- Deep, saturated colours: pale neon washes out to white in the glow.
+	local colors = { Color3.fromRGB(255, 40, 130), Color3.fromRGB(255, 110, 20), Color3.fromRGB(0, 210, 190) }
 	local function branch(from: CFrame, length: number, thick: number, depth: number)
 		local tip = from * CFrame.new(0, length, 0)
 		bar(parent, "EmblemBranch", from.Position, tip.Position, thick, colors[depth % 3 + 1], Enum.Material.Neon)
 		if depth == 0 then
-			prop({ Name = "EmblemTip", Shape = Enum.PartType.Ball, Size = Vector3.new(1.4, 1.4, 1.4), Position = tip.Position, Color = Color3.new(1, 1, 1), Material = Enum.Material.Neon, Parent = parent })
+			prop({ Name = "EmblemTip", Shape = Enum.PartType.Ball, Size = Vector3.new(2, 2, 2), Position = tip.Position, Color = Color3.fromRGB(255, 200, 60), Material = Enum.Material.Neon, Parent = parent })
 			return
 		end
 		for k = 1, 3 do
@@ -153,8 +155,8 @@ local function coralEmblem(parent: Instance, base: Vector3, rng: Random)
 			branch(tip * CFrame.Angles(0, spin, 0) * CFrame.Angles(0.55 + rng:NextNumber(-0.1, 0.1), 0, 0), length * 0.7, thick * 0.7, depth - 1)
 		end
 	end
-	disc(parent, "EmblemBase", 3, 1, base + Vector3.new(0, 0.5, 0), FRAME, Enum.Material.Metal)
-	branch(CFrame.new(base + Vector3.new(0, 1, 0)), 6, 1.4, 3)
+	disc(parent, "EmblemBase", 4, 1.2, base + Vector3.new(0, 0.6, 0), FRAME, Enum.Material.Metal)
+	branch(CFrame.new(base + Vector3.new(0, 1.2, 0)), 9, 2, 3)
 	local glow = prop({ Name = "EmblemLight", Size = Vector3.new(1, 1, 1), Position = base + Vector3.new(0, 8, 0), Transparency = 1, Parent = parent })
 	local light = Instance.new("PointLight")
 	light.Color = Color3.fromRGB(255, 160, 190)

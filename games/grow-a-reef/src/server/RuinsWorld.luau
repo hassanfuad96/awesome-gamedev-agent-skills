@@ -1,8 +1,9 @@
 --!nonstrict
 -- Builds the Sunken Ruins at server start (layout in RuinsConfig, which explains the zone's
--- frame): its own seabed and the sand road in from the lagoon, the entrance with Marlo the
--- explorer, a ruined archway, the temple terrace (temple and sanctum, mermaid statue, the
--- tall column), the pirate ship, the underwater cave, the coral garden and the Wreck Basin.
+-- frame): its own seabed and the sand road in from the lagoon, the entrance with the
+-- explorer's rock (Marlo himself is a Crew NPC), a ruined archway, the temple terrace
+-- (temple and sanctum, mermaid statue, the tall column), the pirate ship, the underwater
+-- cave, the coral garden and the Wreck Basin.
 -- Also the interactive spots: treasure chests, relics and hidden coral, each tagged
 -- RuinsConfig.SPOT_TAG with Kind and Id attributes and a ProximityPrompt that the server's
 -- Ruins module answers. Everything lives under Workspace.SunkenRuins.
@@ -411,12 +412,11 @@ local function buildEntrance(root: Instance, rng: Random)
 	end
 	fallenColumn(m, L(162, 0, 22).Position, 0.6, 3, 2.2, rng)
 
-	-- Marlo the seal, the explorer who gives the missions, on a rock beside the road.
+	-- The rock beside the road where Marlo the Explorer (a Crew NPC) gives the missions.
 	local seatAt = RuinsConfig.Places.explorer
 	local seat = part(m, "ExplorerRock", Vector3.new(1.4, 6, 6), CFrame.new(seatAt + Vector3.new(0, 0.7, 0)) * UPRIGHT, ROCK, Enum.Material.Slate, { shape = Enum.PartType.Cylinder })
 	prompt(seat, "Explorer", "Talk", "Marlo the Explorer", 12)
 	local face = CFrame.lookAt(seatAt + Vector3.new(0, 1.4, 0), at(150, 1.4, 0))
-	RuinsWorld.buildMarlo(m, face)
 	-- His mission board, leaning on a column drum.
 	local board = part(m, "MissionBoard", Vector3.new(6, 4, 0.4), face * CFrame.new(5.5, 3.2, 1.5) * CFrame.Angles(0, math.rad(-20), 0) * CFrame.Angles(math.rad(-8), 0, 0), WOOD, Enum.Material.WoodPlanks)
 	surfaceLabel(board, Enum.NormalId.Front, "EXPLORER'S\nMISSIONS", Color3.fromRGB(255, 230, 160))
@@ -424,53 +424,6 @@ local function buildEntrance(root: Instance, rng: Random)
 
 	-- The whirlpool back to the shops; you land here when you teleport to the ruins.
 	teleportPad(m, RuinsConfig.Places.pad, "TeleportShops", "Go to the shops")
-end
-
--- Marlo: a grey seal in an explorer's pith helmet with a lantern. Tagged as a shopkeeper
--- (ReefConfig.Shopkeepers.Explorer), so the client's Shopkeepers module animates him and
--- shows his greetings. `base` is his footprint, facing the players (-Z).
-function RuinsWorld.buildMarlo(parent: Instance, base: CFrame): Model
-	local m = Instance.new("Model")
-	m.Name = "Marlo"
-	m.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
-	local rootPart = prop(m, "Root", Vector3.new(1, 1, 1), base, Color3.new(), Enum.Material.SmoothPlastic, { transparency = 1 })
-	m.PrimaryPart = rootPart
-	local fur = Color3.fromRGB(150, 160, 170)
-	local belly = Color3.fromRGB(210, 214, 208)
-	local dark = Color3.fromRGB(40, 40, 46)
-	local khaki = Color3.fromRGB(214, 190, 130)
-	local function piece(name: string, size: Vector3, offset: CFrame, color: Color3, shape: Enum.PartType?, material: Enum.Material?)
-		return prop(m, name, size, base * offset, color, material or Enum.Material.SmoothPlastic, { shape = shape })
-	end
-	local BALL = Enum.PartType.Ball
-	piece("Body", Vector3.new(3.4, 4.4, 3), CFrame.new(0, 2.4, 0.4), fur, BALL)
-	piece("Belly", Vector3.new(2.6, 3.4, 1.6), CFrame.new(0, 2.2, -0.5), belly, BALL)
-	piece("Tail", Vector3.new(3, 1.2, 2.2), CFrame.new(0, 0.6, 1.8), fur, BALL)
-	local head = piece("Head", Vector3.new(2.6, 2.4, 2.4), CFrame.new(0, 5.2, -0.2), fur, BALL)
-	piece("Snout", Vector3.new(1.4, 1, 1), CFrame.new(0, 4.8, -1.3), belly, BALL)
-	piece("Nose", Vector3.new(0.45, 0.35, 0.3), CFrame.new(0, 5.05, -1.8), dark, BALL)
-	for _, side in { -1, 1 } do
-		piece("Eye", Vector3.new(0.45, 0.45, 0.45), CFrame.new(side * 0.55, 5.6, -1.15), dark, BALL)
-		piece("Shine", Vector3.new(0.15, 0.15, 0.15), CFrame.new(side * 0.5, 5.7, -1.35), Color3.new(1, 1, 1), BALL, Enum.Material.Neon)
-		piece("Flipper", Vector3.new(0.5, 2, 1.1), CFrame.new(side * 1.8, 2.6, -0.4) * CFrame.Angles(0, 0, side * 0.5), fur:Lerp(dark, 0.2), BALL)
-		for k = -1, 1 do
-			piece("Whisker", Vector3.new(1.2, 0.06, 0.06), CFrame.new(side * 1.05, 4.75 + k * 0.12, -1.55) * CFrame.Angles(0, side * 0.15, k * 0.15), Color3.fromRGB(240, 240, 240))
-		end
-	end
-	-- Pith helmet: a khaki dome over a wide brim, with a band.
-	piece("Brim", Vector3.new(0.2, 3.6, 3.6), CFrame.new(0, 6.2, -0.1) * UPRIGHT, khaki, Enum.PartType.Cylinder, Enum.Material.Fabric)
-	piece("Helmet", Vector3.new(2.4, 1.6, 2.4), CFrame.new(0, 6.55, -0.1), khaki, BALL, Enum.Material.Fabric)
-	piece("Band", Vector3.new(0.3, 2.45, 2.45), CFrame.new(0, 6.35, -0.1) * UPRIGHT, Color3.fromRGB(120, 80, 50), Enum.PartType.Cylinder, Enum.Material.Fabric)
-	-- A satchel strap and a lantern hanging from one flipper.
-	piece("Strap", Vector3.new(0.3, 4, 0.3), CFrame.new(0, 2.8, -1) * CFrame.Angles(0, 0, 0.6), Color3.fromRGB(120, 80, 50), nil, Enum.Material.Leather)
-	piece("Satchel", Vector3.new(1.2, 1, 0.6), CFrame.new(1.2, 1.4, -0.9), Color3.fromRGB(140, 96, 60), nil, Enum.Material.Leather)
-	local lantern = piece("Lantern", Vector3.new(0.7, 0.9, 0.7), CFrame.new(-2.3, 1.4, -0.9), Color3.fromRGB(255, 210, 120), nil, Enum.Material.Neon)
-	light(lantern, Color3.fromRGB(255, 210, 140), 12, 1.5)
-	m.Parent = parent
-	head.Name = "Head"
-	m:SetAttribute("Shopkeeper", "Explorer")
-	m:AddTag(ReefConfig.SHOPKEEPER_TAG)
-	return m
 end
 
 local function buildArchway(root: Instance, rng: Random)

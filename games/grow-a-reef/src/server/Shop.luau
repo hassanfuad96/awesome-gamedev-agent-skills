@@ -20,6 +20,8 @@ local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local Shop = {}
 
 local stock: { [string]: number } = {}
+-- Personal Restock (a Store product): that player's own full stock for RESTOCK_SECONDS.
+local personal: { [Player]: { stock: { [string]: number }, expires: number } } = {}
 local restockAt = 0
 local rng = Random.new()
 local shopStand: BasePart
@@ -34,12 +36,15 @@ local function isNear(player: Player, target: BasePart): boolean
 	return (root.Position - target.Position).Magnitude <= ReefConfig.INTERACT_DISTANCE
 end
 
+-- Each player sees the shared stock, or their own after a Personal Restock.
 local function broadcastStock(target: Player?)
-	local payload = { stock = stock, restockAt = restockAt }
-	if target then
-		Remotes.ShopSync:FireClient(target, payload)
-	else
-		Remotes.ShopSync:FireAllClients(payload)
+	for _, player in if target then { target } else Players:GetPlayers() do
+		local own = personal[player]
+		if own then
+			Remotes.ShopSync:FireClient(player, { stock = own.stock, restockAt = own.expires, personal = true })
+		else
+			Remotes.ShopSync:FireClient(player, { stock = stock, restockAt = restockAt, personal = false })
+		end
 	end
 end
 
@@ -82,7 +87,9 @@ local function onBuySeed(player: Player, seedId: unknown)
 		Plots.notify(player, `Research {seed.name} at the Research Laboratory before you can buy it.`)
 		return
 	end
-	if (stock[seedId] or 0) <= 0 then
+	local own = personal[player]
+	local source = if own then own.stock else stock
+	if (source[seedId] or 0) <= 0 then
 		Plots.notify(player, `{seed.name} is sold out. Restock soon!`)
 		return
 	end
@@ -97,13 +104,13 @@ local function onBuySeed(player: Player, seedId: unknown)
 	end
 	-- No yields between the checks above and these writes.
 	profile.data.shells = wallet.shells
-	stock[seedId] -= 1
+	source[seedId] -= 1
 	profile.data.seeds[seedId] = owned + 1
 	if not profile.selected then
 		profile.selected = seedId
 	end
 	PlayerData.sync(player)
-	broadcastStock()
+	broadcastStock(if source == stock then nil else player)
 end
 
 local function onSelectSeed(player: Player, seedId: unknown)
@@ -144,8 +151,8 @@ local function sellAll(player: Player)
 		Plots.notify(player, "Nothing to sell. Harvest fully grown coral first.")
 		return
 	end
-	-- Rebirths add their bonus to every sale.
-	total = math.floor(total * ReefConfig.shellMultiplier(profile.data.rebirths))
+	-- Rebirths (and the 2x Shells pass) add their bonus to every sale.
+	total = math.floor(total * PlayerData.saleMultiplier(profile.data))
 	profile.data.inventory = {}
 	PlayerData.addShells(player, total)
 	Plots.notify(player, `Sold {count} coral for {EconomyMath.formatNumber(total)} shells!`, "good")
@@ -159,6 +166,20 @@ function Shop.restockNow()
 	restock()
 end
 
+-- Personal Restock (bought in the Store): every seed the shop sells, fully stocked, just for
+-- this player for the next RESTOCK_SECONDS.
+function Shop.personalRestock(player: Player)
+	local own = {}
+	for _, seedId in ReefConfig.SEED_ORDER do
+		local seed = ReefConfig.Seeds[seedId]
+		if seed.shop ~= false and seed.stockMax > 0 then
+			own[seedId] = seed.stockMax
+		end
+	end
+	personal[player] = { stock = own, expires = Workspace:GetServerTimeNow() + ReefConfig.RESTOCK_SECONDS }
+	broadcastStock(player)
+end
+
 function Shop.start(worldParts: World.WorldParts)
 	shopStand = worldParts.shopStand
 	sellStand = worldParts.sellStand
@@ -168,6 +189,9 @@ function Shop.start(worldParts: World.WorldParts)
 		sellPrompt.Triggered:Connect(sellAll)
 	end
 
+	Players.PlayerRemoving:Connect(function(player)
+		personal[player] = nil
+	end)
 	Remotes.BuySeed.OnServerEvent:Connect(onBuySeed)
 	Remotes.SelectSeed.OnServerEvent:Connect(onSelectSeed)
 	Remotes.RequestSync.OnServerEvent:Connect(function(player)
@@ -180,8 +204,15 @@ function Shop.start(worldParts: World.WorldParts)
 	task.spawn(function()
 		while true do
 			task.wait(1)
-			if Workspace:GetServerTimeNow() >= restockAt then
+			local now = Workspace:GetServerTimeNow()
+			if now >= restockAt then
 				restock()
+			end
+			for player, own in personal do
+				if now >= own.expires then
+					personal[player] = nil
+					broadcastStock(player) -- back to the shared stock
+				end
 			end
 		end
 	end)

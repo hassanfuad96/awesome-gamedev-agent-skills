@@ -30,6 +30,7 @@ type Keeper = {
 	lastGreet: number,
 	lastLine: number,
 	bubble: BillboardGui?,
+	walker: boolean, -- one of the human crew, moved by the server
 }
 
 local keepers: { [Model]: Keeper } = {}
@@ -46,7 +47,7 @@ local function nextLine(keeper: Keeper): string
 	return lines[index]
 end
 
--- `long` is for something the player asked for (talking to Inky): a bigger bubble that
+-- `long` is for something the player asked for (talking to Kai): a bigger bubble that
 -- stays up longer.
 local function showBubble(keeper: Keeper, playerGui: PlayerGui, text: string, long: boolean?)
 	if keeper.bubble then
@@ -58,7 +59,7 @@ local function showBubble(keeper: Keeper, playerGui: PlayerGui, text: string, lo
 		Size = if long then UDim2.fromOffset(300, 92) else UDim2.fromOffset(250, 66),
 		-- Usually beside the head, not above it, where it would cover the stand's sign.
 		-- SizeOffset keeps the bubble's edge next to the head at any distance. Long lines
-		-- (Inky, who has no sign) go above the head, where they stay on screen up close.
+		-- (Kai, who has no sign) go above the head, where they stay on screen up close.
 		StudsOffset = if long then Vector3.new(0, keeper.head.Size.Y / 2 + 0.6, 0) else Vector3.new(keeper.head.Size.X / 2 + 0.4, 0.3, 0),
 		SizeOffset = if long then Vector2.new(0, 0.5) else Vector2.new(0.5, 0),
 		-- The Seed Shop roof is in front of the diver's head from most camera angles.
@@ -136,6 +137,9 @@ local function add(instance: Instance)
 		lastGreet = -math.huge,
 		lastLine = 0,
 		bubble = nil,
+		-- The human crew walk about on their own (the server's Crew module): measure from where
+		-- they are, and leave moving them to the server.
+		walker = instance:GetAttribute("Walker") == true,
 	}
 end
 
@@ -149,7 +153,7 @@ local function remove(instance: Instance)
 	end
 end
 
--- Shows a line from the shopkeeper of `kind` (a ReefConfig.Shopkeepers key), such as Inky's
+-- Shows a line from the shopkeeper of `kind` (a ReefConfig.Shopkeepers key), such as Kai's
 -- tutorial lines from the server.
 function Shopkeepers.say(kind: string, text: string)
 	for model, keeper in keepers do
@@ -177,7 +181,18 @@ function Shopkeepers.start(playerGui: PlayerGui)
 		local now = os.clock()
 		local still = Ui.reducedMotion()
 		for model, keeper in keepers do
-			local distance = (root.Position - keeper.home.Position).Magnitude
+			-- A keeper that swapped to its mesh model (ShopkeeperVisuals) has a new Head.
+			if not keeper.head.Parent then
+				local head = model:FindFirstChild("Head")
+				if not (head and head:IsA("BasePart")) then
+					continue
+				end
+				keeper.head = head
+				if keeper.bubble then
+					keeper.bubble.Adornee = head
+				end
+			end
+			local distance =(root.Position - (if keeper.walker then keeper.head.Position else keeper.home.Position)).Magnitude
 			if distance > ANIMATE_DISTANCE then
 				continue
 			end
@@ -191,6 +206,9 @@ function Shopkeepers.start(playerGui: PlayerGui)
 				keeper.near = true
 			elseif distance > ReefConfig.SHOPKEEPER_GREET_DISTANCE + 4 then
 				keeper.near = false
+			end
+			if keeper.walker then
+				continue
 			end
 
 			-- Turn toward the player (forward is -Z), within a limit so they never face the wall.

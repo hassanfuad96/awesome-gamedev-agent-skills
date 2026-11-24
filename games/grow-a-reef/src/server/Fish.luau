@@ -4,6 +4,8 @@
 -- Wild fish also gather at the Main Reef's fish nurseries (ReefConfig.MainReef.fishSpots)
 -- and in the Kelp Forest (KelpConfig.FishSpots, its own species); anyone can catch those,
 -- first click wins. Kelp spots by a seagrass meadow only have fish while it's half restored.
+-- Fish with a mesh model (FishDef.creature, see Creatures) swim as that model once the
+-- templates are built; the rest (and every fish before then) are a Part-built body and tail.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,6 +22,7 @@ local Quests = require(script.Parent.Quests)
 local Tutorial = require(script.Parent.Tutorial)
 local Kelp = require(script.Parent.Kelp)
 local KelpConfig = require(ReplicatedStorage.Shared.KelpConfig)
+local Creatures = require(ReplicatedStorage.Shared.Creatures)
 local RateLimit = require(script.Parent.RateLimit)
 
 local Fish = {}
@@ -48,6 +51,21 @@ local function despawn(player: Player, model: Model)
 end
 
 local function buildFish(kind: ReefConfig.FishDef, at: CFrame): (Model, BasePart)
+	local creature = kind.creature and Creatures.clone(kind.creature)
+	if creature then
+		creature.Name = kind.id
+		creature:SetAttribute("Pace", 1.4) -- always darting somewhere (CreatureAnimator)
+		creature:PivotTo(at)
+		local root = creature.PrimaryPart :: BasePart
+		if kind.multiplier >= 10 then
+			local glow = Instance.new("PointLight")
+			glow.Color = kind.color
+			glow.Range = 8
+			glow.Parent = root
+		end
+		return creature, root
+	end
+
 	local model = Instance.new("Model")
 	model.Name = kind.id
 
@@ -135,7 +153,7 @@ local function reward(clicker: Player, kind: ReefConfig.FishDef, value: number)
 		return
 	end
 	-- A pufferfish makes the catch worth more, and so do rebirths.
-	local earned = math.floor(value * Pets.fishMultiplier(clicker) * ReefConfig.shellMultiplier(profile.data.rebirths))
+	local earned = math.floor(value * Pets.fishMultiplier(clicker) * PlayerData.saleMultiplier(profile.data))
 	PlayerData.addShells(clicker, earned)
 	profile.data.fishCaught += 1
 	Quests.progress(clicker, "fish", 1)

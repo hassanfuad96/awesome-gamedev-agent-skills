@@ -16,6 +16,7 @@ local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
 local CoralVisuals = require(ReplicatedStorage.Shared.CoralVisuals)
 local RuinsConfig = require(ReplicatedStorage.Shared.RuinsConfig)
 local AbyssConfig = require(ReplicatedStorage.Shared.AbyssConfig)
+local Creatures = require(ReplicatedStorage.Shared.Creatures)
 local Ui = require(script.Parent.Ui)
 
 local AquariumDisplay = {}
@@ -28,6 +29,16 @@ local lastKey: string? = nil -- what the tanks were last built for; nil = never 
 local data: any = nil
 
 local function fishModel(kind: ReefConfig.FishDef): Model
+	-- Its mesh model at tank size, if it has one (CreatureAnimator swims it).
+	local creature = kind.creature and Creatures.clone(kind.creature, 1.4)
+	if creature then
+		for _, d in creature:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.CanQuery = false
+			end
+		end
+		return creature
+	end
 	local model = Instance.new("Model")
 	model.Name = kind.id
 	local body = Instance.new("Part")
@@ -196,6 +207,13 @@ function AquariumDisplay.start()
 	folder.Parent = Workspace
 	-- The tanks may stream in after the data arrives.
 	CollectionService:GetInstanceAddedSignal("AquariumTank"):Connect(function()
+		lastKey = nil
+		if data then
+			AquariumDisplay.setData(data)
+		end
+	end)
+	-- Fish drawn before the mesh models were ready get them now.
+	Creatures.onReady(function()
 		lastKey = nil
 		if data then
 			AquariumDisplay.setData(data)

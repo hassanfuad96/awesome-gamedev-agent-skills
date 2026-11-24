@@ -412,7 +412,9 @@ function SuppliesPanel.render(self: SuppliesPanel)
 			r.button.Text = "Use"
 			r.button.BackgroundColor3 = BLUE
 		elseif fence.shop == false then
-			r.detail.Text = `Reef Index reward: complete the {rewardSetName(fence.id) or "?"} set`
+			r.detail.Text = if fence.pass
+				then "VIP game pass: get it in the Store"
+				else `Reef Index reward: complete the {rewardSetName(fence.id) or "?"} set`
 			r.button.Text = "Locked"
 			r.button.BackgroundColor3 = Ui.Colors.buttonDisabled
 		else

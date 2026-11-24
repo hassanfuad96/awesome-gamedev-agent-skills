@@ -12,6 +12,7 @@ local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
 local AdminPanel = require(script.Parent.AdminPanel)
 local Audio = require(script.Parent.Audio)
 local EventBars = require(script.Parent.EventBars)
+local StorePanel = require(script.Parent.StorePanel)
 local CoralLabels = require(script.Parent.CoralLabels)
 local Hud = require(script.Parent.Hud)
 local IndexPanel = require(script.Parent.IndexPanel)
@@ -32,6 +33,9 @@ local RuinsPanel = require(script.Parent.RuinsPanel)
 local RuinsLife = require(script.Parent.RuinsLife)
 local AbyssPanel = require(script.Parent.AbyssPanel)
 local AbyssLife = require(script.Parent.AbyssLife)
+local SuitPicker = require(script.Parent.SuitPicker)
+local MarineCast = require(script.Parent.MarineCast)
+local CreatureAnimator = require(script.Parent.CreatureAnimator)
 local KelpPanel = require(script.Parent.KelpPanel)
 local LabPanel = require(script.Parent.LabPanel)
 local OxygenBar = require(script.Parent.OxygenBar)
@@ -48,6 +52,7 @@ local admin = AdminPanel.new(playerGui)
 local quests = QuestsPanel.new(playerGui)
 local journal = RuinsPanel.new(playerGui) -- the Sunken Ruins' Explorer's Journal
 local abyssShop = AbyssPanel.new(playerGui) -- Lumi's Deep Seeds, in the Abyss
+local suitPicker = SuitPicker.new(playerGui) -- Blue or Pink Explorer diving suit
 local kelpJournal = KelpPanel.new(playerGui) -- Otto's Ranger Journal, in the Kelp Forest
 local lab = LabPanel.new(playerGui) -- the Research Laboratory: species, planters, reef health
 local sidePanels = { index = index, pets = pets, quests = quests, journal = journal, admin = admin }
@@ -71,6 +76,7 @@ end, function()
 end)
 local shop = ShopPanel.new(playerGui)
 local merchant = MerchantPanel.new(playerGui)
+local store = StorePanel.new(playerGui) -- Robux passes and products (the gold Store button)
 local supplies = SuppliesPanel.new(playerGui, function(itemId: string)
 	Planter.startPlacing(itemId)
 	hud:toast("Teleport Home, then tap inside your fence to place it.", "info")
@@ -94,6 +100,7 @@ Remotes.DataSync.OnClientEvent:Connect(function(data)
 	quests:setData(data)
 	supplies:setData(data)
 	merchant:setData(data)
+	store:setData(data)
 	Audio.onData(data)
 	hud:setQuestReady(QuestsPanel.readyToClaim(data))
 	TutorialPanel.setData(data)
@@ -104,6 +111,7 @@ Remotes.DataSync.OnClientEvent:Connect(function(data)
 	KelpLife.setData(data)
 	journal:setData(data)
 	abyssShop:setData(data)
+	suitPicker:setData(data)
 	refreshPlacing()
 end)
 
@@ -136,7 +144,7 @@ Remotes.Announcement.OnClientEvent:Connect(function(from, text, global)
 	end
 end)
 
--- Inky's tutorial lines, already chosen by the server.
+-- Kai the guide's tutorial lines, already chosen by the server.
 Remotes.GuideLine.OnClientEvent:Connect(function(text)
 	if type(text) == "string" then
 		Shopkeepers.say("Guide", text)
@@ -168,6 +176,10 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, triggeredBy)
 	elseif kind == "Merchant" then
 		closeSidePanels()
 		merchant:setOpen(true, prompt.Parent :: BasePart)
+	elseif kind == "SuitPicker" then
+		-- Captain Mako at the Equipment Station: change your diving suit.
+		closeSidePanels()
+		suitPicker:setOpen(true)
 	elseif kind == "AbyssShop" then
 		closeSidePanels()
 		abyssShop:setOpen(true, prompt.Parent :: BasePart)
@@ -249,10 +261,12 @@ EventBars.start(playerGui)
 TutorialPanel.start(playerGui)
 RuinsLife.start()
 AbyssLife.start()
+MarineCast.start()
+CreatureAnimator.start() -- swims the mesh fish and pets
 task.spawn(KelpLife.start) -- its own thread: a problem in the forest's animation stops only it
 OxygenBar.start(playerGui)
 AquariumDisplay.start()
 
 -- Ask for a snapshot in case DataSync fired before these handlers connected.
 Remotes.RequestSync:FireServer()
-hud:toast("Welcome to the Starter Lagoon! Talk to Inky the octopus to get started.", "good")
+hud:toast("Welcome to the Starter Lagoon! Talk to Kai the guide to get started.", "good")

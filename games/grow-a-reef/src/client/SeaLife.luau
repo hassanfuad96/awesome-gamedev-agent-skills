@@ -12,12 +12,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
+local Creatures = require(ReplicatedStorage.Shared.Creatures)
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
 
 local SeaLife = {}
 
 type Joint = { pivot: CFrame, offset: CFrame, swing: Vector3?, speed: number, phase: number }
-type Creature = { model: Model, parts: { BasePart }, joints: { Joint }, path: (number) -> CFrame }
+-- `mesh` is a mesh creature (Creatures) moved whole along the path instead of part by part.
+type Creature = { model: Model, parts: { BasePart }, joints: { Joint }, path: (number) -> CFrame, mesh: Model? }
 type PartOptions = {
 	shape: Enum.PartType?,
 	material: Enum.Material?,
@@ -233,6 +235,20 @@ local function addWhale(startedAt: number, endsAt: number): Creature
 		local progress = (t + serverOffset - startedAt) / (endsAt - startedAt)
 		return WHALE_FROM:Lerp(WHALE_TO, progress) + Vector3.new(0, math.sin(progress * math.pi * 3) * 3, 0)
 	end))
+	-- The humpback mesh when it has loaded (CreatureAnimator beats its flukes), else Parts.
+	local mesh = Creatures.clone("whale")
+	if mesh then
+		mesh:SetAttribute("Pace", -0.8) -- a slow, heavy beat
+		for _, part in mesh:GetDescendants() do
+			if part:IsA("BasePart") then
+				part.CanQuery = false
+				part.CastShadow = part.Name == "Body" -- a shadow sweeping over the plaza
+			end
+		end
+		mesh.Parent = whale.model
+		whale.mesh = mesh
+		return whale
+	end
 	local skin = Color3.fromRGB(70, 92, 125)
 	add(whale, Vector3.new(14, 12, 42), skin, CFrame.identity, { shape = Enum.PartType.Ball, shadow = true })
 	add(whale, Vector3.new(12, 8, 38), Color3.fromRGB(200, 210, 220), CFrame.new(0, -2.6, -1), { shape = Enum.PartType.Ball })
@@ -324,6 +340,9 @@ function SeaLife.start()
 		for _, creature in creatures do
 			local root = creature.path(t)
 			if everything or (root.Position - camera).Magnitude <= UPDATE_DISTANCE then
+				if creature.mesh then
+					creature.mesh:PivotTo(root)
+				end
 				for i, p in creature.parts do
 					local joint = creature.joints[i]
 					local cf = root * joint.pivot

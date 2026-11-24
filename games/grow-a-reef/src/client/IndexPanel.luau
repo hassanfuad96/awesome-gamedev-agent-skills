@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
 local EconomyMath = require(ReplicatedStorage.Shared.EconomyMath)
 local CoralVisuals = require(ReplicatedStorage.Shared.CoralVisuals)
+local Creatures = require(ReplicatedStorage.Shared.Creatures)
 local Ui = require(script.Parent.Ui)
 
 local IndexPanel = {}
@@ -33,6 +34,9 @@ local function silhouette(model: Model)
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
 			if d.Transparency < 1 then
+				if d:IsA("MeshPart") then
+					d.TextureID = "" -- a mesh creature's texture would hide the colour
+				end
 				d.Color = SILHOUETTE
 				d.Material = Enum.Material.SmoothPlastic
 				d.Transparency = 0
@@ -44,6 +48,10 @@ local function silhouette(model: Model)
 end
 
 local function fishModel(kind: ReefConfig.FishDef): Model
+	local creature = kind.creature and Creatures.clone(kind.creature)
+	if creature then
+		return creature
+	end
 	local model = Instance.new("Model")
 	local body = Instance.new("Part")
 	body.Shape = Enum.PartType.Ball

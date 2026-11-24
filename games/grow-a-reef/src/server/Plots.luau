@@ -273,7 +273,7 @@ local function harvest(player: Player, profile: Profile, plot: PlotParts, plantI
 	profile.data.harvested += 1
 	setCoral(player, plot, plantId, nil)
 	paintPlanters(plot, profile.data.unlocked, profile.data.plants)
-	local value = math.floor(ReefConfig.harvestValue(grown.seed, grown.mutation) * ReefConfig.shellMultiplier(profile.data.rebirths))
+	local value = math.floor(ReefConfig.harvestValue(grown.seed, grown.mutation) * PlayerData.saleMultiplier(profile.data))
 	local what = if by then `{by} harvested a` else "+1"
 	notify(player, `{what} {displayName(grown.seed, grown.mutation)} (sells for {EconomyMath.formatNumber(value)} shells)`, "good")
 	ReefIndex.discoverCoral(player, profile, grown.seed, grown.mutation)

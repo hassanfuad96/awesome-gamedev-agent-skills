@@ -26,7 +26,7 @@ local KelpLife = {}
 local SWAY_DISTANCE = 170 -- studs from the camera within which kelp sways
 local SWIM_DISTANCE = 260
 local STEP = 1 / 20 -- seconds between animation updates
-local GREEN = Color3.fromRGB(205, 255, 210)
+local GREEN = Color3.fromRGB(175, 240, 170) -- the forest's sunlit green water
 local FADE = TweenInfo.new(1.6, Enum.EasingStyle.Sine)
 
 type Kelp = { model: Model, home: CFrame, phase: number, swing: number }
@@ -226,7 +226,7 @@ function KelpLife.start()
 		local nowInside = KelpConfig.inForest(eye)
 		if nowInside ~= inside then
 			inside = nowInside
-			TweenService:Create(tint, FADE, { TintColor = if inside then GREEN else Color3.new(1, 1, 1), Saturation = if inside then 0.12 else 0 }):Play()
+			TweenService:Create(tint, FADE, { TintColor = if inside then GREEN else Color3.new(1, 1, 1), Saturation = if inside then 0.25 else 0, Contrast = if inside then 0.08 else 0 }):Play()
 			TweenService:Create(bloom, FADE, { Intensity = if inside then 0.35 else 0 }):Play()
 		end
 

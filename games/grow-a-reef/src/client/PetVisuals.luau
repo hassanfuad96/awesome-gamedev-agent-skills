@@ -1,16 +1,20 @@
 --!nonstrict
--- Pet models made from plain Parts, for the followers (PetFollowers) and the Pets panel.
+-- Pet models for the followers (PetFollowers) and the Pets panel. Pets with a mesh model
+-- (Creatures: all three, the seahorse, pufferfish and octopus) use it once the server has built the templates;
+-- the others, and every pet before then, are made from plain Parts.
 -- Each model's pivot is its centre and it faces -Z. Golden pets are gold foil and sparkle.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
+local Creatures = require(ReplicatedStorage.Shared.Creatures)
 
 local PetVisuals = {}
 
 local GOLD = Color3.fromRGB(255, 200, 60)
 local DARK = Color3.fromRGB(25, 25, 30)
 local FORWARD = CFrame.Angles(0, math.rad(90), 0) -- turns a cylinder (along X) to face -Z
+local MESH_LENGTH = { seahorse = 2.6, pufferfish = 2, octopus = 2.2 } -- pets with a mesh model, at this size
 
 local function piece(model: Model, size: Vector3, cf: CFrame, color: Color3, shape: Enum.PartType?): Part
 	local p = Instance.new("Part")
@@ -81,6 +85,18 @@ local builders: { [string]: (Model, Color3) -> () } = {
 
 function PetVisuals.build(species: string, golden: boolean): Model
 	local def = ReefConfig.Pets.species[species]
+	local creature = MESH_LENGTH[species] and Creatures.clone(species, MESH_LENGTH[species])
+	if creature then
+		creature.Name = if def then def.name else species
+		creature:SetAttribute("Pace", 0.8) -- keeping pace beside you (CreatureAnimator)
+		if golden then
+			Creatures.gild(creature, GOLD)
+			local sparkles = Instance.new("Sparkles")
+			sparkles.SparkleColor = GOLD
+			sparkles.Parent = creature.PrimaryPart
+		end
+		return creature
+	end
 	local model = Instance.new("Model")
 	model.Name = if def then def.name else species
 	local root = piece(model, Vector3.one, CFrame.identity, Color3.new(1, 1, 1), Enum.PartType.Block)

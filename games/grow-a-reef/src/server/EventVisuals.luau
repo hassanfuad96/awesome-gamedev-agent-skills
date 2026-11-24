@@ -1,11 +1,14 @@
 --!nonstrict
 -- Models for the Volcano Vent, Giant Octopus, Mermaid Merchant and Sunken Treasure Hunt
--- events, made from plain Parts like the rest of the reef. Each builder returns a Model
--- whose PrimaryPart sits at the `base` CFrame given (on the seabed, facing -Z).
+-- events, made from plain Parts like the rest of the reef. The Giant Octopus and Marina are
+-- mesh creatures (Creatures) once their templates have loaded, with the Part-built ones as
+-- the fallback. Each builder returns a Model whose pivot sits at the `base` CFrame given (on
+-- the seabed, facing -Z).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
+local Creatures = require(ReplicatedStorage.Shared.Creatures)
 local ReefSounds = require(ReplicatedStorage.Shared.ReefSounds)
 
 local EventVisuals = {}
@@ -14,6 +17,11 @@ local UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- turns a cylinder (along X) 
 local LAVA = Color3.fromRGB(255, 110, 40)
 -- Warmer than real basalt: the sea's blue light turns dark grey rock navy.
 local BASALT = Color3.fromRGB(150, 112, 96)
+-- The Giant Octopus mesh: how tall, and how far its middle floats above `base`.
+local OCTOPUS_HEIGHT = 22
+local OCTOPUS_RAISE = 5
+-- How high the middle of Marina's mesh floats above her stall's base.
+local MARINA_FLOAT = 5
 
 local function piece(model: Model, name: string, size: Vector3, cf: CFrame, color: Color3, material: Enum.Material, shape: Enum.PartType?): Part
 	local p = Instance.new("Part")
@@ -188,6 +196,26 @@ end
 -- The Giant Octopus: a huge head with big eyes and eight curling arms. Returns the model and
 -- its body part (where the health bar hangs).
 function EventVisuals.octopus(base: CFrame): (Model, BasePart)
+	-- The octopus pet's mesh, made huge. Its Root stays the PrimaryPart (GiantOctopus moves it
+	-- with PivotTo) but pivots at `base`, under its middle, like the Part-built one; the head
+	-- is renamed "Body", where the ink bursts come from.
+	local giant = Creatures.clone("octopus", OCTOPUS_HEIGHT)
+	if giant then
+		giant.Name = "GiantOctopus"
+		giant:SetAttribute("Pace", -0.5)
+		local head = giant:FindFirstChild("Head") :: BasePart
+		head.Name = "Body"
+		giant.PrimaryPart.PivotOffset = CFrame.new(0, -OCTOPUS_RAISE, 0)
+		giant:PivotTo(base)
+		for _, part in giant:GetDescendants() do
+			if part:IsA("BasePart") and part ~= giant.PrimaryPart then
+				part.CanQuery = true -- tappable
+			end
+		end
+		light(head, Color3.fromRGB(255, 150, 220), 30, 1.2)
+		return giant, head
+	end
+
 	local model = Instance.new("Model")
 	model.Name = "GiantOctopus"
 	root(model, base)
@@ -223,24 +251,9 @@ function EventVisuals.octopus(base: CFrame): (Model, BasePart)
 	return model, body
 end
 
--- Marina the Mermaid's stall: a giant shell canopy over a counter, with Marina behind it.
--- Returns the model and the counter (where the "Trade" prompt goes).
-function EventVisuals.mermaidStall(base: CFrame): (Model, BasePart)
-	local model = Instance.new("Model")
-	model.Name = "MermaidMerchant"
-	root(model, base)
-	local shell = Color3.fromRGB(255, 200, 210)
-	local counter = piece(model, "Counter", Vector3.new(10, 3.5, 3), base * CFrame.new(0, 1.75, -1), Color3.fromRGB(230, 210, 170), Enum.Material.Sandstone)
-	counter.CanCollide = true
-	counter.CanQuery = true
-	piece(model, "CounterTop", Vector3.new(10.6, 0.4, 3.6), base * CFrame.new(0, 3.7, -1), Color3.fromRGB(120, 220, 210), Enum.Material.SmoothPlastic)
-	-- A scallop-shell canopy: ridged slices fanned out over the stall.
-	for i = -4, 4 do
-		local fan = base * CFrame.new(0, 3.8, 3) * CFrame.Angles(0, 0, math.rad(i * 18)) * CFrame.new(0, 5.5, 0)
-		piece(model, "ShellRib", Vector3.new(2.3, 11, 0.6), fan, shell:Lerp(Color3.fromRGB(255, 160, 170), (i % 2) * 0.4), Enum.Material.SmoothPlastic)
-	end
-	piece(model, "ShellHinge", Vector3.new(3, 3, 1.5), base * CFrame.new(0, 3.8, 3), shell, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
-	-- Marina: a teal tail curling up from the sand, a body, a face and long hair.
+-- Marina built from Parts, for when her mesh hasn't loaded: a teal tail curling up from the
+-- sand, a body, a face and long hair. Returns her head.
+local function partMarina(model: Model, base: CFrame): BasePart
 	local tail = Color3.fromRGB(60, 200, 180)
 	local skin = Color3.fromRGB(255, 212, 180) -- warm: the sea's blue light greys out paler skin
 	local hair = Color3.fromRGB(255, 105, 85)
@@ -265,6 +278,43 @@ function EventVisuals.mermaidStall(base: CFrame): (Model, BasePart)
 	end
 	piece(model, "Smile", Vector3.new(0.55, 0.12, 0.08), base * CFrame.new(0, 6.95, 0.66), Color3.fromRGB(200, 60, 80), Enum.Material.SmoothPlastic)
 	piece(model, "Crown", Vector3.new(1.4, 0.4, 1.4), base * CFrame.new(0, 8.25, 1.5), Color3.fromRGB(255, 215, 90), Enum.Material.Foil)
+	return head
+end
+
+-- Marina the Mermaid's stall: a giant shell canopy over a counter, with Marina behind it.
+-- Returns the model and the counter (where the "Trade" prompt goes).
+function EventVisuals.mermaidStall(base: CFrame): (Model, BasePart)
+	local model = Instance.new("Model")
+	model.Name = "MermaidMerchant"
+	root(model, base)
+	local shell = Color3.fromRGB(255, 200, 210)
+	local counter = piece(model, "Counter", Vector3.new(10, 3.5, 3), base * CFrame.new(0, 1.75, -1), Color3.fromRGB(230, 210, 170), Enum.Material.Sandstone)
+	counter.CanCollide = true
+	counter.CanQuery = true
+	piece(model, "CounterTop", Vector3.new(10.6, 0.4, 3.6), base * CFrame.new(0, 3.7, -1), Color3.fromRGB(120, 220, 210), Enum.Material.SmoothPlastic)
+	-- A scallop-shell canopy: ridged slices fanned out over the stall.
+	for i = -4, 4 do
+		local fan = base * CFrame.new(0, 3.8, 3) * CFrame.Angles(0, 0, math.rad(i * 18)) * CFrame.new(0, 5.5, 0)
+		piece(model, "ShellRib", Vector3.new(2.3, 11, 0.6), fan, shell:Lerp(Color3.fromRGB(255, 160, 170), (i % 2) * 0.4), Enum.Material.SmoothPlastic)
+	end
+	piece(model, "ShellHinge", Vector3.new(3, 3, 1.5), base * CFrame.new(0, 3.8, 3), shell, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+	-- Marina herself, floating behind the counter.
+	local marina = Creatures.clone("mermaid")
+	local head: BasePart
+	if marina then
+		marina.Name = "Marina"
+		marina:SetAttribute("Pace", 0.3)
+		marina:PivotTo(base * CFrame.new(0, MARINA_FLOAT, 1.5))
+		for _, part in marina:GetDescendants() do
+			if part:IsA("BasePart") then
+				part.CanQuery = false
+			end
+		end
+		marina.Parent = model
+		head = marina:FindFirstChild("Head") :: BasePart
+	else
+		head = partMarina(model, base)
+	end
 	light(head, Color3.fromRGB(255, 225, 195), 14, 1.6) -- warm, so her face keeps its colour
 	-- Seed jars on the counter, glowing in the seed colours.
 	for i, color in { Color3.fromRGB(70, 230, 230), Color3.fromRGB(235, 235, 245), Color3.fromRGB(255, 220, 80) } do

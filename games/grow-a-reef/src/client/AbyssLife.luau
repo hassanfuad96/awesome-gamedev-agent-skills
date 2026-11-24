@@ -9,7 +9,9 @@
 --   jellyfish   glowing jellyfish pulsing and drifting round the pit
 --   creatures   the Ghost Shark, Vampire Squid, Gulper Eel and Dumbo Octopus, each on the
 --               path AbyssConfig.creaturePosition gives for the server time, so they are
---               where the server checks sightings
+--               where the server checks sightings; built from Parts, then swapped for
+--               their mesh creatures (Creatures) once the templates load, each with a soft
+--               light of its own so it shows in the dark
 -- Nothing moves while the camera is far from the Abyss.
 
 local Lighting = game:GetService("Lighting")
@@ -18,11 +20,13 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local AbyssConfig = require(ReplicatedStorage.Shared.AbyssConfig)
+local Creatures = require(ReplicatedStorage.Shared.Creatures)
 
 local AbyssLife = {}
 
 type Joint = { pivot: CFrame, offset: CFrame, swing: Vector3?, speed: number, phase: number }
-type Creature = { id: string, model: Model, parts: { BasePart }, joints: { Joint }, path: (number) -> Vector3 }
+-- `mesh` replaces the parts once it has loaded, and is moved whole.
+type Creature = { id: string, model: Model, parts: { BasePart }, joints: { Joint }, path: (number) -> Vector3, mesh: Model? }
 type Options = { shape: Enum.PartType?, material: Enum.Material?, transparency: number?, pivot: CFrame?, swing: Vector3?, speed: number?, phase: number? }
 
 local LOOK = AbyssConfig.Look
@@ -30,6 +34,17 @@ local AWAKE_DISTANCE = 450 -- camera distance from the Abyss's centre
 local BALL = Enum.PartType.Ball
 local creatures: { Creature } = {}
 local folder: Folder
+
+-- Each creature's mesh (a CreatureMeshes id), how hard it swims, the piece its light hangs on
+-- and that light's colour. A `level` one only turns left and right (the upright ones would
+-- tip over when their path climbs or dives).
+type MeshSpec = { id: string, pace: number, glow: string, color: Color3, level: boolean? }
+local MESHES: { [string]: MeshSpec } = {
+	ghostshark = { id = "ghostShark", pace = 0.3, glow = "Body", color = Color3.fromRGB(150, 200, 255) },
+	vampiresquid = { id = "vampireSquid", pace = 0.5, glow = "Body", color = Color3.fromRGB(80, 200, 255), level = true },
+	gulper = { id = "gulperEel", pace = 0.6, glow = "Tail", color = Color3.fromRGB(255, 90, 200) },
+	dumbo = { id = "dumboOctopus", pace = 0.4, glow = "Head", color = Color3.fromRGB(255, 170, 210), level = true },
+}
 
 local function newCreature(id: string, path: (number) -> Vector3): Creature
 	local model = Instance.new("Model")
@@ -178,6 +193,32 @@ local function jellyfish(index: number, lit: boolean)
 	c.model:SetAttribute("Jelly", true)
 end
 
+-- Swaps a creature's Parts for its mesh, if that has loaded.
+local function useMesh(creature: Creature)
+	local spec = MESHES[creature.id]
+	local mesh = spec and Creatures.clone(spec.id)
+	if not mesh then
+		return
+	end
+	for _, part in creature.parts do
+		part:Destroy()
+	end
+	table.clear(creature.parts)
+	table.clear(creature.joints)
+	mesh:SetAttribute("Pace", spec.pace)
+	for _, part in mesh:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.CanQuery = false
+		end
+	end
+	local glow = mesh:FindFirstChild(spec.glow)
+	if glow and glow:IsA("BasePart") then
+		glowLight(glow, spec.color, 12)
+	end
+	mesh.Parent = creature.model
+	creature.mesh = mesh
+end
+
 -- Jellyfish don't face their travel; they stay upright and pulse.
 local function place(creature: Creature, t: number)
 	local p = creature.path(t)
@@ -190,6 +231,14 @@ local function place(creature: Creature, t: number)
 	else
 		local ahead = creature.path(t + 0.25)
 		root = if ahead and (ahead - p).Magnitude > 0.01 then CFrame.lookAt(p, ahead) else CFrame.new(p)
+	end
+	if creature.mesh then
+		local flat = root.LookVector * Vector3.new(1, 0, 1)
+		if MESHES[creature.id].level then
+			creature.mesh:PivotTo(if flat.Magnitude > 0.01 then CFrame.lookAt(p, p + flat) else CFrame.new(p))
+		else
+			creature.mesh:PivotTo(root)
+		end
 	end
 	for i, part in creature.parts do
 		local joint = creature.joints[i]
@@ -273,6 +322,11 @@ function AbyssLife.start()
 	for i = 1, LOOK.jellyfish do
 		jellyfish(i, i % 3 == 0)
 	end
+	Creatures.onReady(function()
+		for _, creature in creatures do
+			useMesh(creature)
+		end
+	end)
 
 	tint = Instance.new("ColorCorrectionEffect")
 	tint.Name = "AbyssDarkness"

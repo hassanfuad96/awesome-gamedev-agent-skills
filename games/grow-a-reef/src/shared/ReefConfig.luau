@@ -29,6 +29,7 @@ export type FishDef = {
 	multiplier: number,
 	color: Color3,
 	kelpWeight: number?, -- set for Kelp Forest fish: how often each turns up there
+	creature: string?, -- its mesh model in CreatureMeshes, if it has one (else Part-built)
 }
 
 export type ShopkeeperDef = {
@@ -43,7 +44,7 @@ local ReefConfig = {}
 -- Index, pets; 2: free planting; 1: tile grid
 ReefConfig.DATA_VERSION = 4
 ReefConfig.STARTING_SHELLS = 40
--- New players start with no seeds: Inky, the tutorial guide by the spawn, hands out the
+-- New players start with no seeds: Kai, the tutorial guide by the spawn, hands out the
 -- first ones (ReefConfig.Tutorial.firstSeeds).
 ReefConfig.STARTING_SEEDS = {} :: { [string]: number }
 ReefConfig.MAX_SEEDS_PER_TYPE = 999
@@ -111,7 +112,7 @@ ReefConfig.Lagoon = {
 	center = Vector3.zero, -- the plaza's middle, where new players spawn
 	plazaRadius = 44,
 	rimRadius = 180, -- the lagoon's rocky edge, open where the roads leave
-	guide = Vector3.new(12, 0, -10), -- Inky, the tutorial octopus, beside the spawn
+	guide = Vector3.new(12, 0, -10), -- the guide rock beside the spawn, where Kai the guide waits
 	-- North-west, the biggest: the Research Laboratory, a geodesic glass dome with a glowing
 	-- coral on top. Research species, unlock planters, coral growth, reef health.
 	research = Vector3.new(-84, 0, -84),
@@ -214,7 +215,8 @@ export type FenceDef = {
 	-- (stacked stone), "ribs" (arched bones) or "crystal" (glowing shards).
 	kind: string,
 	price: number, -- shells at Reef Supplies; 0 = free
-	shop: boolean?, -- false: never sold (a Reef Index reward)
+	shop: boolean?, -- false: never sold (a Reef Index reward, or a game pass's)
+	pass: string?, -- the ReefConfig.Store.passes key that gives this fence
 	postColor: Color3,
 	plankColors: { Color3 },
 	material: string,
@@ -257,26 +259,26 @@ ReefConfig.Teleport = {
 	shopsPad = Vector3.new(68, 0, 50), -- beside the Coral Market's corridor
 }
 
--- The Starter Lagoon tutorial. Inky (by the spawn) walks every new player through these
+-- The Starter Lagoon tutorial. Kai (by the spawn) walks every new player through these
 -- steps in order; the HUD shows the current one and points the way. Each step finishes when
 -- the player does `action` (the same names Quests.progress reports), except "guide" (talk
--- to Inky) and "upgrade" (talk at the Research Laboratory's counter).
+-- to Kai) and "upgrade" (talk at the Research Laboratory's counter).
 export type TutorialStep = {
 	id: string,
 	action: string,
 	title: string,
 	hint: string,
-	inky: string, -- what Inky says while this is the current step
+	inky: string, -- what Kai the guide says while this is the current step (once Inky's)
 }
 ReefConfig.Tutorial = {
-	firstSeeds = { kelp = 3 } :: { [string]: number }, -- Inky's gift, the first step
+	firstSeeds = { kelp = 3 } :: { [string]: number }, -- Kai's gift, the first step
 	reward = 150, -- shells for finishing every step
 	steps = {
 		{
 			id = "seed",
 			action = "guide",
 			title = "Collect your first coral seed",
-			hint = "Talk to Inky the octopus, right beside the spawn.",
+			hint = "Talk to Kai the guide, right beside the spawn.",
 			inky = "Welcome to the Starter Lagoon! Here are 3 Bubble Kelp seeds to get you going.",
 		},
 		{
@@ -423,6 +425,26 @@ ReefConfig.Fences = {
 		rope = false,
 		barnacles = false,
 		glow = Color3.fromRGB(130, 220, 255),
+	},
+	{
+		-- Gold spires topped with pearls. Only from the VIP Royal Fence game pass (Store).
+		id = "royal",
+		name = "Royal Pearl",
+		kind = "crystal",
+		price = 0,
+		shop = false,
+		pass = "royalFence",
+		-- Deep golds (the sea's blue light pales them) and warm pearl.
+		postColor = Color3.fromRGB(255, 180, 30),
+		plankColors = { Color3.fromRGB(255, 185, 35), Color3.fromRGB(255, 160, 20), Color3.fromRGB(255, 232, 205) },
+		material = "Foil",
+		height = 5.5,
+		postSpacing = 6,
+		rails = 1,
+		brokenChance = 0,
+		rope = false,
+		barnacles = false,
+		glow = Color3.fromRGB(255, 200, 110),
 	},
 }
 ReefConfig.DEFAULT_FENCE = "shipwood"
@@ -606,11 +628,50 @@ function ReefConfig.shellMultiplier(rebirths: number): number
 	return 1 + ReefConfig.Rebirth.shellBonus * rebirths
 end
 
+export type StorePass = { key: string, id: number, icon: number, name: string, price: number, description: string }
+export type StoreProduct = { key: string, id: number, icon: number, name: string, price: number, description: string, shells: number? }
+
+-- Robux purchases (the Store button). These ids are the game passes and developer products
+-- created for this game on Roblox; their prices are set there (Creator Dashboard → Monetization),
+-- and `price` here is only what the Store window shows until Roblox reports the live price.
+-- Monetization.luau checks ownership and grants every purchase on the server.
+ReefConfig.Store = {
+	passes = {
+		{ key = "doubleShells", id = 2098378468, icon = 95742037983152, name = "2x Shells", price = 349, description = "Coral and fish sell for double shells, forever." },
+		{ key = "vipBag", id = 2098990444, icon = 114475212129680, name = "VIP Bag", price = 149, description = "Your bag holds 100 more coral, forever." },
+		{ key = "speedFins", id = 2100196418, icon = 71397266954804, name = "Speed Fins", price = 99, description = "Swim 50% faster, forever." },
+		{ key = "royalFence", id = 2100418407, icon = 82183083188594, name = "VIP Royal Fence", price = 199, description = "The gold-and-pearl Royal Pearl fence and the VIP title." },
+	} :: { StorePass },
+	products = {
+		{ key = "instantGrow", id = 3735507930, icon = 118944028336147, name = "Instant Grow", price = 49, description = "Every coral growing on your reef finishes now." },
+		{ key = "restock", id = 3735507942, icon = 72061199940919, name = "Personal Restock", price = 25, description = "Every seed fully stocked in the Seed Shop, just for you, for 5 minutes." },
+		{ key = "shellPouch", id = 3735508014, icon = 103748338573033, name = "Shell Pouch", price = 49, description = "25,000 shells.", shells = 25000 },
+		{ key = "shellChest", id = 3735508029, icon = 129559014498909, name = "Shell Chest", price = 299, description = "250,000 shells. Best value!", shells = 250000 },
+	} :: { StoreProduct },
+	doubleShells = 2, -- sale multiplier with the 2x Shells pass
+	vipBagBonus = 100, -- extra bag space with the VIP Bag pass
+	speedFinsMultiplier = 1.5, -- swim speed with the Speed Fins pass
+	royalFence = "royal", -- the fence and title the VIP Royal Fence pass gives
+	royalTitle = "vip",
+	receiptsKept = 100, -- recent purchase ids remembered per player, so a receipt is never granted twice
+}
+ReefConfig.StorePassByKey = {} :: { [string]: StorePass }
+ReefConfig.StorePassById = {} :: { [number]: StorePass }
+for _, pass in ReefConfig.Store.passes do
+	ReefConfig.StorePassByKey[pass.key] = pass
+	ReefConfig.StorePassById[pass.id] = pass
+end
+ReefConfig.StoreProductById = {} :: { [number]: StoreProduct }
+for _, product in ReefConfig.Store.products do
+	ReefConfig.StoreProductById[product.id] = product
+end
+
 export type TitleDef = { id: string, text: string, color: Color3 }
 
 -- Titles shown over your head. Earned from Reef Index sets and from rebirthing.
 ReefConfig.Titles = {
 	{ id = "reborn", text = "Reborn", color = Color3.fromRGB(255, 150, 90) },
+	{ id = "vip", text = "VIP", color = Color3.fromRGB(255, 215, 90) }, -- the VIP Royal Fence game pass
 	{ id = "kelpkeeper", text = "Kelp Keeper", color = Color3.fromRGB(120, 230, 120) },
 	{ id = "bigbrain", text = "Big Brain", color = Color3.fromRGB(255, 150, 190) },
 	{ id = "fanfavourite", text = "Fan Favourite", color = Color3.fromRGB(190, 140, 255) },
@@ -988,16 +1049,16 @@ ReefConfig.Fish = {
 	-- Wild fish at the Main Reef's fish nurseries: anyone can catch them.
 	wild = { perSpot = 2, interval = 15, value = 12, roam = 9 }, -- value x fish multiplier
 	kinds = {
-		{ id = "Minnow", weight = 60, multiplier = 1, color = Color3.fromRGB(180, 200, 220) },
-		{ id = "Striped Tang", weight = 28, multiplier = 2, color = Color3.fromRGB(60, 120, 255) },
-		{ id = "Pufferfish", weight = 10, multiplier = 4, color = Color3.fromRGB(240, 200, 90) },
-		{ id = "Moonfish", weight = 2, multiplier = 10, color = Color3.fromRGB(230, 230, 255) },
+		{ id = "Minnow", weight = 60, multiplier = 1, color = Color3.fromRGB(180, 200, 220), creature = "minnow" },
+		{ id = "Striped Tang", weight = 28, multiplier = 2, color = Color3.fromRGB(60, 120, 255), creature = "stripedTang" },
+		{ id = "Pufferfish", weight = 10, multiplier = 4, color = Color3.fromRGB(240, 200, 90), creature = "pufferfish" },
+		{ id = "Moonfish", weight = 2, multiplier = 10, color = Color3.fromRGB(230, 230, 255), creature = "moonfish" },
 		-- Kelp Forest fish (KelpConfig.FISH_IDS): never on the reefs, only in the forest.
-		{ id = "Garibaldi", weight = 0, kelpWeight = 40, multiplier = 2, color = Color3.fromRGB(255, 130, 40) },
-		{ id = "Kelp Bass", weight = 0, kelpWeight = 30, multiplier = 2, color = Color3.fromRGB(120, 110, 70) },
-		{ id = "Opaleye", weight = 0, kelpWeight = 18, multiplier = 3, color = Color3.fromRGB(80, 140, 120) },
-		{ id = "Sheephead", weight = 0, kelpWeight = 9, multiplier = 6, color = Color3.fromRGB(230, 110, 130) },
-		{ id = "Giant Sea Bass", weight = 0, kelpWeight = 3, multiplier = 15, color = Color3.fromRGB(70, 80, 100) },
+		{ id = "Garibaldi", weight = 0, kelpWeight = 40, multiplier = 2, color = Color3.fromRGB(255, 130, 40), creature = "garibaldi" },
+		{ id = "Kelp Bass", weight = 0, kelpWeight = 30, multiplier = 2, color = Color3.fromRGB(120, 110, 70), creature = "kelpBass" },
+		{ id = "Opaleye", weight = 0, kelpWeight = 18, multiplier = 3, color = Color3.fromRGB(80, 140, 120), creature = "opaleye" },
+		{ id = "Sheephead", weight = 0, kelpWeight = 9, multiplier = 6, color = Color3.fromRGB(230, 110, 130), creature = "sheephead" },
+		{ id = "Giant Sea Bass", weight = 0, kelpWeight = 3, multiplier = 15, color = Color3.fromRGB(70, 80, 100), creature = "giantSeaBass" },
 	} :: { FishDef },
 }
 
@@ -1005,14 +1066,16 @@ ReefConfig.SAVE_INTERVAL = 90
 ReefConfig.LEADERBOARD_REFRESH = 60
 ReefConfig.INTERACT_DISTANCE = 20 -- studs from a shop or sell stand
 
--- Cosmetic shopkeepers, keyed by the stand's prompt Kind. The server builds them
--- (ShopkeeperVisuals); each client animates them and shows a greeting on approach.
+-- Shopkeepers, keyed by the stand's prompt Kind. The animal ones are built by the server
+-- (ShopkeeperVisuals) and animated by each client; the human crew (ReefConfig.Crew) are R15
+-- NPCs the server walks about (Crew). Each client shows their greetings on approach.
 ReefConfig.SHOPKEEPER_TAG = "Shopkeeper"
 ReefConfig.SHOPKEEPER_GREET_DISTANCE = 22 -- studs
 ReefConfig.SHOPKEEPER_GREET_COOLDOWN = 20 -- seconds before the same shopkeeper greets again
 ReefConfig.Shopkeepers = {
+	-- Coralie, the Shopkeeper from the character roster, at the Coral Market's seed counter.
 	SeedShop = {
-		name = "Captain Coralie",
+		name = "Coralie",
 		bob = 0.25,
 		greetings = {
 			"Welcome, diver! Fresh seeds, straight from the deep.",
@@ -1031,30 +1094,40 @@ ReefConfig.Shopkeepers = {
 			"Snip snip! Best prices on the seabed.",
 		},
 	},
+	-- Captain Mako, the Master Diver, at the Equipment Station: gear, and your diving suit.
 	Supplies = {
-		name = "Old Shellby",
+		name = "Captain Mako",
 		bob = 0.15,
 		greetings = {
-			"Fences, lanterns, anchors... make that reef your own!",
+			"Ahoy! Need better gear? Every good dive starts here.",
+			"A bigger Oxygen Tank lets you stay down in the deep for longer.",
+			"Swim Fins make you faster. Very handy round the Abyss!",
+			"Fancy a new look? Press F by me to change your diving suit.",
 			"A Bigger Bag holds more coral between trips to Pinch.",
-			"Fertilizer makes every coral on your reef grow faster.",
-			"Try the Bubble Wand: tap a growing coral to hurry it along.",
-			"Want more room? I can grow your reef, one coral slot at a time.",
 		},
 	},
-	-- The tutorial octopus by the spawn. Talking to Inky (the Guide prompt) gives the tutorial
-	-- lines in ReefConfig.Tutorial instead; these are for walking past.
+	-- Dr. Pearl, the Research Scientist, at the Research Laboratory's counter.
+	Lab = {
+		name = "Dr. Pearl",
+		bob = 0.15,
+		greetings = {
+			"Welcome to the lab! Every species you find helps the reef.",
+			"Research a new species and the whole ocean gets healthier.",
+			"Fascinating... your reef's health is looking up!",
+			"New planters, faster growth: talk to me at the counter.",
+		},
+	},
+	-- Kai, the Guide NPC by the spawn. Talking to him (the Guide prompt on the rock beside him)
+	-- gives the tutorial lines in ReefConfig.Tutorial instead; these are for walking past.
 	Guide = {
-		name = "Inky",
+		name = "Kai",
 		bob = 0.2,
 		greetings = {
-			"Hi there! I'm Inky. Press E to talk to me!",
+			"Hi there! I'm Kai, your guide. Press E to talk to me!",
 			"Welcome to the Starter Lagoon! Talk to me if you're lost.",
 			"Psst! Talk to me for the next step.",
 		},
 	},
-	-- Marlo, the seal explorer at the Sunken Ruins entrance (built by RuinsWorld). Talking to
-	-- him opens the Explorer's Journal; these are for walking past.
 	-- Otto the sea otter, the Kelp Forest's ranger (KelpWorld). Talking opens his journal of
 	-- challenges (KelpPanel); these are for walking past.
 	Otto = {
@@ -1067,6 +1140,8 @@ ReefConfig.Shopkeepers = {
 			"Some paths here are hidden. Look for glowing pebbles.",
 		},
 	},
+	-- Marlo, the Explorer NPC at the Sunken Ruins entrance (one of the Crew). Talking to him
+	-- (the rock beside him) opens the Explorer's Journal; these are for walking past.
 	Explorer = {
 		name = "Marlo",
 		bob = 0.18,
@@ -1089,6 +1164,45 @@ ReefConfig.Shopkeepers = {
 		},
 	},
 } :: { [string]: ShopkeeperDef }
+
+-- The human crew from the character roster (1-npc-character.png): R15 NPCs dressed by
+-- Outfits and walked about by Crew, keyed by their shopkeeper Kind (ReefConfig.Shopkeepers
+-- has their names and lines). ShopkeeperVisuals builds no animal model for these kinds.
+--   station/mode  the counter prompt they stand behind (Guide and Explorer stand by a rock)
+--   wander        how far (studs) they stroll from their post when nobody needs them
+export type CrewDef = {
+	name: string,
+	outfit: string,
+	skin: string, -- Outfits.SKIN key
+	station: string?,
+	mode: string?,
+	wander: number,
+	restMin: number?,
+	restMax: number?,
+	walkSpeed: number?,
+	prompt: { kind: string, action: string }?, -- a prompt on the NPC itself
+}
+ReefConfig.Crew = {
+	SeedShop = { name = "Coralie", outfit = "shopkeeper", skin = "Coralie", station = "SeedShop", wander = 9 },
+	Guide = { name = "Kai", outfit = "guide", skin = "Kai", wander = 8, restMin = 10, restMax = 18 },
+	Supplies = {
+		name = "Captain Mako", outfit = "masterdiver", skin = "Mako", station = "Supplies", mode = "equipment", wander = 9,
+		prompt = { kind = "SuitPicker", action = "Change diving suit" },
+	},
+	Lab = { name = "Dr. Pearl", outfit = "scientist", skin = "Pearl", station = "Lab", wander = 14 },
+	Explorer = { name = "Marlo", outfit = "explorer", skin = "Marlo", wander = 16, restMin = 6, restMax = 12, walkSpeed = 9 },
+} :: { [string]: CrewDef }
+
+-- The players' diving suits (Suits, Outfits): each player picks one, saved as data.suit.
+-- Roblox doesn't tell games a player's gender, so it's the player's choice, not assumed.
+export type SuitDef = { id: string, name: string, outfit: string, color: Color3 }
+ReefConfig.Suits = {
+	order = { "blue", "pink" },
+	byId = {
+		blue = { id = "blue", name = "Blue Explorer", outfit = "explorerBlue", color = Color3.fromRGB(40, 150, 255) },
+		pink = { id = "pink", name = "Pink Explorer", outfit = "explorerPink", color = Color3.fromRGB(235, 70, 200) },
+	} :: { [string]: SuitDef },
+}
 
 ReefConfig.CORAL_TAG = "Coral" -- every planted coral model, for the client's labels and preview
 

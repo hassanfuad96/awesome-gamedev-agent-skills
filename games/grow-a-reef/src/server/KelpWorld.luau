@@ -39,8 +39,8 @@ local CENTER = KelpConfig.center
 local FOREST_SAND = Color3.fromRGB(206, 200, 156)
 local MUD = Color3.fromRGB(96, 78, 58)
 local STIPE = Color3.fromRGB(120, 112, 44)
-local BLADE_LOW = Color3.fromRGB(96, 160, 44)
-local BLADE_HIGH = Color3.fromRGB(196, 230, 90) -- sunlit tops, like the concept art
+local BLADE_LOW = Color3.fromRGB(120, 190, 50)
+local BLADE_HIGH = Color3.fromRGB(215, 245, 110) -- sunlit tops, backlit gold-green like the concept art
 local BLADDER = Color3.fromRGB(206, 186, 74)
 local SEAGRASS = Color3.fromRGB(90, 176, 80)
 
@@ -63,11 +63,15 @@ local function giantKelp(parent: Instance, base: Vector3, height: number, rng: R
 		local t = i / segments
 		local point = base + Vector3.new(math.sin(i * 0.7 + phase) * 1.4, i * step, math.cos(i * 0.55 + phase) * 1.4)
 		bar(model, "Stipe", previous, point, 0.55, STIPE:Lerp(BLADE_LOW, t * 0.5), Enum.Material.SmoothPlastic).CastShadow = false
-		-- One long blade per joint, on alternating sides, angled up and out.
-		local length = rng:NextNumber(7, 10.5)
+		-- Two long, wide, wavy-edged blades per joint, on opposite sides, angled up and out:
+		-- the ribbons of the concept art.
 		local spin = i * 2.4 + phase
-		local blade = CFrame.new(point) * CFrame.Angles(0, spin, 0) * CFrame.Angles(0, 0, math.rad(-38)) * CFrame.new(0, length / 2, 0)
-		prop({ Name = "Blade", Size = Vector3.new(0.14, length, rng:NextNumber(1.8, 2.6)), CFrame = blade, Color = BLADE_LOW:Lerp(BLADE_HIGH, t), Material = Enum.Material.SmoothPlastic, Transparency = 0.15, CastShadow = false, Parent = model })
+		for side = 0, 1 do
+			local length = rng:NextNumber(10, 15)
+			local tilt = math.rad(-30 - rng:NextNumber(0, 14))
+			local blade = CFrame.new(point) * CFrame.Angles(0, spin + side * math.pi, 0) * CFrame.Angles(0, 0, tilt) * CFrame.new(0, length / 2, 0) * CFrame.Angles(0, rng:NextNumber(-0.4, 0.4), 0)
+			prop({ Name = "Blade", Size = Vector3.new(0.14, length, rng:NextNumber(3.4, 4.8)), CFrame = blade, Color = BLADE_LOW:Lerp(BLADE_HIGH, math.clamp(t + rng:NextNumber(-0.1, 0.15), 0, 1)), Material = Enum.Material.SmoothPlastic, Transparency = 0.22, CastShadow = false, Parent = model })
+		end
 		prop({ Name = "Bladder", Shape = Enum.PartType.Ball, Size = Vector3.new(0.8, 0.8, 0.8), CFrame = CFrame.new(point) * CFrame.Angles(0, spin, 0) * CFrame.new(0.5, 0, 0), Color = BLADDER, Material = Enum.Material.SmoothPlastic, CastShadow = false, Parent = model })
 		previous = point
 	end
@@ -75,7 +79,7 @@ local function giantKelp(parent: Instance, base: Vector3, height: number, rng: R
 	for k = 1, 4 do
 		local spin = (k / 4) * math.pi * 2 + phase
 		local frond = CFrame.new(previous) * CFrame.Angles(0, spin, 0) * CFrame.Angles(0, 0, math.rad(-72)) * CFrame.new(0, 4.5, 0)
-		prop({ Name = "Frond", Size = Vector3.new(0.14, 9, 2.4), CFrame = frond, Color = BLADE_HIGH, Material = Enum.Material.SmoothPlastic, Transparency = 0.1, CastShadow = false, Parent = model })
+		prop({ Name = "Frond", Size = Vector3.new(0.14, 12, 4), CFrame = frond, Color = BLADE_HIGH, Material = Enum.Material.SmoothPlastic, Transparency = 0.1, CastShadow = false, Parent = model })
 	end
 	model.PrimaryPart = root
 	model:SetAttribute("Height", height)

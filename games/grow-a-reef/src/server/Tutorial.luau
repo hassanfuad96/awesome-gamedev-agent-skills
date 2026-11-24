@@ -1,6 +1,6 @@
 --!nonstrict
 -- The Starter Lagoon tutorial (ReefConfig.Tutorial). Every new player starts on step 1 and
--- Inky, the octopus by the spawn, walks them through: collect a seed, plant it, earn shells,
+-- Kai the guide, by the spawn, walks them through: collect a seed, plant it, earn shells,
 -- catch a fish, and find the Research Laboratory. The step is saved in data.tutorial; one past
 -- the last step means done.
 --   Tutorial.progress(player, action)  other systems report what the player did (Quests
@@ -59,7 +59,7 @@ function Tutorial.progress(player: Player, action: string)
 	end
 end
 
--- Talking to Inky: the first step hands over the starter seeds; after that Inky repeats
+-- Talking to Kai: the first step hands over the starter seeds; after that Kai repeats
 -- what to do next, or shares a tip once the tutorial is done.
 local function talkToGuide(player: Player)
 	local profile, step = currentStep(player)

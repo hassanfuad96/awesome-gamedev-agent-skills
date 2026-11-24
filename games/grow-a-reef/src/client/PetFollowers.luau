@@ -4,10 +4,12 @@
 -- its own copies, so following stays smooth and nothing replicates.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local PetVisuals = require(script.Parent.PetVisuals)
+local Creatures = require(ReplicatedStorage.Shared.Creatures)
 
 local PetFollowers = {}
 
@@ -57,6 +59,12 @@ function PetFollowers.start()
 	end
 	Players.PlayerAdded:Connect(watch)
 	Players.PlayerRemoving:Connect(clear)
+	-- Pets drawn before the mesh models were ready get them now.
+	Creatures.onReady(function()
+		for player in followers do
+			rebuild(player)
+		end
+	end)
 
 	RunService.Heartbeat:Connect(function(dt)
 		local t = os.clock()

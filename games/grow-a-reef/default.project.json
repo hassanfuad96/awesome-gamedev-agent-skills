@@ -89,6 +89,9 @@
         },
         "BuyAbyssSeed": {
           "$className": "RemoteEvent"
+        },
+        "ChooseSuit": {
+          "$className": "RemoteEvent"
         }
       }
     },

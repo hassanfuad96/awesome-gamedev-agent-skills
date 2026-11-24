@@ -94,7 +94,9 @@ local function onBuyFence(player: Player, fenceId: unknown)
 		return
 	end
 	if fence.shop == false then
-		Plots.notify(player, `The {fence.name} fence can't be bought. Complete its Reef Index set!`)
+		Plots.notify(player, if fence.pass
+			then `The {fence.name} fence comes with a game pass. Open the Store to get it!`
+			else `The {fence.name} fence can't be bought. Complete its Reef Index set!`)
 		return
 	end
 	if not isNear(player, "market") then

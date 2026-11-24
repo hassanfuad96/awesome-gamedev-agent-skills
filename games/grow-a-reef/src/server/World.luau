@@ -1,6 +1,6 @@
 --!nonstrict
 -- Builds the Starter Lagoon at server start (layout in ReefConfig.Lagoon; north is -Z):
---   centre  the plaza, with the spawn on a glowing dais and Inky, the tutorial octopus
+--   centre  the plaza, with the spawn on a glowing dais and Kai the guide (one of the Crew)
 --   round   the hub's four buildings in glass domes, joined to the plaza by glass corridors
 --           (Hub builds them): the Research Laboratory (north-west, the biggest), the
 --           Aquarium (north-east), the Coral Market (south-east), the Equipment Station
@@ -238,14 +238,15 @@ local function buildPlaza(root: Instance, rng: Random)
 	end
 end
 
--- Inky's rock beside the spawn, a "Start here" sign, and Inky, facing the spawn.
+-- The guide rock beside the spawn (its prompt talks to Kai the guide, a Crew NPC who stands
+-- by it) and a "Start here" sign.
 local function buildGuide(root: Instance): Vector3
 	local at = LAGOON.guide
 	local model = Instance.new("Model")
 	model.Name = "Guide"
 	model.Parent = root
 	local seat = disc(model, "GuideRock", 2.8, 1.6, at + Vector3.new(0, 0.8, 0), STONE, Enum.Material.Slate)
-	prompt(seat, "Guide", "Talk", "Inky", 12)
+	prompt(seat, "Guide", "Talk", "Kai the Guide", 12)
 	local base = CFrame.lookAt(at + Vector3.new(0, 1.6, 0), Vector3.new(CENTER.X, 1.6, CENTER.Z))
 	ShopkeeperVisuals.build("Guide", base).Parent = model
 

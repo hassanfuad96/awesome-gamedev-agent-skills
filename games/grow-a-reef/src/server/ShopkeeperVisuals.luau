@@ -3,10 +3,15 @@
 -- ReefConfig.SHOPKEEPER_TAG and its Shopkeeper attribute names its ReefConfig.Shopkeepers
 -- entry; the client's Shopkeepers module animates it and shows its greetings.
 -- The base CFrame is the centre of the model's footprint, facing the players (-Z local).
+-- The animal keepers with a mesh model (MESH_KEEPERS: Pinch, Otto and Lumi) swap their
+-- Part-built body for it once the mesh templates are ready (ShopkeeperVisuals.start).
 
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
+local Creatures = require(ReplicatedStorage.Shared.Creatures)
 
 local ShopkeeperVisuals = {}
 
@@ -163,6 +168,13 @@ local builders: { [string]: (Model, CFrame) -> () } = {
 }
 
 function ShopkeeperVisuals.build(kind: string, base: CFrame): Model
+	-- The human crew (ReefConfig.Crew) replaced these animal keepers: they're R15 NPCs that
+	-- the Crew module spawns and walks about, so here's just an empty placeholder.
+	if ReefConfig.Crew[kind] then
+		local placeholder = Instance.new("Model")
+		placeholder.Name = kind .. "CrewPost"
+		return placeholder
+	end
 	local def = ReefConfig.Shopkeepers[kind]
 	local build = builders[kind]
 	assert(def and build, `no shopkeeper for stand kind {kind}`)
@@ -188,6 +200,86 @@ function ShopkeeperVisuals.build(kind: string, base: CFrame): Model
 	model:SetAttribute("Shopkeeper", kind)
 	model:AddTag(ReefConfig.SHOPKEEPER_TAG)
 	return model
+end
+
+-- Shopkeepers (by their Shopkeeper attribute) drawn with a mesh creature: its id, its size
+-- (Creatures.clone), and `float` = how high its centre sits over the model's base (nil: it
+-- stands on the base). `glow` lights the named piece (Lumi's lure).
+local MESH_KEEPERS: { [string]: { creature: string, length: number, float: number?, glow: string? } } = {
+	Sell = { creature = "crab", length = 4.2 },
+	Otto = { creature = "otter", length = 5.6 },
+	Abyss = { creature = "lanternfish", length = 4.6, float = 2.2, glow = "Lure" },
+}
+
+-- Swaps a Part-built shopkeeper's body for its mesh creature. Keeps the model, its Root and
+-- tags, adds an invisible "Head" box over the creature for speech bubbles, and re-tags it so
+-- every client's Shopkeepers module picks up the new Head.
+local function upgrade(model: Model)
+	local spec = MESH_KEEPERS[model:GetAttribute("Shopkeeper") or ""]
+	local root = model.PrimaryPart
+	local creature = spec and root and Creatures.clone(spec.creature, spec.length)
+	if not creature or model:FindFirstChild("Creature") then
+		return
+	end
+	local size = creature:GetExtentsSize()
+	local base = (root :: BasePart).CFrame
+	local centre = base * CFrame.new(0, spec.float or size.Y / 2, 0)
+	creature.Name = "Creature"
+	creature:SetAttribute("Pace", 0.5) -- resting at the counter (CreatureAnimator)
+	creature:PivotTo(centre)
+	for _, d in creature:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CanQuery = false
+		end
+	end
+	if spec.glow then
+		local bulb = creature:FindFirstChild(spec.glow) :: MeshPart?
+		if bulb then
+			local light = Instance.new("PointLight")
+			light.Color = Color3.fromRGB(150, 255, 230)
+			light.Range = 18
+			light.Brightness = 2
+			light.Parent = bulb
+		end
+	end
+
+	-- Untag first and give clients a moment to let go of the old Head before it goes.
+	model:RemoveTag(ReefConfig.SHOPKEEPER_TAG)
+	task.wait(0.5)
+	for _, child in model:GetChildren() do
+		if child:IsA("BasePart") and child ~= root then
+			child:Destroy()
+		end
+	end
+	local head = Instance.new("Part")
+	head.Name = "Head"
+	head.Size = Vector3.new(size.X * 0.8, size.Y * 0.5, size.Z * 0.8)
+	head.CFrame = centre * CFrame.new(0, size.Y * 0.25, 0)
+	head.Transparency = 1
+	head.Anchored = true
+	head.CanCollide = false
+	head.CanQuery = false
+	head.CanTouch = false
+	head.Parent = model
+	creature.Parent = model
+	model:AddTag(ReefConfig.SHOPKEEPER_TAG)
+end
+
+-- Once the mesh templates are built, every animal keeper in the world that has one swaps to it.
+function ShopkeeperVisuals.start()
+	Creatures.onReady(function()
+		for _, model in CollectionService:GetTagged(ReefConfig.SHOPKEEPER_TAG) do
+			if model:IsA("Model") and model:IsDescendantOf(Workspace) then
+				task.spawn(function()
+					local ok, problem = pcall(upgrade, model)
+					if not ok then
+						warn(`Shopkeeper {model.Name} kept its old look: {problem}`)
+						model:AddTag(ReefConfig.SHOPKEEPER_TAG)
+					end
+				end)
+			end
+		end
+	end)
 end
 
 return ShopkeeperVisuals

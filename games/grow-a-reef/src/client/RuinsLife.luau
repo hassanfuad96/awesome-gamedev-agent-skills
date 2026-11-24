@@ -2,22 +2,34 @@
 -- The Sunken Ruins' rare creatures: a Coelacanth, an Anglerfish, a Leafy Sea Dragon and the
 -- Giant Squid. Client-only and cosmetic, like SeaLife, but each one swims the path in
 -- RuinsConfig.creaturePosition for the server time, so it is where the server checks
--- sightings (and where every other player sees it). Parts swing round pivots for tails,
--- fins and tentacles. Nothing moves while the camera is far from the ruins.
+-- sightings (and where every other player sees it). Each is built from Parts that swing round
+-- pivots for tails, fins and tentacles, then swapped for its mesh creature (Creatures) once the
+-- templates have loaded; CreatureAnimator swims the mesh. Nothing moves while the camera is far
+-- from the ruins.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
+local Creatures = require(ReplicatedStorage.Shared.Creatures)
 local RuinsConfig = require(ReplicatedStorage.Shared.RuinsConfig)
 
 local RuinsLife = {}
 
 type Joint = { pivot: CFrame, offset: CFrame, swing: Vector3?, speed: number, phase: number }
-type Creature = { id: string, model: Model, parts: { BasePart }, joints: { Joint }, shown: boolean }
+-- `mesh` replaces the parts once it has loaded, and is moved whole.
+type Creature = { id: string, model: Model, parts: { BasePart }, joints: { Joint }, shown: boolean, mesh: Model? }
 type Options = { shape: Enum.PartType?, material: Enum.Material?, transparency: number?, pivot: CFrame?, swing: Vector3?, speed: number?, phase: number? }
 
 local AWAKE_DISTANCE = RuinsConfig.radius + 250 -- camera distance from the ruins' centre
+-- Each creature's mesh (a CreatureMeshes id) and how hard it swims. A `level` one only turns
+-- left and right (the upright squid would tip onto its back as it rises).
+local MESHES: { [string]: { id: string, pace: number, level: boolean? } } = {
+	coelacanth = { id = "coelacanth", pace = 0.4 },
+	angler = { id = "anglerfish", pace = 0.6 },
+	seadragon = { id = "seadragon", pace = 0.2 },
+	squid = { id = "giantSquid", pace = -0.4, level = true },
+}
 local BALL = Enum.PartType.Ball
 local creatures: { Creature } = {}
 local folder: Folder
@@ -151,6 +163,37 @@ local function squid()
 	end
 end
 
+-- Swaps a creature's Parts for its mesh, if that has loaded.
+local function useMesh(creature: Creature)
+	local spec = MESHES[creature.id]
+	local mesh = spec and Creatures.clone(spec.id)
+	if not mesh then
+		return
+	end
+	for _, part in creature.parts do
+		part:Destroy()
+	end
+	table.clear(creature.parts)
+	table.clear(creature.joints)
+	mesh:SetAttribute("Pace", spec.pace)
+	for _, part in mesh:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.CanQuery = false
+		end
+	end
+	-- The anglerfish keeps its glowing lure.
+	local lure = mesh:FindFirstChild("Lure")
+	if lure and lure:IsA("BasePart") then
+		local glow = Instance.new("PointLight")
+		glow.Color = Color3.fromRGB(150, 255, 220)
+		glow.Range = 14
+		glow.Brightness = 2
+		glow.Parent = lure
+	end
+	mesh.Parent = creature.model
+	creature.mesh = mesh
+end
+
 -- Positions every creature for the server time; hides the squid between its visits.
 local function step(t: number)
 	for _, creature in creatures do
@@ -168,6 +211,15 @@ local function step(t: number)
 		end
 		local ahead = RuinsConfig.creaturePosition(creature.id, t + 0.25) or p
 		local root = if (ahead - p).Magnitude > 0.01 then CFrame.lookAt(p, ahead) else CFrame.new(p)
+		if creature.mesh then
+			local spec = MESHES[creature.id]
+			local flat = root.LookVector * Vector3.new(1, 0, 1)
+			if spec.level then
+				creature.mesh:PivotTo(if flat.Magnitude > 0.01 then CFrame.lookAt(p, p + flat) else CFrame.new(p))
+			else
+				creature.mesh:PivotTo(root)
+			end
+		end
 		for i, part in creature.parts do
 			local joint = creature.joints[i]
 			local cf = root * joint.offset
@@ -189,6 +241,11 @@ function RuinsLife.start()
 	angler()
 	seadragon()
 	squid()
+	Creatures.onReady(function()
+		for _, creature in creatures do
+			useMesh(creature)
+		end
+	end)
 	local awake = true
 	RunService.RenderStepped:Connect(function()
 		local camera = Workspace.CurrentCamera

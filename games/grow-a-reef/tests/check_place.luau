@@ -12,22 +12,22 @@ local function check(cond, msg) if cond then print("ok   " .. msg) else failures
 -- 1. Place structure
 local game = roblox.deserializePlace(fs.readFile(process.args[1]))
 local rs = game:GetService("ReplicatedStorage")
-for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify", "Teleport", "Teleported", "AdminAction", "Announcement", "BuyFence", "EquipFence", "BuyDecor", "PlaceDecor", "UpgradeGear", "ClaimQuest", "Rebirth", "EquipTitle", "GuideLine", "BuyMerchant", "BuyAbyssSeed", "ResearchSpecies" } do
+for _, name in { "SelectSeed", "BuySeed", "ExpandReef", "PlantAt", "BuyEgg", "EquipPet", "ReleasePet", "RequestSync", "DataSync", "ShopSync", "Notify", "Teleport", "Teleported", "AdminAction", "Announcement", "BuyFence", "EquipFence", "BuyDecor", "PlaceDecor", "UpgradeGear", "ClaimQuest", "Rebirth", "EquipTitle", "GuideLine", "BuyMerchant", "BuyAbyssSeed", "ResearchSpecies", "ChooseSuit" } do
 	local r = rs.Remotes:FindFirstChild(name)
 	check(r and r.ClassName == "RemoteEvent", "remote " .. name)
 end
 local server = game:GetService("ServerScriptService").Server
 check(server.Main.ClassName == "Script", "server Main is a Script")
-for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport", "Shipwreck", "ShipwreckVisuals", "Admin", "Quests", "Supplies", "Likes", "Rebirth", "Tutorial", "RuinsWorld", "Ruins", "AbyssWorld", "Abyss", "WorldKit", "MainReef", "Collectibles", "Volcano", "GiantOctopus", "Merchant", "TreasureHunt", "EventVisuals", "KelpWorld", "Kelp", "Hub", "Research", "Oxygen" } do
+for _, m in { "World", "PlayerData", "Plots", "Shop", "Fish", "Currents", "Leaderboard", "RateLimit", "ShopkeeperVisuals", "SeabedDecor", "Events", "EventState", "TreasureStorm", "ReefIndex", "Pets", "Teleport", "Shipwreck", "ShipwreckVisuals", "Admin", "Quests", "Supplies", "Likes", "Rebirth", "Tutorial", "RuinsWorld", "Ruins", "AbyssWorld", "Abyss", "Crew", "Outfits", "Suits", "WorldKit", "MainReef", "Collectibles", "Volcano", "GiantOctopus", "Merchant", "TreasureHunt", "EventVisuals", "KelpWorld", "Kelp", "Hub", "Research", "Oxygen", "CreatureModels", "Monetization" } do
 	check(server:FindFirstChild(m) and server[m].ClassName == "ModuleScript", "server module " .. m)
 end
 local client = game:GetService("StarterPlayer").StarterPlayerScripts.Client
 check(client.Main.ClassName == "LocalScript", "client Main is a LocalScript")
-for _, m in { "Swimming", "AdminPanel", "SuppliesPanel", "QuestsPanel", "NameTags", "TutorialPanel", "MerchantPanel", "EventBars", "RuinsPanel", "RuinsLife", "AbyssPanel", "AbyssLife", "Audio", "KelpPanel", "KelpLife", "LabPanel", "OxygenBar", "AquariumDisplay" } do
+for _, m in { "Swimming", "AdminPanel", "SuppliesPanel", "QuestsPanel", "NameTags", "TutorialPanel", "MerchantPanel", "RuinsPanel", "RuinsLife", "AbyssPanel", "AbyssLife", "Audio", "KelpPanel", "KelpLife", "LabPanel", "OxygenBar", "AquariumDisplay", "SuitPicker", "MarineCast", "CreatureAnimator", "StorePanel" } do
 	check(client:FindFirstChild(m) and client[m].ClassName == "ModuleScript", "client module " .. m)
 end
 check(rs.Shared.ReefConfig.ClassName == "ModuleScript", "shared ReefConfig")
-for _, m in { "CoralVisuals", "FenceVisuals", "DecorVisuals", "RuinsConfig", "ReefSounds" } do
+for _, m in { "CoralVisuals", "FenceVisuals", "DecorVisuals", "RuinsConfig", "ReefSounds", "CreatureMeshes", "Creatures" } do
 	check(rs.Shared:FindFirstChild(m) and rs.Shared[m].ClassName == "ModuleScript", "shared " .. m)
 end
 check(math.abs(game:GetService("Workspace").Gravity - 70) < 0.01, "Workspace.Gravity = 70")
@@ -100,7 +100,7 @@ for name, radius in buildings do
 	local at = Lagoon[name]
 	check(not Config.nearPlot(at.X, at.Z, radius), "the " .. name .. " stands clear of every reef")
 end
-check((Lagoon.guide - Lagoon.center).Magnitude < Config.SHOPKEEPER_GREET_DISTANCE, "Inky is close enough to the spawn to greet new players")
+check((Lagoon.guide - Lagoon.center).Magnitude < Config.SHOPKEEPER_GREET_DISTANCE, "Kai is close enough to the spawn to greet new players")
 -- The hub: four buildings in the four quadrants, the Lab the biggest, the roads on the axes.
 check(Lagoon.research.X < -40 and Lagoon.research.Z < -40, "the Research Laboratory is north-west")
 check(Lagoon.aquarium.X > 40 and Lagoon.aquarium.Z < -40, "the Aquarium is north-east")
@@ -140,7 +140,7 @@ check(Lagoon.oceanGate.X < -60 and math.abs(Lagoon.oceanGate.Z) < 10, "the Ocean
 local frame3 = Config.plotFrame(3)
 local x3, z3 = Config.plotOffset(frame3, Config.plotPoint(frame3, 12.5, -7.25, 1.4))
 check(math.abs(x3 - 12.5) < 1e-6 and math.abs(z3 + 7.25) < 1e-6, "plot offsets round-trip through world space on a turned reef")
-check(Config.STARTING_SEEDS.kelp == nil and Config.Tutorial.firstSeeds.kelp == 3, "new players get their first seeds from Inky")
+check(Config.STARTING_SEEDS.kelp == nil and Config.Tutorial.firstSeeds.kelp == 3, "new players get their first seeds from Kai")
 local actions = {}
 for _, step in Config.Tutorial.steps do table.insert(actions, step.action) end
 check(table.concat(actions, ",") == "guide,plant,sell,fish,upgrade", "tutorial: seed, plant, sell, fish, expand")
@@ -272,7 +272,7 @@ for _, style in Config.Fences do
 	check(style.kind == "planks" or style.kind == "hedge" or style.kind == "wall" or style.kind == "ribs" or style.kind == "crystal", "fence " .. style.id .. " has a known kind")
 	check(style.price >= 0 and (style.shop == false or style.price > 0 or style.id == Config.DEFAULT_FENCE), "fence " .. style.id .. " is free (default), priced, or an Index reward")
 end
-check(table.concat(fenceIds, ",") == "shipwood,kelp,coralstone,whalebone,crystal", "five fence styles")
+check(table.concat(fenceIds, ",") == "shipwood,kelp,coralstone,whalebone,crystal,royal", "six fence styles (the last from the VIP pass)")
 for _, item in Config.Decor.items do
 	check(Config.DecorById[item.id] == item and item.price > 0 and item.footprint > 0, "decoration " .. item.id .. " has a price and footprint")
 end
@@ -484,6 +484,121 @@ check(Config.Shopkeepers.Otto ~= nil, "Otto the sea otter is a shopkeeper")
 local saved = Kelp.sanitize({ done = { reach = true, nope = true }, glades = { statue = true, x = true }, nests = { cove1 = 100, bad = 5 }, hatchlings = 2.7, restored = -3 })
 check(saved.done.reach and not saved.done.nope and saved.glades.statue and not saved.glades.x and saved.nests.cove1 == 100 and saved.nests.bad == nil and saved.hatchlings == 2 and saved.restored == 0, "kelp saves are repaired, not trusted")
 check(Kelp.nestWait(Kelp.newState(), "cove1", 1000) == 0 and Kelp.nestWait({ nests = { cove1 = 1000 } }, "cove1", 1000 + Kelp.nestCooldown - 5) == 5, "turtle nests rest between hatchlings")
+
+-- The character roster: the human crew and the players' suits
+local outfitSource = fs.readFile("src/server/Outfits.luau")
+local crewOk = true
+for kind, def in Config.Crew do
+	crewOk = crewOk and Config.Shopkeepers[kind] ~= nil and Config.Shopkeepers[kind].name == def.name
+		and string.find(outfitSource, "\n\t" .. def.outfit .. " = function", 1, true) ~= nil
+		and string.find(outfitSource, def.skin .. " = Color3", 1, true) ~= nil and def.wander >= 0
+end
+check(crewOk, "every crew member has a shopkeeper entry with their name, a real outfit and a skin tone")
+check(Config.Crew.SeedShop and Config.Crew.Guide and Config.Crew.Supplies and Config.Crew.Lab and Config.Crew.Explorer and Config.Shopkeepers.Sell.name == "Pinch", "Shopkeeper, Guide, Master Diver, Scientist and Explorer are crew; Pinch stays")
+check(Config.Crew.Supplies.prompt and Config.Crew.Supplies.prompt.kind == "SuitPicker", "Captain Mako changes your diving suit")
+local suitsOk = #Config.Suits.order == 2
+for _, id in Config.Suits.order do
+	local suit = Config.Suits.byId[id]
+	suitsOk = suitsOk and suit ~= nil and suit.id == id and string.find(outfitSource, "\n\t" .. suit.outfit .. " = function", 1, true) ~= nil
+end
+check(suitsOk and Config.Suits.byId.blue and Config.Suits.byId.pink, "players pick the Blue or Pink Explorer suit, each a real outfit")
+check(string.find(Config.Tutorial.steps[1].hint, "Kai", 1, true) ~= nil and string.find(fs.readFile("src/client/TutorialPanel.luau"), '"Kai"', 1, true) ~= nil, "the tutorial and its tracker point at Kai the guide")
+
+-- The mesh creatures (catalog batches 1-3: catchable fish, pets, shopkeepers, event characters)
+local CreatureMeshes = load("src/shared/CreatureMeshes.luau")
+local roles = { body = true, tail = true, fin = true, flutter = true, dangle = true, fluke = true }
+local meshesOk, meshCount = true, 0
+for id, def in CreatureMeshes do
+	meshCount += 1
+	meshesOk = meshesOk and def.id == id and (def.style == "fish" or def.style == "whale" or def.style == "upright") and def.length > 0 and #def.pieces >= 1
+	for _, piece in def.pieces do
+		meshesOk = meshesOk and roles[piece.role] and string.match(piece.mesh, "^rbxassetid://%d+$") ~= nil and string.match(piece.texture, "^rbxassetid://%d+$") ~= nil
+			and (piece.role ~= "fin" or piece.side == -1 or piece.side == 1)
+	end
+end
+check(meshesOk and meshCount >= 5, "every mesh creature has asset ids, a size and a known role for each piece")
+local fishMeshOk = true
+for _, kind in Config.Fish.kinds do
+	fishMeshOk = fishMeshOk and (kind.creature == nil or CreatureMeshes[kind.creature] ~= nil)
+end
+check(fishMeshOk and Config.Fish.kinds[1].creature == "minnow", "catchable fish point at real mesh creatures")
+local petSource = fs.readFile("src/client/PetVisuals.luau")
+local petsMeshOk = true
+for species in Config.Pets.species do
+	petsMeshOk = petsMeshOk and CreatureMeshes[species] ~= nil and string.find(petSource, species .. " = %d", 1, false) ~= nil
+end
+check(petsMeshOk, "every pet (seahorse, pufferfish, octopus) uses its mesh model")
+local keeperSource = fs.readFile("src/server/ShopkeeperVisuals.luau")
+local keepersOk = true
+for kind, creature in { Sell = "crab", Otto = "otter", Abyss = "lanternfish" } do
+	keepersOk = keepersOk and Config.Shopkeepers[kind] ~= nil and CreatureMeshes[creature] ~= nil
+		and string.find(keeperSource, kind .. ' = { creature = "' .. creature .. '"', 1, true) ~= nil
+end
+check(keepersOk and string.find(fs.readFile("src/server/Main.server.luau"), "ShopkeeperVisuals.start()", 1, true) ~= nil, "Pinch, Otto and Lumi swap to their crab, otter and lanternfish meshes")
+
+local eventsMeshOk = true
+for file, creature in {
+	["src/server/EventVisuals.luau"] = 'Creatures.clone("octopus", OCTOPUS_HEIGHT)',
+	["src/server/ShipwreckVisuals.luau"] = 'Creatures.clone("orca")',
+	["src/client/SeaLife.luau"] = 'Creatures.clone("whale")',
+} do
+	eventsMeshOk = eventsMeshOk and string.find(fs.readFile(file), creature, 1, true) ~= nil
+end
+local eventSource = fs.readFile("src/server/EventVisuals.luau")
+eventsMeshOk = eventsMeshOk and string.find(eventSource, 'Creatures.clone("mermaid")', 1, true) ~= nil
+	and string.find(eventSource, 'head.Name = "Body"', 1, true) ~= nil -- GiantOctopus bursts ink from its Body
+for _, id in { "mermaid", "orca", "whale", "octopus" } do
+	eventsMeshOk = eventsMeshOk and CreatureMeshes[id] ~= nil
+end
+check(eventsMeshOk, "Marina, the orcas, the Whale Pass whale and the Giant Octopus use their meshes")
+local ruinsSource = fs.readFile("src/client/RuinsLife.luau")
+local ruinsMeshOk = string.find(ruinsSource, "Creatures.onReady", 1, true) ~= nil
+for _, creature in Ruins.Creatures.list do
+	local id = string.match(ruinsSource, "\n\t" .. creature.id .. ' = { id = "(%w+)"')
+	ruinsMeshOk = ruinsMeshOk and id ~= nil and CreatureMeshes[id] ~= nil
+end
+check(ruinsMeshOk, "every Sunken Ruins creature swaps to its mesh")
+local abyssSource = fs.readFile("src/client/AbyssLife.luau")
+local abyssMeshOk = string.find(abyssSource, "Creatures.onReady", 1, true) ~= nil
+for _, creature in A.Creatures.list do
+	local id = string.match(abyssSource, "\n\t" .. creature.id .. ' = { id = "(%w+)"')
+	abyssMeshOk = abyssMeshOk and id ~= nil and CreatureMeshes[id] ~= nil
+end
+check(abyssMeshOk, "every Abyss creature swaps to its mesh")
+local kelpMeshOk = true
+for _, id in Kelp.FISH_IDS do
+	local kind = nil
+	for _, k in Config.Fish.kinds do
+		if k.id == id then
+			kind = k
+		end
+	end
+	kelpMeshOk = kelpMeshOk and kind ~= nil and kind.creature ~= nil and CreatureMeshes[kind.creature] ~= nil
+end
+check(kelpMeshOk, "every Kelp Forest fish is a mesh creature")
+
+-- Store (Robux): real ids, unique, priced, with icons; the pass perks point at real things
+local Store = Config.Store
+local seenIds, storeOk = {}, #Store.passes == 4 and #Store.products == 4
+for _, item in Store.passes do
+	storeOk = storeOk and item.id > 0 and item.icon > 0 and item.price > 0 and not seenIds[item.id] and Config.StorePassByKey[item.key] == item and Config.StorePassById[item.id] == item
+	seenIds[item.id] = true
+end
+for _, item in Store.products do
+	storeOk = storeOk and item.id > 0 and item.icon > 0 and item.price > 0 and not seenIds[item.id] and Config.StoreProductById[item.id] == item
+	seenIds[item.id] = true
+end
+check(storeOk, "4 game passes and 4 developer products, each with a unique id, an icon and a price")
+check(Config.FenceById[Store.royalFence] ~= nil and Config.FenceById[Store.royalFence].shop == false and Config.StorePassByKey[Config.FenceById[Store.royalFence].pass] ~= nil, "the Royal Pearl fence is pass-only")
+check(Config.TitleById[Store.royalTitle] ~= nil, "the VIP title exists")
+check(Store.doubleShells == 2 and Store.vipBagBonus > 0 and Store.speedFinsMultiplier > 1 and Store.receiptsKept >= 50, "pass perks and receipt memory are sane")
+local shellsPerRobux = {}
+for _, item in Store.products do if item.shells then table.insert(shellsPerRobux, item.shells / item.price) end end
+table.sort(shellsPerRobux)
+check(#shellsPerRobux == 2 and shellsPerRobux[2] > shellsPerRobux[1], "the bigger shell pack is better value")
+local royalRewardedByIndex = false
+for _, reward in Config.IndexRewards do royalRewardedByIndex = royalRewardedByIndex or reward.fence == Store.royalFence end
+check(not royalRewardedByIndex, "the Reef Index never gives away the pass fence")
 
 print(failures == 0 and "ALL PASSED" or (failures .. " FAILED"))
 process.exit(if failures > 0 then 1 else 0)

@@ -15,11 +15,11 @@ Every new player starts in the middle of the lagoon, on the glowing dais in the 
 | Place | Where | What it's for |
 |---|---|---|
 | Spawn | Centre of the plaza | Where new players appear. |
-| Inky, the tutorial guide | Beside the spawn | A purple octopus. Talk to him (E) for your first seeds and the next tutorial step. |
+| Kai, the Guide | Beside the spawn | In a blue cap and polo. Talk to him at the guide rock (E) for your first seeds and the next tutorial step. |
 | Research Laboratory | North-west, the biggest | A geodesic glass dome (from `5-athmosphere.jpg`) over a lit research tower, labs and coral garden beds, with a big glowing coral on top and a robot arm outside. Its counter: **research species**, **unlock planters**, **coral growth** research and **reef health**. |
 | Aquarium | North-east | The Collection Center: display tanks filled with the fish, coral and rare creatures you've discovered (each player sees their own), the **Reef Index** hologram and the **Pet Hatchery**. |
-| Coral Market | South-east | **Seeds** (Captain Coralie), **Sell Coral** (Pinch), **Decor & Fences**, and a case of rare species. The Shop teleport lands beside it. |
-| Equipment Station | South-west | Old Shellby the turtle: the **Bubble Wand**, **Bigger Bag**, **Oxygen Tank** and **Swim Fins**. |
+| Coral Market | South-east | **Seeds** (Coralie the Shopkeeper), **Sell Coral** (Pinch), **Decor & Fences**, and a case of rare species. The Shop teleport lands beside it. |
+| Equipment Station | South-west | Captain Mako, the Master Diver (press F by him to change your diving suit): the **Bubble Wand**, **Bigger Bag**, **Oxygen Tank** and **Swim Fins**. |
 | Ocean Gate | West | A huge stone arch; the road through it leads to the **Main Reef**, where the reefs are. |
 | Roads | North, east, south | North to the **Kelp Forest** (or the whirlpool at the plaza's north edge), east to the **Sunken Ruins**, south past the leaderboards to the **Abyss**. |
 | Leaderboards | South | Top Reefs and Best Reefs, either side of the south path. |
@@ -40,10 +40,10 @@ back to the plaza. You start with 60 seconds; the **Oxygen Tank** adds 45 a leve
 The layout lives in `ReefConfig.Lagoon` (north is -Z). The lagoon's rocky rim
 (`rimRadius`) is open at the Ocean Gate (west) and at the sand road to the Sunken Ruins (east).
 
-**Tutorial.** Inky walks every new player through five steps; a card at the top right shows the
+**Tutorial.** Kai walks every new player through five steps; a card at the top right shows the
 current one, and a glowing beam and marker point the way:
 
-1. Collect your first coral seed: talk to Inky (he gives 3 Bubble Kelp seeds).
+1. Collect your first coral seed: talk to Kai (he gives 3 Bubble Kelp seeds).
 2. Plant your first coral.
 3. Earn your first shells: harvest it and sell at the Coral Shop.
 4. Unlock your first fish: catch one at your reef (fish come to every grown coral on this step).
@@ -100,7 +100,7 @@ rewards and missions are all in `src/shared/RuinsConfig.luau`.
 
 | Place | What's there |
 |---|---|
-| Entrance | Two great pillars under a "SUNKEN RUINS" plaque. **Marlo** the seal explorer (talk to him: E) gives the missions and opens your Journal. A whirlpool takes you back to the shops. |
+| Entrance | Two great pillars under a "SUNKEN RUINS" plaque. **Marlo** the Explorer (talk at his rock: E) gives the missions and opens your Journal. A whirlpool takes you back to the shops. |
 | Archway | A ruined stone arch over the road, with a chest on its cap stone. |
 | Wreck Basin | Open sand ringed by rocks and bubble vents (left as you walk in). The Shipwreck liner lands here, and the Giant Squid rises out of it every 6 minutes. |
 | Temple terrace | Up a flight of mossy steps (right): broken columns, the temple and its sanctum (an altar with the Stone Tablet, and the Relic Coral), the mermaid statue with her harp, and the tallest column, with the Old Spyglass on top. |
@@ -249,10 +249,122 @@ specks and diver bubbles near you. Schools of reef fish, sea turtles, jellyfish,
 and crabs swim around. They are decoration and can't be caught; the fish to catch are the
 ones that gather around your own grown coral.
 
-Each counter has a shopkeeper: Captain Coralie, a diver behind the Seeds counter, Pinch, a crab
-on the Sell Coral counter, and Old Shellby, a turtle at the Upgrade Station; Inky the octopus waits
-by the spawn. They turn to face you and greet you when you walk up. Their
-names and lines are in `ReefConfig.Shopkeepers`.
+Each counter has a shopkeeper: Coralie behind the Seeds counter, Pinch the crab on the Sell
+Coral counter, Captain Mako at the Equipment Station and Dr. Pearl at the Lab; Kai the guide waits
+by the spawn. They greet you when you walk up. Their names and lines are in
+`ReefConfig.Shopkeepers` (see Characters, below, for the human crew).
+
+## Characters
+
+From the character roster (`1-npc-character.png`).
+
+**Your diving suit.** Every player wears a diving suit over their own avatar (their head, face and
+hair stay): black with **blue** accents (Blue Explorer) or **pink** accents (Pink Explorer), with an
+oxygen tank, goggles on the forehead, a glowing coral emblem, a harness and belt, and flippers.
+Roblox doesn't tell games a player's gender, so each player picks: a window offers both the first
+time you play, and Captain Mako at the Equipment Station (press F by him) lets you change it.
+The choice is saved. Outfits are parts welded to the limbs and sized to them, so they fit R15
+and R6 avatars of any body scale.
+
+**The crew** are real R15 characters with Roblox's default idle, walk and wave animations, run by
+a small AI (`Crew.luau`): each stands at their post facing customers, now and then strolls
+nearby along a path and back, stops to turn and wave when a player walks up, and hurries back to
+the counter whenever someone comes to it. Players walk through them rather than pushing them.
+
+| Character | Role | Where | Look |
+|---|---|---|---|
+| Coralie | Shopkeeper: coral seeds | Coral Market seed counter | Tan shirt, navy apron with the coral emblem, straw sun hat |
+| Kai | Guide NPC: tutorial | By the spawn | Blue polo and cap, khaki shorts, lanyard badge |
+| Captain Mako | Master Diver: equipment, diving suits | Equipment Station | Black suit with glowing cyan trim, full helmet with a glowing visor, gold-banded tank |
+| Dr. Pearl | Research Scientist: the Lab | Research Laboratory counter | White lab coat over navy, glasses, a glowing tablet |
+| Marlo | Explorer NPC: Sunken Ruins missions | Ruins entrance | Khaki shirt and shorts, safari hat, binoculars, backpack |
+
+Pinch the crab (selling), Otto the otter (Kelp Forest), Lumi the lanternfish (Abyss) and Marina
+the mermaid (a sea event) are still the animal characters.
+
+**Marine life.** Besides the reef fish, turtles, jellyfish and the pufferfish pet, a friendly
+cartoon **shark** patrols high over the lagoon and the Main Reef, and a **dolphin pod** of three
+porpoises along a loop of its own (`MarineCast.luau`, client only). Both steer smoothly, and now
+and then swim over to circle a player who's close before heading back to their route.
+
+**Mesh creatures.** The marine-life catalog (`images/living-sea/catchable-model.png`, reference
+only) is being rebuilt as real 3D meshes made with Roblox's AI mesh generator, in the catalog's
+priority order. Batch 1 is done: the catchable **Minnow, Striped Tang, Pufferfish and Moonfish**
+and the **Seahorse** and **Pufferfish** pets. Each is a few textured MeshParts (asset ids, sizes
+and offsets in `CreatureMeshes.luau`), built at server start into
+`ReplicatedStorage.CreatureModels` with `AssetService:CreateMeshPartAsync` (`CreatureModels.luau`),
+then cloned by the fish, the pets, the Reef Index and the aquarium (`Creatures.luau`). On each
+client, `CreatureAnimator.luau` swims every one near the camera: the body sways, and tails and
+fins swing from their hinges when the generator split them out cleanly. Golden pets are gold foil.
+Anything still loading, or a creature whose meshes fail, keeps its old Part-built look.
+
+Batch 2 adds the **Octopus** pet (all three pets are meshes now) and the animal shopkeepers:
+**Pinch** the crab, **Otto** the sea-otter ranger and **Lumi** the lanternfish. Shopkeepers are
+built with the world, before the templates load, so `ShopkeeperVisuals.start` swaps each one's
+Part-built body for its mesh once they're ready. The swap keeps the model and its Root, adds an
+invisible Head for speech bubbles and re-tags the keeper so clients pick it up again. Lumi's lure
+carries a light. Tentacles and the otter's arms use the `dangle` role, swaying from their tops.
+
+Batch 3 is the event characters. **Marina** the mermaid floats behind her shell stall (the counter,
+canopy and jars are unchanged). The Shipwreck **orcas** are chubby, toy-like meshes, still moved by
+their server-owned AlignPosition/AlignOrientation. The Whale Pass **humpback** crosses overhead and
+casts a shadow. The **Giant Octopus** is the octopus pet mesh at 22 studs tall. Its head is named
+`Body` and its Root pivots at the hover point, so `GiantOctopus.luau` (taps, ink bursts, drop and
+bob) works unchanged. Whales and orcas use the `whale` style and the `fluke` role: they roll and
+beat their tails up and down instead of wiggling sideways. A negative `Pace` gives the whale and
+the Giant Octopus a slow, heavy beat.
+
+Batch 4 is the Sunken Ruins' rare creatures. `RuinsLife.luau` builds the **Coelacanth**,
+**Anglerfish**, **Leafy Sea Dragon** and **Giant Squid** from Parts as before. Once the templates
+are ready it swaps each one for its mesh, which then follows the same server-timed path, so
+sightings still match. The anglerfish keeps its glowing lure, and the sea dragon's fronds sway. The
+generator made the squid chubby and upright (one big mantle piece), so it turns only left and
+right as it rises out of the Wreck Basin, with its arms and tentacles dangling.
+
+Batch 5 is the Abyss. `AbyssLife.luau` swaps the **Ghost Shark**, **Vampire Squid**, **Gulper Eel**
+and **Dumbo Octopus** for their meshes the same way. The pit is dark, so each mesh gets a soft
+light in its own colour, like the neon eyes and tips the Part-built ones had: pale blue for the
+shark, cyan for the squid, pink at the eel's tail and on the octopus. The vampire squid and the
+octopus are upright and only turn left and right; the octopus's ear fins flap. The generator
+coiled the gulper eel up under its big head instead of making it long.
+
+Batch 6 is the Kelp Forest's catchable fish: **Garibaldi, Kelp Bass, Opaleye, Sheephead** and the
+rare **Giant Sea Bass** (4.5 studs). They're ordinary fish kinds with a `creature` field in
+`ReefConfig.Fish.kinds`, so the wild fish, the Reef Index and the aquarium all show the meshes.
+Still to do: the background sea life.
+
+Checked in Studio (2026-11-24): all five templates build at their game sizes with no errors. New
+wild fish spawn as meshes, their pieces stay attached while they swim, and they keep their click
+detector. The seahorse and golden pufferfish pets follow the player as meshes, and fins and tails
+animate near the camera. Studio's screenshots weren't drawing 3D during this test, so how the
+models look (and which way the tang, pufferfish and moonfish face) still needs checking by eye.
+Batch 2 (same day): all nine templates build. Pinch, Otto and Lumi swap to their meshes and the
+human crew are left alone. Pinch's claws animate while he bobs and turns, and he greets a player
+walking up with the bubble on his new Head. The octopus pets (plain and golden) follow as meshes
+with rippling tentacles.
+Batch 3 (same day): all twelve templates build. The Giant Octopus, Marina's stall and an orca were
+built with the real builders in Play. The octopus pivots at its hover point with all five pieces
+tappable. The orca glides to its goal under its movers. The Whale Pass whale swims its path facing
+forward. All four animate near the camera.
+Batch 4 (same day): all sixteen templates build. The coelacanth, anglerfish and sea dragon swap
+to their meshes in the Ruins, face along their paths, have no leftover Parts and the lure glows.
+The squid wasn't due to rise during the test, so it hasn't been seen in Play yet.
+Batch 5 (same day): all twenty templates build. The four Abyss creatures swap to their meshes,
+face along their paths, keep their lights, stay level where upright, and the octopus's ears
+and arms animate near the camera.
+Batch 6 (same day): all twenty-five templates build, and wild Kelp Forest fish spawn as meshes
+with their click detectors.
+
+**Checked in Studio** (solo Play through the Studio MCP server, on 2026-11-24): all five crew
+spawn at their posts, dressed and playing their idle animations; Dr. Pearl, Captain Mako and
+Marlo stroll 5 to 13 studs out (walk animation) and back, and Coralie stays at her counter while a
+player is there. Talking to Kai still gives the first seeds, shows his line in a bubble over his
+head and finishes tutorial step 1. The suit picker opens on a first visit; Pink and Blue each put
+the suit on (35 pieces, the avatar's own shirt and pants removed), switching replaces the old one,
+an unknown suit id is ignored, Captain Mako's F prompt reopens the picker, and the suit comes back
+after a respawn. The shark and the three dolphins swim at their cruising speeds, the dolphins in
+formation. Not yet checked: the shark and dolphins coming over to circle a player, the suits on R6
+avatars and on phones, and pathfinding round the larger hub buildings over a long session.
 
 ### Mutations and sea events
 
@@ -380,6 +492,29 @@ swap one there to change it.
   rewards, rebirths, teleports, starting a swim, every sea event starting, octopus hits, treasure
   clues, and lava rocks and the treasure chest heard where they land.
 
+### Store (Robux)
+
+The gold **Store** button (right side, under Music) opens the Store. These items exist on Roblox for
+this game; their ids and the shown prices are in `ReefConfig.Store`. Change a price on the Creator
+Dashboard (Monetization) and the Store shows the new one.
+
+| Item | Kind | Price | What it does |
+|---|---|---|---|
+| 2x Shells | game pass | 349 R$ | Coral and fish sell for double shells (stacks with rebirths). |
+| VIP Bag | game pass | 149 R$ | +100 bag space. |
+| Speed Fins | game pass | 99 R$ | Swim 50% faster. |
+| VIP Royal Fence | game pass | 199 R$ | The gold-and-pearl Royal Pearl fence and the VIP title. |
+| Instant Grow | product | 49 R$ | Every coral growing on your reef finishes now. |
+| Personal Restock | product | 25 R$ | Every seed fully stocked, just for you, for 5 minutes. |
+| Shell Pouch | product | 49 R$ | 25,000 shells. |
+| Shell Chest | product | 299 R$ | 250,000 shells. |
+
+`Monetization.luau` is the only purchase handler: passes are checked with Roblox on join and after
+a purchase; each product receipt is recorded with its grant and saved before Roblox is told it
+was granted, so a repeated receipt never pays twice. The game's owner owns every pass, so in
+Studio the Store shows them as Owned; test product purchases in Studio are free. The icons are
+in `store-icons/`.
+
 ### Admins
 
 Owners and admins get a red **Admin** button on the left. Its window can:
@@ -434,6 +569,8 @@ src/shared/                 -> ReplicatedStorage.Shared
   FenceVisuals.luau         reef fences made from Parts: planks, hedge, wall, ribs or crystal
   DecorVisuals.luau         the reef decorations made from Parts
   ReefSounds.luau           every sound id: music, ambience and effects
+  CreatureMeshes.luau       the mesh creatures' asset ids, piece sizes, offsets and swim roles
+  Creatures.luau            cloning, scaling, gilding and swimming the mesh creatures
   EconomyMath.luau          copied unchanged from skills/other-engines/roblox-simulator-economy
 src/server/                 -> ServerScriptService.Server
   Main.server.luau          starts everything in order
@@ -447,10 +584,17 @@ src/server/                 -> ServerScriptService.Server
   Research.luau             species research at the Lab (ResearchSpecies)
   Oxygen.luau               air in deep water: drains, refills, whisks you home when it runs out
   World.luau                builds the Starter Lagoon: seabed, lighting, surface, plaza and
-                            spawn, Inky, Research Station, Upgrade Station, Coral Shop, Ocean
+                            spawn, the guide rock, Research Station, Upgrade Station, Coral Shop, Ocean
                             Gate, paths and leaderboards, then the 6 reefs and their planters
                             in the Main Reef
-  Tutorial.luau             the Starter Lagoon tutorial steps, Inky's lines and the reward
+  Tutorial.luau             the Starter Lagoon tutorial steps, Kai's lines and the reward
+  Crew.luau                 the human crew: R15 NPCs at their posts, with a wander, greet and
+                            serve AI (pathfinding, default animations)
+  Outfits.luau              the character outfits built from parts welded to the limbs: the
+                            players' Blue and Pink Explorer suits and the crew's clothes
+  Suits.luau                players' diving suits: choosing (ChooseSuit), saving, dressing
+                            on spawn, and the picker's previews
+  CreatureModels.luau       builds the mesh creature templates at server start
   SeabedDecor.luau          kelp forests, coral clusters, starfish and urchins
   PlayerData.luau           DataStore load/save with a session lock, data repair, leaderstats
   Plots.luau                plot assignment, free planting (PlantAt), growth, harvesting
@@ -462,7 +606,8 @@ src/server/                 -> ServerScriptService.Server
   Pets.luau                 eggs, taking pets out, releasing, and the pet perks
   Teleport.luau             Shop/Home teleports, the whirlpool pads and their bubble effect
   Admin.luau                admin checks, event control, announcements, gifts
-  ShopkeeperVisuals.luau    the shopkeeper models made from Parts, tagged "Shopkeeper"
+  ShopkeeperVisuals.luau    the animal shopkeeper models made from Parts, tagged "Shopkeeper"
+                            (the human crew's kinds get an empty placeholder)
   Shop.luau                 shared stock, buying, expanding, seed selection, selling
   Fish.luau                 fish spawning, swimming and catching
   Events.luau               sea event scheduler: timer, banner, night lighting, whale growth boost
@@ -512,7 +657,11 @@ src/client/                 -> StarterPlayer.StarterPlayerScripts.Client
   Planter.luau              placement preview ring, click/tap to plant or place decorations
   SeaLife.luau              fish schools, turtles, jellyfish, manta ray, crabs (client only)
   ShopPanel.luau            seed shop window
-  Shopkeepers.luau          shopkeeper idle animation, turning and greetings (client only)
+  Shopkeepers.luau          shopkeeper idle animation, turning and greetings (client only;
+                            the crew walk on their own, so they only get the greetings)
+  SuitPicker.luau           the Choose your diving suit window, with 3D previews
+  MarineCast.luau           the shark and the dolphin pod, with their steering AI (client only)
+  CreatureAnimator.luau     swims the mesh creatures near the camera (client only)
   Ui.luau                   shared colours and UI helpers
 ```
 

@@ -36,7 +36,7 @@ local LANDMARKS = {
 	{ key = "upgrade", name = "the Equipment Station" },
 	{ key = "oceanGate", name = "the Ocean Gate" },
 	{ key = "boards", name = "the leaderboards" },
-	{ key = "guide", name = "Inky" },
+	{ key = "guide", name = "Kai" },
 }
 
 local function landmarks(): { { name: string, at: Vector3 } }

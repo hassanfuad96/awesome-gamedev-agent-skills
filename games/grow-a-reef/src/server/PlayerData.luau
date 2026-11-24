@@ -65,8 +65,11 @@ export type Data = {
 	tutorial: number, -- the Starter Lagoon step you're on; past the last step = finished
 	ruins: RuinsConfig.State, -- Sunken Ruins: missions, chests, cuttings, relics, sightings
 	abyss: AbyssConfig.State, -- the Abyss: unlocked, deep-sea creatures spotted
+	suit: string, -- the diving suit picked (ReefConfig.Suits), "" until the player picks one
 	kelp: KelpConfig.State, -- the Kelp Forest: places found, hatchlings, seagrass, challenges
 	research: { [string]: true }, -- coral species researched at the lab (ReefConfig.Research)
+	ownedPasses: { [string]: true }, -- Store game passes owned (ReefConfig.Store keys), re-checked on join
+	receipts: { [string]: number }, -- recent developer product purchase ids → when granted (Monetization)
 }
 
 export type Profile = {
@@ -130,8 +133,11 @@ local function defaultData(): Data
 		tutorial = 1,
 		ruins = RuinsConfig.newState(),
 		abyss = AbyssConfig.newState(),
+		suit = "",
 		kelp = KelpConfig.newState(),
 		research = {},
+		ownedPasses = {},
+		receipts = {},
 	}
 end
 
@@ -422,6 +428,25 @@ local function sanitize(raw: any): Data
 	data.indexRewarded = cleanKeySet(raw.indexRewarded, function(id)
 		return ReefConfig.IndexRewards[id] ~= nil
 	end)
+	-- Store: passes are a cache (Monetization re-checks them with Roblox on join); receipts
+	-- keep only the most recent purchase ids, so the save can't grow forever.
+	data.ownedPasses = cleanKeySet(raw.ownedPasses, function(key)
+		return ReefConfig.StorePassByKey[key] ~= nil
+	end)
+	if type(raw.receipts) == "table" then
+		local recent = {}
+		for purchaseId, at in raw.receipts do
+			if type(purchaseId) == "string" and #purchaseId <= 64 and type(at) == "number" and at == at then
+				table.insert(recent, { id = purchaseId, at = at })
+			end
+		end
+		table.sort(recent, function(a, b)
+			return a.at > b.at
+		end)
+		for i = 1, math.min(#recent, ReefConfig.Store.receiptsKept) do
+			data.receipts[recent[i].id] = recent[i].at
+		end
+	end
 	-- Saves from before the tutorial: anyone who has already grown or earned something has
 	-- played, so they skip it.
 	local finished = #ReefConfig.Tutorial.steps + 1
@@ -432,6 +457,7 @@ local function sanitize(raw: any): Data
 	end
 	data.ruins = RuinsConfig.sanitize(raw.ruins)
 	data.abyss = AbyssConfig.sanitize(raw.abyss)
+	data.suit = if type(raw.suit) == "string" and ReefConfig.Suits.byId[raw.suit] then raw.suit else ""
 	data.kelp = KelpConfig.sanitize(raw.kelp)
 	-- Researched species. Saves from before research keep every species the player has already
 	-- grown (Reef Index), planted, or has seeds of, so nobody loses anything they could buy.
@@ -628,7 +654,14 @@ function PlayerData.addShells(player: Player, amount: number)
 	profile.data.totalEarned += clean
 end
 
--- What the bag sells for, rebirth bonus included.
+-- What selling coral and catching fish pay on top of their value: the rebirth bonus, doubled
+-- with the 2x Shells game pass.
+function PlayerData.saleMultiplier(data: Data): number
+	local passBonus = if data.ownedPasses.doubleShells then ReefConfig.Store.doubleShells else 1
+	return ReefConfig.shellMultiplier(data.rebirths) * passBonus
+end
+
+-- What the bag sells for, bonuses included.
 local function inventoryValue(data: Data): number
 	local total = 0
 	for key, count in data.inventory do
@@ -637,7 +670,7 @@ local function inventoryValue(data: Data): number
 			total += ReefConfig.harvestValue(seedId, mutationId) * count
 		end
 	end
-	return math.floor(total * ReefConfig.shellMultiplier(data.rebirths))
+	return math.floor(total * PlayerData.saleMultiplier(data))
 end
 PlayerData.inventoryValue = inventoryValue
 
@@ -651,7 +684,8 @@ function PlayerData.bagCount(data: Data): number
 end
 
 function PlayerData.bagCapacity(data: Data): number
-	return ReefConfig.bagCapacity(data.gear.bag or 0)
+	local passBonus = if data.ownedPasses.vipBag then ReefConfig.Store.vipBagBonus else 0
+	return ReefConfig.bagCapacity(data.gear.bag or 0) + passBonus
 end
 
 -- Placed decorations by item id.
@@ -722,9 +756,11 @@ function PlayerData.sync(player: Player)
 		titles = data.titles,
 		title = data.title,
 		likes = data.likes,
+		ownedPasses = data.ownedPasses,
 		tutorial = data.tutorial,
 		ruins = data.ruins,
 		abyss = data.abyss,
+		suit = data.suit,
 		kelp = data.kelp,
 		research = data.research,
 		harvested = data.harvested, -- Reef Health, for the Abyss's unlock

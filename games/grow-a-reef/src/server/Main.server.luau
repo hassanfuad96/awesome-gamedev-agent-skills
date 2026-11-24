@@ -27,10 +27,17 @@ local Abyss = require(script.Parent.Abyss)
 local Kelp = require(script.Parent.Kelp)
 local Research = require(script.Parent.Research)
 local Oxygen = require(script.Parent.Oxygen)
+local Crew = require(script.Parent.Crew)
+local Suits = require(script.Parent.Suits)
+local CreatureModels = require(script.Parent.CreatureModels)
+local ShopkeeperVisuals = require(script.Parent.ShopkeeperVisuals)
+local Monetization = require(script.Parent.Monetization)
 
+CreatureModels.start() -- the mesh creatures' templates load in the background
 local worldParts = World.build()
 RuinsWorld.build() -- the Sunken Ruins, east of the plaza
 AbyssWorld.build() -- the Abyss, south of the lagoon
+ShopkeeperVisuals.start() -- Pinch, Otto and Lumi swap to their mesh models once those load
 Plots.start(worldParts)
 Teleport.start(worldParts)
 Shop.start(worldParts)
@@ -50,5 +57,15 @@ Abyss.start()
 Kelp.start(worldParts.kelp)
 Research.start(worldParts)
 Oxygen.start()
+Monetization.start() -- Robux purchases: before PlayerData, so pass checks run on every join
+-- The crew and diving suits are cosmetic: if one of them breaks (say a place synced without
+-- the ChooseSuit remote), warn and carry on, so saves, reefs and teleports still start.
+-- Crew goes after every world is built: the crew stand at their counters.
+for _, feature in { { "Crew", Crew.start }, { "Suits", Suits.start } } do
+	local ok, problem = pcall(feature[2])
+	if not ok then
+		warn(`{feature[1]} didn't start: {problem}`)
+	end
+end
 PlayerData.start()
 Leaderboard.start(worldParts)

@@ -1,9 +1,11 @@
 --!nonstrict
 -- Models for the Shipwreck event, built from plain Parts: the sunken liner (a hollow hull you
--- can swim into through holes in its sides and hatches in its deck) and the orcas.
+-- can swim into through holes in its sides and hatches in its deck) and the orcas (the orca
+-- mesh creature once it has loaded, else Parts).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Creatures = require(ReplicatedStorage.Shared.Creatures)
 local ReefConfig = require(ReplicatedStorage.Shared.ReefConfig)
 
 local ShipwreckVisuals = {}
@@ -178,9 +180,8 @@ end
 
 export type Orca = { model: Model, root: BasePart, mover: AlignPosition, turner: AlignOrientation }
 
--- An orca facing -Z. It is unanchored and moved by its AlignPosition/AlignOrientation, so
--- clients see it glide smoothly; the server owns its physics.
-function ShipwreckVisuals.buildOrca(at: CFrame): Orca
+-- The orca built from Parts, for when its mesh hasn't loaded.
+local function partOrca(at: CFrame): (Model, BasePart)
 	local model = Instance.new("Model")
 	model.Name = "Orca"
 	local root = Instance.new("Part")
@@ -223,6 +224,36 @@ function ShipwreckVisuals.buildOrca(at: CFrame): Orca
 	end
 	add("Dorsal", Vector3.new(0.6, 6, 4), CFrame.new(0, 5.5, 1.2), black, nil, true)
 	add("Fluke", Vector3.new(8, 0.5, 3), CFrame.new(0, 0, 10), black)
+	return model, root
+end
+
+-- The orca mesh, with its Root made a little heavier so the movers have something to push.
+local function meshOrca(at: CFrame): (Model?, BasePart?)
+	local model = Creatures.clone("orca")
+	if not model then
+		return nil, nil
+	end
+	model.Name = "Orca"
+	model:SetAttribute("Pace", 1.4)
+	local root = model.PrimaryPart
+	root.Size = Vector3.new(2, 2, 2)
+	root.Anchored = false
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.CanQuery = false
+		end
+	end
+	model:PivotTo(at)
+	return model, root
+end
+
+-- An orca facing -Z. It is unanchored and moved by its AlignPosition/AlignOrientation, so
+-- clients see it glide smoothly; the server owns its physics.
+function ShipwreckVisuals.buildOrca(at: CFrame): Orca
+	local model, root = meshOrca(at)
+	if not (model and root) then
+		model, root = partOrca(at)
+	end
 
 	local attachment = Instance.new("Attachment")
 	attachment.Parent = root
